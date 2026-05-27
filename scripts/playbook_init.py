@@ -1,0 +1,348 @@
+#!/usr/bin/env python3
+"""
+Per-project init: scaffold AGENTS.md + .playbook-config.yaml in a target repo.
+
+v0.3 introduces a hybrid pattern (per ADR-0022): every target project gets a
+steipete-style pointer AGENTS.md (references the playbook for global rules)
+plus a project-specific 8-section override. A .playbook-config.yaml records
+the customization so future `playbook_update.py` can re-apply consistently.
+
+Usage:
+  python3 scripts/playbook_init.py --target /path/to/project
+  python3 scripts/playbook_init.py --target /path/to/project --profile backend-developer
+  python3 scripts/playbook_init.py --target /path/to/project --install-mode pointer
+
+Profile names: TOML basenames under profiles/ (backend-developer,
+frontend-developer, qa, tech-lead; see ADR-0025).
+Install modes: pointer (default; lightest) / symlink / copy
+
+Pointer mode: target AGENTS.md links to the playbook; no skills copied
+Symlink mode: target/.agents/skills/<name>/ symlinks back to playbook source
+Copy mode: target/.agents/skills/<name>/ has independent copies
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from datetime import date
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+PROFILES_DIR = REPO_ROOT / "profiles"
+
+# v0.11: scripts/ on sys.path so `from scope_resolution import ...` resolves
+# both at runtime + under pyright.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+# Per ADR-0025: Profile is now the TOML role bundle at profiles/<name>.toml
+# (backend-developer, frontend-developer, qa, tech-lead, plus any added later).
+# The shorter YAML names (backend, frontend, data-science, generic, custom)
+# from the old profiles/init/*.yaml drift have been deleted.
+VALID_PROFILES = {p.stem for p in PROFILES_DIR.glob("*.toml")}
+VALID_INSTALL_MODES = {"pointer", "symlink", "copy"}
+
+
+def detect_language(target: Path) -> str:
+    """Guess primary language by looking at common project markers."""
+    if (target / "pyproject.toml").exists() or (target / "requirements.txt").exists():
+        return "python"
+    if (target / "package.json").exists():
+        return "javascript"
+    if (target / "go.mod").exists():
+        return "go"
+    if (target / "Cargo.toml").exists():
+        return "rust"
+    if (target / "Gemfile").exists():
+        return "ruby"
+    if (target / "build.gradle").exists() or (target / "pom.xml").exists():
+        return "java"
+    return "unknown"
+
+
+def detect_adapter(target: Path) -> list[str]:
+    """Detect which coding agents the target project already uses."""
+    found = []
+    if (target / ".claude").exists() or (target / "CLAUDE.md").exists():
+        found.append("claude-code")
+    if (target / ".codex").exists() or (target / ".agents/skills").exists():
+        found.append("codex")
+    if (target / ".cursor").exists() or (target / ".cursorrules").exists():
+        found.append("cursor")
+    if (target / ".windsurfrules").exists():
+        found.append("windsurf")
+    if (target / ".github/copilot-instructions.md").exists():
+        found.append("copilot")
+    return found
+
+
+def detect_existing_agents_md(target: Path) -> Path | None:
+    """Return the path to an existing AGENTS.md if present."""
+    candidate = target / "AGENTS.md"
+    if candidate.exists():
+        return candidate
+    return None
+
+
+def render_pointer_agents_md(
+    playbook_root: Path, project_name: str, profile: str
+) -> str:
+    """Render the steipete-style pointer AGENTS.md content."""
+    today = date.today().isoformat()
+    return f"""# AGENTS.md for {project_name}
+
+Owner: TBD
+last_reviewed: {today}
+profile: {profile}
+
+READ {playbook_root}/AGENTS.md BEFORE ANYTHING (skip if missing).
+
+## Purpose
+
+(Plain-language: what does this project do for the user.)
+
+## What Lives Here
+
+(Top-level dirs and ownership boundary.)
+
+## Local Commands
+
+- Check: `(make check or equivalent)`
+- Format: `(formatter command)`
+- Test: `(test command)`
+
+## Edit Rules
+
+(Local edit rules that narrow or extend the playbook root.)
+
+## Required Checks
+
+(Smallest local checks the agent must pass before commit.)
+
+## Required Skills
+
+- `/playbook-doctor` if install state is unclear
+- (skills specific to this project)
+
+## Do Not
+
+(Local forbidden actions.)
+
+## Owner And Freshness
+
+Owner: TBD
+Last reviewed: {today}
+"""
+
+
+def render_config(
+    profile: str,
+    install_mode: str,
+    language: str,
+    adapters: list[str],
+    content_scope: str = "",
+) -> str:
+    """Render .playbook-config.yaml content (minimal manual YAML).
+
+    v0.11 (ADR-0040): the optional `content_scope` field records which
+    overlays were active when init ran, so subsequent `playbook_update.py`
+    runs apply the same overlay composition without re-running auto-detect.
+    """
+    today = date.today().isoformat()
+    adapters_lines = "\n".join(f"  - {a}" for a in adapters) if adapters else "  []"
+    scope_line = f'content_scope: "{content_scope}"\n' if content_scope else ""
+    return f"""# Per-project playbook configuration. Generated by playbook_init.py.
+# Updated by playbook_update.py to keep target in sync with the playbook.
+
+version: "0.3.0"
+generated_at: "{today}"
+profile: "{profile}"
+install_mode: "{install_mode}"
+language: "{language}"
+{scope_line}
+adapters:
+{adapters_lines}
+
+# Profile name maps to profiles/<profile>.toml in the playbook.
+# playbook_update.py uses it to refresh the pointer + bump last_reviewed.
+# Per-project content materialization is wired in v0.5 via
+# scripts/target_materializer.py (ADR-0028). install_mode=pointer keeps the
+# v0.4 pointer-only behavior; symlink/copy populate target/.agents/ with the
+# profile's content and project per-tool symlinks. Run
+# `python3 scripts/playbook_update.py --target <this-dir>` after init.
+"""
+
+
+def init_target(
+    target: Path,
+    profile: str,
+    install_mode: str,
+    non_interactive: bool,
+    force: bool = False,
+    content_scope: str = "",
+) -> int:
+    if not target.is_dir():
+        print(f"ERROR: target {target} is not a directory", file=sys.stderr)
+        return 1
+
+    project_name = target.name
+    language = detect_language(target)
+    adapters = detect_adapter(target)
+    existing_agents_md = detect_existing_agents_md(target)
+
+    print(f"Target: {target}")
+    print(f"Detected language: {language}")
+    print(f"Detected adapters: {', '.join(adapters) if adapters else 'none'}")
+    if existing_agents_md:
+        print(f"Existing AGENTS.md found: {existing_agents_md}")
+        if force:
+            print("--force given; overwriting.")
+        elif not non_interactive:
+            choice = input("Overwrite with pointer scaffold? (y/N): ").strip().lower()
+            if choice != "y":
+                print("Aborted; existing AGENTS.md preserved.")
+                return 1
+        else:
+            print("Non-interactive: refusing to overwrite. Pass --force to override.")
+            return 1
+
+    print(f"\nWriting target/AGENTS.md (profile={profile}, mode={install_mode}) ...")
+    agents_md_content = render_pointer_agents_md(REPO_ROOT, project_name, profile)
+    (target / "AGENTS.md").write_text(agents_md_content, encoding="utf-8")
+
+    config_content = render_config(
+        profile, install_mode, language, adapters, content_scope=content_scope
+    )
+    (target / ".playbook-config.yaml").write_text(config_content, encoding="utf-8")
+    print("Writing target/.playbook-config.yaml ...")
+
+    # v0.8 (ADR-0038): register this target in the machine-wide registry so
+    # `make targets-list` and `make targets-doctor` can iterate every
+    # project the playbook is bound to. Best-effort: a registry write
+    # failure is logged but does not block init -- single-target installs
+    # work without the registry.
+    try:
+        from target_registry import record_target
+
+        record_target(target, profile=profile, install_mode=install_mode)
+    except Exception as exc:  # pragma: no cover - defensive log only
+        print(
+            f"WARNING: failed to record target in multi-target registry: {exc}",
+            file=sys.stderr,
+        )
+
+    print()
+    print(
+        f"Initialized {target.name} with playbook profile '{profile}' (install_mode={install_mode})."
+    )
+    print("Next steps:")
+    print("  1. Edit target/AGENTS.md to fill in the 8 sections.")
+    print("  2. (Optional) Edit profile in target/.playbook-config.yaml.")
+    print(
+        f"  3. Run `python3 {REPO_ROOT}/scripts/install.py --profile {profile}` "
+        "to install the profile's content into your detected adapters."
+    )
+    print(
+        f"  4. Run `python3 {REPO_ROOT}/scripts/playbook_update.py --target {target}` "
+        "later to refresh the pointer in this project's AGENTS.md."
+    )
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target", required=True, help="Target project directory")
+    default_profile = (
+        "tech-lead"
+        if "tech-lead" in VALID_PROFILES
+        else (sorted(VALID_PROFILES)[0] if VALID_PROFILES else "")
+    )
+    parser.add_argument(
+        "--profile",
+        default=default_profile,
+        help=(
+            "One or more profile slugs (profiles/<name>.toml basename). Pass a "
+            "comma-separated list to compose, e.g. "
+            "--profile product-manager,research,backend-developer. The init "
+            "step records the resolved list in .playbook-config.yaml so the "
+            "matching install command stays explicit."
+        ),
+    )
+    parser.add_argument(
+        "--install-mode", default="pointer", choices=sorted(VALID_INSTALL_MODES)
+    )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Do not prompt on existing AGENTS.md",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing AGENTS.md without prompting",
+    )
+    parser.add_argument(
+        "--scope",
+        default="",
+        help=(
+            "v0.11: content scope written to .playbook-config.yaml so "
+            "subsequent playbook_update.py runs apply the same overlay(s). "
+            "Pass overlay names comma-separated (e.g. --scope team). "
+            "Omit to record an empty scope (base-only)."
+        ),
+    )
+    args = parser.parse_args()
+
+    # v0.10: accept comma-separated profiles so multi-role devs can record
+    # their composition at init time. Each name still has to resolve to a
+    # real profiles/<name>.toml. The joined string is what we persist in
+    # .playbook-config.yaml and the rendered AGENTS.md pointer so the
+    # follow-up `make install PROFILE=<value>` invocation is copy-pasteable.
+    from playbook_profile import parse_profile_arg
+
+    profile_names = parse_profile_arg(args.profile)
+    if not profile_names:
+        print("ERROR: --profile requires at least one profile name.", file=sys.stderr)
+        return 2
+    unknown = [name for name in profile_names if name not in VALID_PROFILES]
+    if unknown:
+        print(
+            f"ERROR: unknown profile(s): {', '.join(unknown)}", file=sys.stderr
+        )
+        print(
+            f"Available: {', '.join(sorted(VALID_PROFILES))}", file=sys.stderr
+        )
+        return 2
+    profile_value = ",".join(profile_names)
+
+    target = Path(args.target).expanduser().resolve()
+    non_interactive = args.non_interactive or args.force
+
+    # v0.11 ADR-0040 (Codex adversarial round #1): when --scope was not passed,
+    # auto-detect from the target project's git remote (same logic install uses).
+    # Without this, fresh init defaults to tech-lead profile + empty scope, then
+    # the very next playbook_update.py rejects with "tech-lead requires team
+    # overlay" because tech-lead is one of the requires_overlays profiles.
+    content_scope = args.scope
+    if not content_scope:
+        from scope_resolution import detect_scope_from_remote
+        detected = detect_scope_from_remote(target, REPO_ROOT)
+        if detected:
+            content_scope = ",".join(detected)
+            print(
+                f"Content scope: auto-detected '{content_scope}' from "
+                f"target remote (pass --scope to override)."
+            )
+
+    return init_target(
+        target,
+        profile_value,
+        args.install_mode,
+        non_interactive,
+        force=args.force,
+        content_scope=content_scope,
+    )
+
+
+if __name__ == "__main__":
+    sys.exit(main())

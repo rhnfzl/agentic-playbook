@@ -1,0 +1,4 @@
+{
+  "type": "http",
+  "url": "https://mcp.tavily.com/mcp/?tavilyApiKey={{REPLACE_WITH_YOUR_TAVILY_API_KEY}}"
+}

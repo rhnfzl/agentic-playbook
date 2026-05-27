@@ -1,0 +1,4 @@
+interface:
+  display_name: "Anchored Edit"
+  short_description: "Compact large file edits with unique anchors"
+  default_prompt: "Use $anchored-edit when a large replacement or deletion would require retyping a long unchanged oldText block."

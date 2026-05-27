@@ -1,0 +1,43 @@
+# Curated research skill imports.
+#
+# Per the v0.10 profile-separation principle, research is its own profile
+# (not subsumed under product-manager). Skills here are research-only:
+# user research, competitive intel, market sizing, sentiment analysis,
+# interview prep + synthesis.
+#
+# Selection criteria:
+#   - upstream research-flavored skills only (not strategic PM, not
+#     execution; those belong in pm-curated)
+#   - balanced across phuryn + product-on-purpose so neither upstream is
+#     load-bearing alone
+#
+# When upstream advances, bump the pin in scripts/sync_curated_skills.py
+# (UPSTREAMS dict) and re-run `python3 scripts/sync_curated_skills.py`.
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-product-discovery/skills/interview-script"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-product-discovery/skills/summarize-interview"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-market-research/skills/competitor-analysis"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-market-research/skills/user-personas"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-market-research/skills/market-sizing"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-market-research/skills/sentiment-analysis"
+
+[[skills]]
+upstream = "product-on-purpose"
+path = "skills/discover-interview-synthesis"

@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# TEMPLATE: replace sentinels per scripts/templates/CUSTOMIZE.md
+# Installs a macOS launchd agent that runs a workspace-local maintenance script
+# on a schedule. Reverse with "uninstall"; inspect with "status".
+set -euo pipefail
+
+WORKSPACE="{{WORKSPACE_ROOT}}"
+LABEL="{{LAUNCHD_LABEL}}"  # e.g. com.yourteam.agent-harness.hourly
+PLIST="$WORKSPACE/scripts/launchd/$LABEL.plist"
+LAUNCHD_PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+DOMAIN="gui/$(id -u)"
+export PATH="{{LAUNCHD_PATH}}"  # e.g. /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+usage() {
+  cat <<USAGE
+Usage: $0 install|uninstall|status [--global-memory]
+
+Default install keeps the workspace memory MCP local to this workspace and its
+nested repos. Use --global-memory only if Codex or Claude sessions outside this
+workspace should also see this workspace's memory bridge.
+USAGE
+}
+
+global_memory_enabled() {
+  [ "${AGENT_HARNESS_GLOBAL_MEMORY:-0}" = "1" ] || [ "${2:-}" = "--global-memory" ]
+}
+
+install_agent() {
+  cd "$WORKSPACE"
+  APPLY_ARGS=(apply)
+  if global_memory_enabled "$@"; then
+    APPLY_ARGS+=(--global-memory)
+  fi
+  python3 scripts/agent_instruction_sync.py "${APPLY_ARGS[@]}"
+  python3 scripts/agent_memory_bridge.py init
+  python3 scripts/agent_memory_bridge.py import-claude --promote-on-import --limit 10
+  if command -v claude >/dev/null 2>&1; then
+    PYTHON_MCP="/opt/homebrew/opt/python@3.11/libexec/bin/python3"
+    if [ ! -x "$PYTHON_MCP" ]; then
+      PYTHON_MCP="$(command -v python3)"
+    fi
+    claude mcp add --transport http --scope user openaiDeveloperDocs https://developers.openai.com/mcp >/dev/null 2>&1 || true
+    if global_memory_enabled "$@"; then
+      claude mcp add --scope user agentMemoryBridge -- "$PYTHON_MCP" "$WORKSPACE/scripts/agent_memory_mcp.py" >/dev/null 2>&1 || true
+    else
+      claude mcp remove agentMemoryBridge -s user >/dev/null 2>&1 || true
+    fi
+  fi
+  mkdir -p "$HOME/Library/LaunchAgents" "$WORKSPACE/.agent-harness/logs"
+  cp "$PLIST" "$LAUNCHD_PLIST"
+  launchctl bootout "$DOMAIN" "$LAUNCHD_PLIST" >/dev/null 2>&1 || true
+  launchctl bootstrap "$DOMAIN" "$LAUNCHD_PLIST"
+  launchctl kickstart -k "$DOMAIN/$LABEL" >/dev/null 2>&1 || true
+  echo "installed: $LABEL"
+}
+
+uninstall_agent() {
+  launchctl bootout "$DOMAIN" "$LAUNCHD_PLIST" >/dev/null 2>&1 || true
+  rm -f "$LAUNCHD_PLIST"
+  echo "uninstalled: $LABEL"
+}
+
+status_agent() {
+  cd "$WORKSPACE"
+  python3 scripts/agent_instruction_sync.py check || true
+  python3 scripts/agent_memory_bridge.py status || true
+  if launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; then
+    echo "launchd: loaded $LABEL"
+  else
+    echo "launchd: not loaded $LABEL"
+  fi
+  if [ -f "$WORKSPACE/.agent-harness/logs/maintain.log" ]; then
+    echo "log tail:"
+    tail -20 "$WORKSPACE/.agent-harness/logs/maintain.log"
+  fi
+}
+
+case "${1:-}" in
+  install) install_agent "$@" ;;
+  uninstall) uninstall_agent ;;
+  status) status_agent ;;
+  *) usage; exit 2 ;;
+esac

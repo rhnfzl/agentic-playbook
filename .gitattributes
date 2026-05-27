@@ -1,0 +1,15 @@
+# v0.12: mark vendored upstream content under base/mcp/anchored-fs/ so
+# GitHub and Bitbucket diff views collapse the 5,064 files by default and
+# language statistics exclude them. The local MCP wrapper is small; the
+# bulk content under that path is upstream and managed by the MCP project
+# itself, not by playbook contributors.
+#
+# `linguist-vendored=true` is the canonical signal; both GitHub and
+# Bitbucket honor it in their diff renderers. Files are still tracked and
+# diffable; they just don't dominate the "Files changed" tab on PRs.
+base/mcp/anchored-fs/** linguist-vendored=true
+
+# Curated imported skill sets (vendored from public upstream repos per
+# ADR-0019 with pinned SHAs via SOURCES.toml) get the same treatment so
+# upstream-driven changes don't pollute language stats / diff noise.
+base/skills/imported/** linguist-vendored=true

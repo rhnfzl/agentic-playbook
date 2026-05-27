@@ -1,0 +1,94 @@
+# 0009. Unified agents/ directory with per-tool format transformation
+
+## Status
+Accepted (2026-05-24)
+
+## Context
+
+Multiple coding agents now expose first-class "subagent" surfaces (specialized assistants with their own context window, invoked by name): Cursor (markdown frontmatter at `.cursor/agents/<name>.md`), Claude Code (markdown frontmatter at `~/.claude/agents/<name>.md`), and Codex CLI (TOML at `~/.codex/agents/<name>.toml`, GA March 2026 per developers.openai.com/codex/subagents).
+
+Format differences across these three:
+
+| Agent       | File format | Required fields                                | Body convention                          |
+|-------------|-------------|-----------------------------------------------|------------------------------------------|
+| Cursor      | Markdown + YAML frontmatter | name, description                  | Markdown body becomes system prompt      |
+| Claude Code | Markdown + YAML frontmatter | name, description (tools optional) | Markdown body becomes system prompt      |
+| Codex CLI   | TOML        | name, description, developer_instructions     | developer_instructions is triple-quoted string |
+
+Two other agents in our adapter set do NOT have custom subagent surfaces:
+- Windsurf has Cascade but its custom-agent format is undocumented as of May 2026.
+- Pi (pi.dev) explicitly skips subagents by design ("Spawn Pi instances via tmux").
+- Antigravity has built-in Browser/Terminal subagents but NO custom subagent surface (per Google forum, March 2026).
+
+The playbook needed to decide whether to ship per-tool source artifacts (forcing authors to write the same logic in markdown AND TOML), or a canonical source format with adapter-level transformation.
+
+## Decision
+
+**Single canonical source format in the repo: `agents/<name>.md` with YAML frontmatter (Claude Code shape) + markdown body. Per-adapter transformation at materialization time.**
+
+Canonical frontmatter fields (modeled on Claude Code's subagent shape, the most expressive of the three):
+
+```yaml
+---
+name: data-explorer
+description: Use when the user asks to profile a new dataset or run exploratory analysis.
+model: claude-opus-4-7    # optional; adapter may override
+tools: [bash, read, edit, grep]   # optional; honored by cursor + claude-code; dropped for codex
+---
+
+# Body
+Markdown body. Becomes the system prompt for Cursor + Claude Code subagents.
+Becomes `developer_instructions` (triple-quoted) for Codex.
+```
+
+### Optional frontmatter (Amended 2026-05-25)
+
+Authors MAY add the following optional fields, mirroring `skills/SKILL.md` frontmatter:
+
+```yaml
+---
+name: data-explorer
+description: Use when the user asks to profile a new dataset or run exploratory analysis.
+model: claude-opus-4-7
+tools: [bash, read, edit, grep]
+version: 1.0.0                       # semver; bump on body or behavior change
+owner: research-team                 # OWNERS.md alias or VCS handle
+last_reviewed: 2026-05-25            # YYYY-MM-DD; decay-tracked
+tags: [data, exploration, research]  # free-form
+---
+```
+
+Rationale: subagents rot like skills (the upstream model deprecates, the prompt becomes stale, ownership shifts). The decay-tracking discipline (`scripts/decay_check.py` 60/90/180-day bands) and owner-responsibility model already in place for `skills/SKILL.md` apply equally well to subagents. Allowing the same optional fields keeps the schema consistent and lets the playbook gates eventually cover subagents.
+
+`_loader.agent_to_toml` passes these optional fields through to the Codex TOML (under their own keys) so the same metadata is visible there; adapters that consume native markdown (`cursor`, `claude_code`) preserve them in the frontmatter verbatim. Existing agent files that ship with only `name` + `description` + `model` + `tools` remain valid.
+
+Adapter responsibilities:
+
+| Adapter      | Output | Conversion rule |
+|--------------|--------|-----------------|
+| `cursor`     | `~/.cursor/agents/<name>.md` (and project dup if target != $HOME) | Verbatim copy |
+| `claude_code`| `~/.claude/agents/<name>.md` | Verbatim copy |
+| `codex`      | `~/.codex/agents/<name>.toml` | `_loader.agent_to_toml`: frontmatter -> TOML keys, body -> `developer_instructions = """..."""`. Drops `tools` field (no direct Codex equivalent). |
+| `windsurf`, `pi`, `agents_md` (Tier 3) | Skip | No subagent surface; nothing materialized |
+
+## Why this shape
+
+- **Markdown is the dominant authoring format** across the playbook (skills, rules, hooks). Using markdown for agents keeps contribution friction low. Forcing authors into TOML for one content type would slow adoption.
+- **Claude Code's shape is a strict superset of Cursor's** (they're the same format), and Codex can be derived from it with one field rename and a string-quote wrapping. Choosing Codex TOML as canonical would lose `tools` for Cursor/Claude.
+- **`developer_instructions` is a triple-quoted TOML string**, so embedding markdown is lossless. Verified via Python `tomllib` roundtrip in foundation tests.
+- **Adapters skip what they cannot serve.** Windsurf, Pi, Antigravity simply don't get subagent materialization. This is honest about each tool's actual surface; no fake "supports subagents" claim that materializes dead files.
+
+## Consequences
+
+- Authors write one `agents/<name>.md`; the playbook ships it to Cursor + Claude Code + Codex with no extra work.
+- Adding a new agent surface (e.g., when Windsurf publishes its custom-agent spec) requires only a new adapter conversion rule, not a new repo content type.
+- The 3 existing user-machine TOML subagents (`agentic-scenario-auditor.toml`, `docs-harness-validator.toml`, `second-eye-reviewer.toml` in `~/.codex/`) need to be converted BACK to canonical markdown when bulk-imported per Q10. The reverse direction is mechanical: TOML keys become frontmatter, `developer_instructions` becomes body.
+- The smoke-test suite must verify the markdown-to-TOML roundtrip and the TOML-to-markdown reverse roundtrip for any imported items.
+
+## Source
+
+- developers.openai.com/codex/subagents (Codex TOML spec)
+- code.claude.com/docs/en/agents (Claude Code subagent spec)
+- forum.cursor.com Cursor 2.5 Plugins announcement (Cursor subagent surface)
+- discuss.ai.google.dev Antigravity sub-agent forum thread (no custom surface, March 2026)
+- pi.dev homepage (explicit "No sub-agents" design choice)

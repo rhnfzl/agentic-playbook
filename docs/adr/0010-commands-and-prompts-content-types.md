@@ -1,0 +1,111 @@
+# 0010. commands/ and prompts/ as 5th and 6th content types
+
+## Status
+Accepted (2026-05-24)
+
+## Context
+
+v0.1 shipped four content types: `skills/`, `rules/`, `hooks/`, `mcp/`. v0.2 added `agents/` per ADR-0009. Three of the v0.2 target adapters expose ADDITIONAL surfaces that don't fit any of the first 5:
+
+- **Cursor**: `.cursor/commands/<name>.md` (user-triggered slash actions, distinct from skills which are agent-decided).
+- **Claude Code**: `~/.claude/commands/<name>.md` (slash commands).
+- **Pi**: `~/.pi/agent/prompts/<name>.md` (reusable prompt templates, `/name` expansion).
+
+These could be folded into `skills/` with `disable-model-invocation: true` frontmatter (effectively turning a skill into a manual-only command). The conceptual distinction matters though:
+
+- **Skills**: agent-decided; the agent loads the skill when its description matches the user's task. Authors write for "when the agent would benefit from following this workflow".
+- **Commands**: user-triggered; the user types `/cmd-name` and the command runs. Authors write for "when the user wants this specific action, on demand".
+- **Prompts**: reusable templates that EXPAND inline (like a macro). Authors write reusable text fragments, not workflows.
+
+Conflating all three into `skills/` would muddy the authoring discipline and obscure which content is meant for which invocation pattern.
+
+## Decision
+
+Two new content types alongside the existing 5 (skills, rules, hooks, mcp, agents):
+
+- `commands/<name>.md`, user-triggered slash actions. YAML frontmatter (`name`, `description`) + markdown body that becomes the command's prompt.
+- `prompts/<name>.md`, reusable prompt templates with `/name` expansion. YAML frontmatter (`name`, `description`) + markdown body that gets expanded inline by Pi-style harnesses.
+
+## Authoring shape
+
+### Required frontmatter
+
+```yaml
+# commands/<name>.md
+---
+name: rebase-current-branch
+description: Rebase the current branch onto its base, surface conflicts cleanly.
+---
+
+# Body
+Markdown body. When the user types /rebase-current-branch, this body becomes
+the prompt sent to the agent.
+```
+
+```yaml
+# prompts/<name>.md
+---
+name: data-summary-template
+description: Reusable summary template for new datasets.
+---
+
+# Body
+Template body with {{placeholders}} the user fills in inline.
+```
+
+### Optional frontmatter (Amended 2026-05-25)
+
+Authors MAY add the following optional fields, mirroring `skills/SKILL.md` frontmatter:
+
+```yaml
+---
+name: rebase-current-branch
+description: Rebase the current branch onto its base, surface conflicts cleanly.
+version: 1.0.0                   # semver; bump on body change
+owner: playbook-core             # OWNERS.md alias or VCS handle
+last_reviewed: 2026-05-25        # YYYY-MM-DD; decay-tracked when scanner picks up
+tags: [git, branch-management]   # free-form
+---
+```
+
+Rationale: commands and prompts rot like skills (the upstream tool name changes, the prompt text becomes stale, a new pattern supersedes the old one). The decay-tracking discipline (`scripts/decay_check.py` 60/90/180-day bands) and the owner-responsibility model that work for `skills/SKILL.md` are equally useful here. Allowing the same optional fields keeps the schema consistent and lets the playbook gates eventually cover commands and prompts the same way they cover skills today.
+
+The loader treats these fields as additive metadata only; it does not require them. Existing command and prompt files that ship with only `name` + `description` remain valid.
+
+## Adapter responsibilities
+
+| Adapter      | commands/ output | prompts/ output |
+|--------------|------------------|-----------------|
+| `cursor`     | `~/.cursor/commands/<name>.md` (and project dup if target != $HOME) | (no native prompts surface; skip) |
+| `claude_code`| `~/.claude/commands/<name>.md` | (no native prompts surface; skip) |
+| `pi`         | (no native commands surface; skip) | `~/.pi/agent/prompts/<name>.md` |
+| `codex`      | (no separate commands surface; Codex uses skills with description match) | (no native; skip) |
+| `windsurf`, `agents_md` (Tier 3) | Skip | Skip |
+
+## Disambiguating from the existing `prompts/` directory
+
+The existing `prompts/` directory in the playbook repo (v0.1) contains setup / onboarding documents: `bootstrap-your-playbook.md`, `onboard-a-new-teammate.md`, etc. These are META PROMPTS for adopting the playbook, NOT runtime templates.
+
+`_loader.load_prompts()` distinguishes between them by REQUIRING YAML frontmatter:
+- Files with `name:` + `description:` frontmatter are treated as runtime templates and materialized to Pi.
+- Files without frontmatter (the existing meta-prompts) are SKIPPED by the runtime loader.
+
+This avoids a directory rename for v0.2. If the dual purpose proves confusing in practice, v0.2.1 may rename `prompts/` to `setup/` and use `prompts/` exclusively for runtime templates.
+
+## Reject if
+
+- A future v0.x finds that commands and skills overlap too much in practice and authors want a single surface with `disable-model-invocation: true` instead. Watch for: low command authoring rate, frequent "should this be a skill or a command" questions. If observed, deprecate `commands/` and migrate to skills with the flag.
+
+## Consequences
+
+- Authoring discipline gains clarity: agent-decided (skills) vs user-triggered (commands) vs template-expansion (prompts).
+- 3 new directories at repo root (`agents/`, `commands/`, `prompts/` semantic split via frontmatter).
+- Per-adapter dispatch widens; each adapter must declare what it does with each content type. Adapter docstrings list this explicitly.
+- ADR-0007's "three buckets" (rules, skills, hooks) becomes "seven buckets" (rules, skills, hooks, mcp, agents, commands, prompts). The seven-bucket diagram should be added to CONTEXT.md.
+
+## Source
+
+- [docs.cursor.com/context/commands](https://docs.cursor.com/context/commands) (Cursor slash commands)
+- [code.claude.com/docs/en/commands](https://code.claude.com/docs/en/commands) (Claude Code slash commands)
+- [pi.dev/docs/latest/usage](https://pi.dev/docs/latest/usage) ("prompt templates" section, Pi `/name` expansion)
+- Internal discussion: Q11 v0.2 grilling session

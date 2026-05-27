@@ -1,0 +1,79 @@
+# Curated Product Manager skill imports.
+#
+# Per the v0.10 import-strategy lock (Q5 in the grill): hand-picked subset
+# of phuryn/pm-skills (MIT) + product-on-purpose/pm-skills (Apache 2.0).
+# Deanpeters/Product-Manager-Skills is CC BY-NC-SA (non-commercial) and is
+# not imported; derisk-ai/awesome-devops-skills is a metalist (no direct
+# import).
+#
+# Selection criteria:
+#   - high-leverage for everyday PM execution (PRD, sprint, roadmap, retro)
+#   - lifecycle coverage (discover -> define -> deliver -> measure -> iterate)
+#   - minimal overlap with the research-curated set (research lives there)
+#   - one entry per concept; pick the better-shaped of the two upstreams
+#     when both have the same idea
+#
+# When upstream advances, bump the pin in scripts/sync_curated_skills.py
+# (UPSTREAMS dict) and re-run `python3 scripts/sync_curated_skills.py`.
+# The script copies + injects version/owner/last_reviewed; the playbook
+# does not modify body content.
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/create-prd"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/user-stories"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/sprint-plan"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/retro"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/pre-mortem"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/stakeholder-map"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/brainstorm-okrs"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/release-notes"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/summarize-meeting"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/job-stories"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-execution/skills/outcome-roadmap"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-product-discovery/skills/prioritize-features"
+
+[[skills]]
+upstream = "phuryn"
+path = "pm-product-discovery/skills/opportunity-solution-tree"
+
+[[skills]]
+upstream = "product-on-purpose"
+path = "skills/utility-pm-critic"
+
+[[skills]]
+upstream = "product-on-purpose"
+path = "skills/define-problem-statement"

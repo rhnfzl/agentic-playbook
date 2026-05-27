@@ -1,0 +1,41 @@
+{
+  "_comment": "TEMPLATE for ~/.cursor/hooks.json or <workspace>/.cursor/hooks.json. Replace {{WORKSPACE_ROOT}}. See profiles/templates/cursor-workspace-bootstrap/CUSTOMIZE.md. Cursor uses camelCase events and a flat per-entry shape (no nested 'hooks' list).",
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "{{WORKSPACE_ROOT}}/.cursor/hooks/never-push-to-develop.sh",
+        "matcher": "Shell",
+        "timeout": 10
+      },
+      {
+        "command": "{{WORKSPACE_ROOT}}/.cursor/hooks/human-html-advisory-cursor.sh",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|StrReplace",
+        "timeout": 5
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "{{WORKSPACE_ROOT}}/.cursor/hooks/lint-guard.sh",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|StrReplace",
+        "timeout": 30
+      },
+      {
+        "command": "{{WORKSPACE_ROOT}}/.cursor/hooks/human-html-autoindex.sh",
+        "matcher": "Edit|Write|MultiEdit|StrReplace|Shell",
+        "timeout": 10
+      },
+      {
+        "command": "{{WORKSPACE_ROOT}}/.cursor/hooks/code-review-graph-update.sh",
+        "matcher": "Edit|Write|MultiEdit|Shell|StrReplace",
+        "timeout": 60
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "bash {{WORKSPACE_ROOT}}/.cursor/hooks/agent-memory-session-brief.sh",
+        "timeout": 120
+      }
+    ]
+  }
+}

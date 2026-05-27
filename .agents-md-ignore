@@ -1,0 +1,3 @@
+# Per-path exemptions from scripts/check_agents_md.py.
+# Empty by v0.3 design: full coverage is authored rather than allowlisted.
+# One relative path per line; comments start with #.

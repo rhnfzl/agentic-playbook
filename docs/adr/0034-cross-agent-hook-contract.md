@@ -1,0 +1,84 @@
+# ADR-0034: Cross-agent hook contract
+
+## Status
+
+Accepted (2026-05-25); landed in v0.6 across Cursor, Codex, Cline, Copilot, and Windsurf adapters.
+
+## Context
+
+v0.4 introduced PLAYBOOK-HOOK-EVENT headers (ADR-0027) so Claude Code's adapter could read each hook's lifecycle event without filename-based inference. v0.5 (ADR-0029) added matcher reconciliation so a narrowed profile cleaned up dropped entries. Both ADRs stopped at Claude Code: Cursor, Codex, Cline, Copilot, and Windsurf all have native hook surfaces in 2026 but the playbook treated hooks as Claude-only.
+
+The 2026-05-25 multi-agent hook gap analysis (`docs/human-html/2026-05-25-research-cursor-adapter-deployment-gap-analysis.html`) cataloged 26 findings (F1-F26) showing the gap was systemic. v0.5 closed the Claude-shaped subset (Codex, Cline, Copilot register via `claude_shaped_entry` + Cursor registers via a dedicated `cursor_shaped_entry`). v0.6 closes the rest: Codex semantic split (PreToolUse + non-Bash auto-promote), Windsurf Cascade translator, and the canonical hook source unification.
+
+## Decision
+
+Each adapter exposes a "shape function" in `scripts/hook_registration.py` that takes a `Hook` + command path and returns an event + entry pair appropriate to the adapter's native config schema. Adapters share matchers via PLAYBOOK-HOOK-MATCHER headers; per-adapter overrides exist for cases where the auto-derive doesn't fit.
+
+Shape functions and their schemas:
+
+| Function | Adapters | Event style | Entry shape |
+|---|---|---|---|
+| `claude_shaped_entry` | claude_code | PascalCase | `{hooks:[{type:"command", command}], matcher?}` |
+| `codex_shaped_entry` (v0.6) | codex | PascalCase + auto-promote | `{hooks:[{type:"command", command}], matcher?}` |
+| `cursor_shaped_entry` | cursor | camelCase | `{command, timeout, matcher?}` |
+| `claude_shaped_entry` | cline, copilot | PascalCase | (Cline v3.36+ / VS Code Copilot accept Claude shape) |
+| `windsurf_shaped_entry` (v0.6) | windsurf | snake_case (12-event Cascade) | `{command: "<translator> <hook>"}` |
+
+Codex auto-promotion rule: when `resolve_hook_event(hook) == "PreToolUse"` and the matcher excludes Bash, the registered event becomes `PostToolUse`. The hook script body stays unchanged. This is required because OpenAI Codex's PreToolUse reliably intercepts only Bash (per `developers.openai.com/codex/hooks` 2026).
+
+Windsurf Cascade translation: Cascade delivers stdin in `{agent_action_name, tool_info: {command_line|file_path|...}}` shape instead of Claude's `{tool_name, tool_input}`. Rather than fork every playbook hook into a Cascade variant, the installer ships a single shared wrapper `_cascade-translate.sh` and registers entries shaped `{command: "<translator> <core-hook>"}`. The wrapper reads Cascade stdin, derives Claude `tool_name` from `agent_action_name`, populates `tool_input` from `tool_info`, and pipes the translated JSON into the original hook. Exit code 2 (pre-hooks) passes through; post-hooks exit 0.
+
+Windsurf event auto-derive map (in `scripts/hook_registration.py`):
+
+```
+PreToolUse  + Bash-family matcher  -> pre_run_command
+PreToolUse  + Edit-family matcher  -> pre_write_code
+PostToolUse + Bash-family matcher  -> post_run_command
+PostToolUse + Edit-family matcher  -> post_write_code
+SessionStart                       -> post_setup_worktree
+Stop                               -> post_cascade_response
+<other>                            -> [] (skip; explicit override required)
+```
+
+Mixed matchers (Bash | Edit | ...) register under BOTH applicable Cascade events.
+
+New header conventions (v0.6):
+
+```bash
+# PLAYBOOK-HOOK-CURSOR-WRAPPER: <wrapper>.sh   # parent: cursor uses wrapper, not core
+# PLAYBOOK-HOOK-CURSOR-ONLY: true              # wrapper: non-cursor adapters skip
+# PLAYBOOK-HOOK-WINDSURF-EVENT: <event_name>   # optional Windsurf event pin
+```
+
+`is_cursor_only(hook)` is honored by every non-cursor adapter for BOTH copy and registration so the wrapper isn't dead weight under `~/.claude/hooks/` etc.
+
+## Consequences
+
+### Good
+
+- A single PLAYBOOK-HOOK-EVENT + PLAYBOOK-HOOK-MATCHER pair on each hook covers Claude / Codex / Cline / Copilot. Authors do not write per-adapter variants for the common case.
+- Cursor and Windsurf get full hook parity (gap-analysis F1/F3/F5/F15/F16/F25 closed).
+- Codex's Bash-only PreToolUse limit is invisible to hook authors (gap-analysis F20 closed).
+- Reconciliation works for every adapter on profile narrow.
+
+### Risks / open threads
+
+- Cursor `postToolUse.additional_context` is documented as unreliable through Cursor 2.0.77 (forum reports through May 2026). Hooks should not rely on it for context injection; use stderr + `sessionStart` instead. This is a per-tool reliability caveat, not a shape problem.
+- Windsurf wrapper invocation depends on Cascade's command-string parsing. If Cascade ever changes how it shells out (e.g., refuses to split args), the wrapper indirection breaks. Mitigation: lifecycle test asserts wrapper output matches Claude-shape on representative events.
+- Codex `apply_patch` and MCP tools are listed in the PreToolUse schema but unreliable per the OpenAI docs. The auto-promote handles only Bash vs non-Bash; finer-grained matching could come if OpenAI stabilizes those paths.
+
+## Implementation
+
+- `scripts/hook_registration.py`: `_CLAUDE_TO_CURSOR_EVENT`, `_CODEX_PRE_TOOL_USE_SUPPORTED`, `_WINDSURF_EVENTS`, `_WINDSURF_EDIT_TOOLS`, `_WINDSURF_BASH_TOOLS` registries; resolve_*/entry/reconcile/strip helpers.
+- `scripts/adapters/{claude_code,codex,cursor,cline,copilot,windsurf}.py`: each uses the shape function appropriate to its native config schema, with cursor-only filtering on non-cursor adapters.
+- `scripts/install.py`: `_HOOK_REGISTERING_ADAPTERS` includes all six; `_hook_command_keys` is adapter-aware (Codex auto-promote); `_windsurf_hook_names` returns the flat name set for Cascade reconciliation.
+- `hooks/_cascade-translate.sh`: shared wrapper, underscore-prefixed so `load_hooks` skips it.
+- `scripts/adapters/_reader.py`: underscore-prefixed files in `hooks/` are not loaded as Hook entries.
+
+## Related
+
+- ADR-0027 (PLAYBOOK-HOOK-EVENT header): predecessor; Claude Code only.
+- ADR-0029 (hook reconciliation + matcher header): v0.5; extended now to every adapter's native config.
+- ADR-0035 (canonical hook source): v0.6 companion ADR for hook ownership.
+- `docs/human-html/2026-05-25-research-cursor-adapter-deployment-gap-analysis.html`: the gap analysis that drove this work.
+- `docs/human-html/2026-05-25-plan-v0-6-multi-agent-hook-parity.html`: v0.6 plan with phase-by-phase deliverables.

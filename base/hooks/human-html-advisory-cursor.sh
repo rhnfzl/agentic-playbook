@@ -1,0 +1,1 @@
+../skills/meta/human-html/hooks/human-html-advisory-cursor.sh

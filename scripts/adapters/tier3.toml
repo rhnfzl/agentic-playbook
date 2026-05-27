@@ -1,0 +1,106 @@
+# Tier 3 declarative registry (per ADR-0030).
+#
+# Each [[tier3]] entry produces one TierThreeAdapter instance at import time.
+# Detection rules use one of five idioms:
+#
+#   detect.home_dir         = ".X"          - True if ~/.X is a directory
+#   detect.cli              = "X"           - True if `X` is on $PATH
+#   detect.vscode_extension = "vendor.X"    - True if any ~/.vscode/extensions/<id>
+#                                              directory starts with "vendor.X"
+#   detect.app_bundle       = "/Apps/X.app" - True if path exists (macOS)
+#   detect.any_of = [ {<idiom>...}, ... ]   - True if any sub-rule matches
+#
+# Adding a new Tier 3 tool: append a [[tier3]] table here. No Python changes
+# needed unless the detection needs a new idiom.
+
+[[tier3]]
+name = "kiro"
+detect.home_dir = ".kiro"
+
+[[tier3]]
+name = "goose"
+detect.cli = "goose"
+
+[[tier3]]
+name = "junie"
+detect.vscode_extension = "jetbrains.junie"
+
+[[tier3]]
+name = "zed"
+detect.app_bundle = "/Applications/Zed.app"
+
+[[tier3]]
+name = "amp"
+detect.cli = "amp"
+
+[[tier3]]
+name = "augment"
+detect.vscode_extension = "augment.vscode-augment"
+
+[[tier3]]
+name = "opencode"
+detect.any_of = [
+    { home_dir = ".opencode" },
+    { cli = "opencode" },
+]
+
+[[tier3]]
+name = "aide"
+detect.any_of = [
+    { home_dir = ".aide" },
+    { cli = "aide" },
+]
+
+[[tier3]]
+name = "droid"
+detect.cli = "droid"
+
+[[tier3]]
+name = "jules"
+detect.any_of = [
+    { home_dir = ".jules" },
+    { cli = "jules" },
+]
+
+[[tier3]]
+name = "qodo"
+detect.vscode_extension = "qodo.qodo"
+
+[[tier3]]
+name = "q-developer"
+detect.vscode_extension = "amazonwebservices.amazon-q-vscode"
+
+[[tier3]]
+name = "swe-agent"
+detect.any_of = [
+    { cli = "swe-agent" },
+    { home_dir = ".swe-agent" },
+]
+
+[[tier3]]
+name = "devon"
+detect.cli = "devon"
+
+[[tier3]]
+name = "claude-flow"
+detect.cli = "claude-flow"
+
+[[tier3]]
+name = "kilo"
+detect.vscode_extension = "kilocode.kilo-code"
+
+[[tier3]]
+name = "continue"
+detect.vscode_extension = "continue.continue"
+
+[[tier3]]
+name = "tabnine"
+detect.vscode_extension = "tabnine.tabnine-vscode"
+
+[[tier3]]
+name = "cline-cli"
+detect.cli = "cline"
+
+[[tier3]]
+name = "supermaven"
+detect.vscode_extension = "supermaven.supermaven"

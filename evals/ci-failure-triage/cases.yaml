@@ -1,0 +1,37 @@
+# Eval cases for skills/engineering/ci-failure-triage/SKILL.md
+
+cases:
+  - name: covers when-to-use trigger
+    skill: base/skills/engineering/ci-failure-triage/SKILL.md
+    assertions:
+      - type: section_present
+        pattern: when to use
+
+  - name: distinguishes fix vs flake
+    skill: base/skills/engineering/ci-failure-triage/SKILL.md
+    assertions:
+      - type: body_contains
+        pattern: (flak|regression|repeat)
+
+  - name: sonar or lint coverage referenced
+    skill: base/skills/engineering/ci-failure-triage/SKILL.md
+    assertions:
+      - type: body_contains
+        pattern: (sonar|lint|coverage)
+
+  - name: actionable next step shape
+    skill: base/skills/engineering/ci-failure-triage/SKILL.md
+    assertions:
+      - type: body_contains
+        pattern: (classify|root cause|next step)
+
+  - name: frontmatter complete
+    skill: base/skills/engineering/ci-failure-triage/SKILL.md
+    assertions:
+      - type: frontmatter_has
+        key: name
+        value: ci-failure-triage
+      - type: frontmatter_has
+        key: owner
+      - type: frontmatter_has
+        key: last_reviewed

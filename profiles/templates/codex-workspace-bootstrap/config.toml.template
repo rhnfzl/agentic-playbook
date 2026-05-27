@@ -1,0 +1,52 @@
+# TEMPLATE for ~/.codex/config.toml workspace-specific add-ons.
+# Replace {{WORKSPACE_ROOT}} and {{AGENT_SHARED_VENV}} sentinels.
+# See profiles/templates/codex-workspace-bootstrap/CUSTOMIZE.md.
+#
+# Merge this with whatever managed block your playbook installer writes;
+# the values below are workspace add-ons, not full replacements.
+
+[mcp_servers.code-review-graph]
+args = [
+    "code-review-graph",
+    "serve",
+]
+command = "uvx"
+startup_timeout_sec = 60.0
+required = false
+enabled = false
+
+[mcp_servers.playwright]
+args = [
+    "-y",
+    "@playwright/mcp@latest",
+]
+command = "npx"
+startup_timeout_sec = 180.0
+enabled = false
+
+[mcp_servers.code-review-graph.tools.list_graph_stats_tool]
+approval_mode = "approve"
+
+[sandbox_workspace_write]
+network_access = true
+
+[features]
+hooks = true
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+
+[mcp_servers.agentMemoryBridge]
+command = "{{AGENT_SHARED_VENV}}/bin/python"
+args = ["{{WORKSPACE_ROOT}}/scripts/agent_memory_mcp.py"]
+startup_timeout_sec = 30.0
+enabled = true
+
+[mcp_servers.anchored-fs.tools.list_allowed_directories]
+approval_mode = "approve"
+
+[mcp_servers.filesystem.tools.write_file]
+approval_mode = "approve"
+
+[mcp_servers.filesystem.tools.edit_file]
+approval_mode = "approve"

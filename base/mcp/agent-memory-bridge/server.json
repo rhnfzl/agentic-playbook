@@ -1,0 +1,9 @@
+{
+  "command": "python3",
+  "args": [
+    "{{AGENT_SHARED_MCP_DIR}}/agent_memory_mcp.py"
+  ],
+  "env": {
+    "PYTHONPATH": "{{AGENT_SHARED_MCP_DIR}}"
+  }
+}

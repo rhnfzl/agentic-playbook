@@ -1,0 +1,156 @@
+# 0041. Content tiering guardrails
+
+## Status
+
+Accepted (2026-05-26); landing in v0.11 alongside ADR-0040 (as a pre-refactor commit batch so the guardrails are in place BEFORE the mass `git mv`).
+
+## Context
+
+ADR-0040 introduces the base + overlay subtree split. Three classes of failure surfaced during the v0.11 design pass that prose-in-an-ADR does not prevent:
+
+### Gap 1: ADR number collisions
+
+The base + overlay ADR was initially numbered 0030, then 0031, then 0032, then finally 0040. The first three were taken (by v0.10's `tier3-declarative-toml-registry`, `loader-py-four-file-split`, and v0.5's `anchored-fs-bundle-conformance`). The mistakes happened because earlier `ls docs/adr/ | head -30` outputs were truncated and missed existing ADRs. No CI check catches duplicate ADR numbers today. The 0032 collision was caught and resolved by renumbering, but only by independent human review; the failure mode would have recurred without a mechanical check.
+
+### Gap 2: Content tier drift after the refactor
+
+With `base/` and `overlays/team/` as separate dirs, the boundary is enforced only by code review. A reviewer can miss an team reference landing in `base/` if not specifically looking for it. The mistake compounds because the next reviewer assumes prior reviews caught such drift. Without an automated check, the directory boundary is aspirational, not actual.
+
+### Gap 3: Hidden / ignored file leakage
+
+During the v0.11 containment review pass, a stale row in the gitignored `docs/human-html/index.html` referenced a removed plan artifact. Standard tracked-file grep (`git ls-files | xargs grep`) missed it because the file is ignored. The leak was caught only on an explicit `rg --hidden --no-ignore` pass. The class of leak: anything an ignored file references that should not exist anywhere in the repo dir.
+
+## Decision
+
+### scripts/checks/adr_number_unique.py
+
+Scans `docs/adr/`, groups files by 4-digit prefix, fails if any prefix appears more than once. Registered in `scripts/checks/__init__.py` `CHECKS` list. Runs as part of `make check`.
+
+```python
+# CheckResult is a NamedTuple with fields: status (Literal["ok","warn","fail"]),
+# summary (str), details (list[str]).
+def run(ctx: CheckContext) -> CheckResult:
+    adr_dir = ctx.repo_root / "docs" / "adr"
+    by_number: dict[str, list[str]] = defaultdict(list)
+    for path in sorted(adr_dir.glob("[0-9][0-9][0-9][0-9]-*.md")):
+        number = path.name[:4]
+        by_number[number].append(path.name)
+    duplicates = {n: files for n, files in by_number.items() if len(files) > 1}
+    if duplicates:
+        return CheckResult(
+            status="fail",
+            summary=f"{len(duplicates)} duplicate ADR number(s)",
+            details=[f"{n}: {files}" for n, files in duplicates.items()],
+        )
+    return CheckResult(status="ok", summary="ADR numbers unique", details=[])
+```
+
+The check would have caught the 0032 collision at design time. Maintenance cost: zero ongoing; one-time check addition.
+
+### scripts/checks/scope_boundary.py
+
+Scans `base/` for occurrences of team-specific markers. Fails if any match found in `base/` outside the allowlist:
+
+- Default patterns (case-insensitive, STRONG signals only): `\bR8-\d+\b`, `\bMATCH-\d+\b`, `\bteam\b`, `\binternal-host\b`, `\bbitbucket\.org\b`. Weaker product names (error-tracking, CI, code-quality, LLM-router, Atlassian, Jira) are NOT in the default set because those are universal products anyone can use; gating on them would force allowlisting most generic infrastructure rules. The earlier draft of this ADR listed them as defaults; the implementation walked back to the strong-only set after measuring 24+ legitimate base-rule allowlist needs vs ~5 actual leak attempts.
+- Plus configurable extensions in `scripts/checks/scope_boundary_terms.toml` for teams that DO want stricter scoping. Match is case-insensitive because "team" appears in mixed case across the existing repo. The core org marker `team` is included by default; allowlisting it for specific universal-with-team-example rules (bucket 2) is the expected workflow.
+
+Allowlist for GENERIC-with-team-examples (per ADR-0040 classification bucket 2) lives in `scripts/checks/scope_boundary_allowlist.toml`:
+
+```toml
+# scripts/checks/scope_boundary_allowlist.toml
+# Files in base/ that may mention team markers because they are
+# universal rules that use team as a concrete example.
+
+[[allow]]
+path = "base/rules/no-ticket-ids-in-code.md"
+patterns = ["R8-", "MATCH-"]
+rationale = "Universal rule about not putting ticket IDs in code; uses R8/MATCH as concrete examples."
+
+[[allow]]
+path = "base/rules/never-push-to-develop.md"
+patterns = ["VCS.org"]
+rationale = "Universal feature-branch discipline; mentions VCS as the example trigger context."
+
+# ... etc
+```
+
+Each allowlist entry MUST have a non-empty rationale. The check fails if rationale is empty.
+
+The allowlist is intentionally small; growth in it is a smell that the file might belong in `overlays/team/` instead.
+
+### scripts/checks/ignored_containment.py
+
+Scans the WHOLE working tree (including .gitignored files; excluding `.git/`) for term patterns loaded from an external configuration file. The configuration file lives OUTSIDE the repository, at a path supplied by the `$PLAYBOOK_CONTAINMENT_TERMS` env var (typical location: `~/.config/playbook/containment-terms.toml`). The file is never committed.
+
+This separation is deliberate: the check exists to enforce that certain term patterns do not appear in the repo, but listing those terms inside the repo would defeat the purpose. The external-file pattern keeps the term list outside the audit surface entirely. Each contributor configures their own list per their own separate-surface concerns (or no list at all).
+
+Schema of the external file (documented in source, not in repo):
+
+```toml
+# Schema (the file lives outside the repo)
+terms = ["<pattern-1>", "<pattern-2>", ...]
+exclude_dirs = [".git", ".claude/worktrees", ...]
+```
+
+Fails if any match found. Default behavior when `$PLAYBOOK_CONTAINMENT_TERMS` is unset: emit a WARN (NOT silent pass), with summary "containment check unconfigured; set $PLAYBOOK_CONTAINMENT_TERMS to enable enforcement". The warn surfaces in `make check` output so contributors know the safety net exists and can opt in; it does not fail CI.
+
+If the branch owner wants hard-fail when unconfigured (stricter local discipline), set `$PLAYBOOK_CONTAINMENT_STRICT=1`. Absence of `$PLAYBOOK_CONTAINMENT_TERMS` then fails the check.
+
+CI wiring note: VCS CI will NOT catch containment leaks unless the pipeline explicitly sets `$PLAYBOOK_CONTAINMENT_TERMS` to a file the CI runner can read. For server-side enforcement, the team owns wiring that env var in the Jenkinsfile / VCS Pipelines config. Pre-push hooks running locally pick up the user's per-developer config.
+
+Implementation note: cannot rely on `git ls-files` (excludes ignored). Use `os.walk` with explicit exclude_dirs, OR `rg --hidden --no-ignore -g '!.git/'` if available, with fallback to `find` + `grep`.
+
+### Path-scanning checks become scope-aware
+
+ADR-0040 specifies this conversion; this ADR confirms the checks that need updating:
+
+- `scripts/check_em_dashes.py` (legacy root script): replace hardcoded `skills/**/*.md` patterns with PlaybookContent-resolved roots.
+- `scripts/checks/frontmatter.py`: same.
+- `scripts/checks/decay.py`: same.
+- `scripts/checks/size.py`: same.
+- `scripts/checks/external_skill_audit.py`: same.
+- `scripts/checks/skill_description.py`: same.
+- `scripts/checks/hook_source_unification.py`: same.
+
+Without this conversion, post-refactor those checks silently scan nothing (the directories they target no longer exist at the old paths).
+
+## Consequences
+
+### Good
+
+- ADR number collision impossible going forward; the meta-lesson "lessons-as-prose are weak, lessons must become checks" gets encoded once.
+- team markers in `base/` caught at CI time, not at review time.
+- Hidden/ignored leaks caught (containment hygiene); the class of leak that prompted this check is now closed.
+- Path-scanning checks survive the v0.11 refactor; no silent regressions.
+- `make check` exit code stays meaningful for both pre-refactor (validates current state) and post-refactor (validates new structure).
+
+### Bad
+
+- More checks to maintain (3 new + 7 updated).
+- `scope_boundary_allowlist.toml` requires ongoing curation. Mitigation: rationale is mandatory; growth in the list is a smell flagged in code review.
+- Some test fixtures will need updating to satisfy the new checks (test fixtures that intentionally contain team markers in base-test-only paths need explicit allowlist entries or fixture relocation).
+
+### Trade-offs considered and rejected
+
+- **"Just be careful in code review"**: rejected per the meta-lesson that lessons-as-prose are weak. Every gap in this ADR was found by either a tool or an independent reviewer; ad-hoc review repeatedly missed the same classes.
+- **Single all-in-one check**: rejected because the three failure modes are independent. Separate checks let each fail clearly and let the user resolve one at a time.
+- **CI-only enforcement (not local)**: rejected. Local `make check` should be authoritative; CI is the safety net, not the primary gate.
+
+## Implementation note
+
+Each check is ~50-100 lines of Python. All checks register in `scripts/checks/__init__.py` `CHECKS` list. `make check` runs them all.
+
+Pre-refactor landing sequence:
+
+1. Land `adr_number_unique.py` first (cheap, catches duplicate numbers BEFORE we land more ADRs).
+2. Land `ignored_containment.py` (containment is the highest-stakes class).
+3. Land `scope_boundary.py` with the initial allowlist (must come after `base/` exists, so this lands as part of the v0.11 refactor PR itself).
+4. Update path-scanning checks alongside the refactor.
+
+The first two can be precursor commits on `feat/v0-11-base-overlay-refactor` before the mass `git mv`. The third lands inside the refactor PR.
+
+## References
+
+- ADR-0040 (base + overlay subtree split): the refactor these guardrails protect.
+- ADR-0029 (hook reconciliation): same "lesson-as-check, not as prose" principle that motivated the v0.5 `PLAYBOOK-HOOK-MATCHER` header convention.
+- 2026-05-26 design session learnings: the meta-lesson promoted from prose-in-handoff to ADR + check.

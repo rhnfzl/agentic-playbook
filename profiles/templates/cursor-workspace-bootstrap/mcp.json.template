@@ -1,0 +1,27 @@
+{
+  "_comment": "TEMPLATE for ~/.cursor/mcp.json or <workspace>/.cursor/mcp.json. Replace {{WORKSPACE_ROOT}}, {{AGENT_SHARED_VENV}}, and {{AGENT_SHARED_MCP_ROOT}} sentinels. See profiles/templates/cursor-workspace-bootstrap/CUSTOMIZE.md.",
+  "mcpServers": {
+    "agent-memory-bridge": {
+      "command": "{{AGENT_SHARED_VENV}}/bin/python",
+      "args": [
+        "{{AGENT_SHARED_MCP_ROOT}}/agent-memory-bridge/agent_memory_mcp.py"
+      ],
+      "env": {
+        "AGENT_MEMORY_WORKSPACE": "{{WORKSPACE_ROOT}}",
+        "PYTHONPATH": "{{AGENT_SHARED_MCP_ROOT}}/agent-memory-bridge"
+      }
+    },
+    "anchored-fs": {
+      "command": "{{AGENT_SHARED_VENV}}/bin/python",
+      "args": [
+        "{{AGENT_SHARED_MCP_ROOT}}/anchored-fs/server.py",
+        "--allowed-dir",
+        "{{WORKSPACE_ROOT}}"
+      ],
+      "env": {
+        "PYTHONPATH": "{{AGENT_SHARED_MCP_ROOT}}/anchored-fs"
+      },
+      "cwd": "{{AGENT_SHARED_MCP_ROOT}}/anchored-fs"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "include": [
+    "scripts",
+    "tests",
+    "base/mcp/anchored-fs"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/.venv",
+    "**/node_modules",
+    "base/skills/imported",
+    "base/skills/**/scripts",
+    "base/skills/**/references",
+    "overlays/team/skills/**/scripts",
+    "overlays/team/skills/**/references",
+    "graphify-out",
+    ".worktrees"
+  ],
+  "extraPaths": [
+    "scripts",
+    "scripts/adapters",
+    "base/mcp/anchored-fs",
+    "base/mcp/anchored-fs/bundle",
+    "base/mcp/anchored-fs/.venv/lib/python3.11/site-packages"
+  ],
+  "pythonVersion": "3.11",
+  "reportMissingImports": "warning",
+  "reportAttributeAccessIssue": "warning",
+  "reportArgumentType": "warning",
+  "reportAssignmentType": "warning",
+  "reportOptionalMemberAccess": "warning",
+  "reportReturnType": "warning",
+  "reportUnusedImport": "warning",
+  "reportUnusedVariable": "information",
+  "typeCheckingMode": "basic"
+}

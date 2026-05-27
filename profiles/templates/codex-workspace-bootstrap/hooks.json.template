@@ -1,0 +1,68 @@
+{
+  "_comment": "TEMPLATE for ~/.codex/hooks.json. Replace {{WORKSPACE_ROOT}} and {{AGENT_SHARED_VENV}} sentinels. See profiles/templates/codex-workspace-bootstrap/CUSTOMIZE.md.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{WORKSPACE_ROOT}}/.codex/hooks/deny-edits-in-readonly-dir.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "{{WORKSPACE_ROOT}}/.codex/hooks/human-html-advisory.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{WORKSPACE_ROOT}}/.codex/hooks/code-review-graph-update.sh",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|apply_patch|Bash|exec_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{WORKSPACE_ROOT}}/.codex/hooks/human-html-autoindex.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c 'cat >/dev/null || true; /opt/homebrew/bin/code-review-graph status >/dev/null 2>&1 || true'",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{AGENT_SHARED_VENV}}/bin/python {{WORKSPACE_ROOT}}/scripts/agent_session_hook.py --codex --finding-limit 5 --memory-limit 5",
+            "timeout": 120,
+            "statusMessage": "Loading workspace session brief",
+            "managed_by": "coding-agents-playbook"
+          }
+        ]
+      }
+    ]
+  }
+}

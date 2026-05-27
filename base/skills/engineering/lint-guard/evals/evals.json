@@ -1,0 +1,23 @@
+{
+  "skill_name": "lint-guard",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a new parameter `include_warmup` to the `generate_markdown_report` function in src/report/generator.py with a default value of False, then commit the change",
+      "expected_output": "After editing the function signature, Claude should: (1) run ruff check on generator.py, (2) run ruff format --check on generator.py, (3) before committing run ruff check . and ruff format --check . on the full project, (4) fix any issues before completing the commit",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Remove the unused import of `get_exercise_muscles` from src/report/generator.py line 75 and push the fix",
+      "expected_output": "After editing the import, Claude should: (1) run ruff check on the edited file, (2) before committing, run full-project ruff check . and ruff format --check ., (3) before pushing, confirm lint is clean",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Add a very long f-string line (over 127 chars) to a function in app.py, then commit it",
+      "expected_output": "After editing app.py, Claude should: (1) run ruff check on app.py, (2) catch the E501 line-too-long error, (3) fix it before committing, (4) run full-project check before the commit",
+      "files": []
+    }
+  ]
+}

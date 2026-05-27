@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# PreToolUse hook (TEMPLATE): deny Edit/Write/MultiEdit/NotebookEdit on a
+# read-only directory that you sync from elsewhere.
+#
+# Common use case: you have a directory like {{READONLY_DIR_NAME}}/ inside
+# your workspace that is checked out from upstream and synced periodically
+# (cron, launchd, GitHub action). Local edits would be overwritten by the
+# next sync, and the equivalent owned-code change belongs in a different
+# repo. This hook prevents accidental edits there.
+#
+# Hook contract (Claude Code + Codex): exit 2 + stderr = deny tool call,
+# exit 0 = allow. Stderr is fed back to the model, not the user.
+#
+# CUSTOMIZE: see hooks/templates/CUSTOMIZE.md.
+# Required sentinels: {{WORKSPACE_ROOT}}, {{READONLY_DIR_NAME}},
+# {{READONLY_DIR_REASON}}, {{ALTERNATIVE_LOCATIONS}}.
+
+set -u
+
+WORKSPACE_ROOT="{{WORKSPACE_ROOT}}"
+READONLY_ROOT="$WORKSPACE_ROOT/{{READONLY_DIR_NAME}}"
+
+INPUT="$(cat)"
+
+TOOL_NAME=$(jq -r '.tool_name // empty' <<<"$INPUT")
+TARGET_PATH=$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"$INPUT")
+
+# Tool variants without a path. Allow.
+[ -z "$TARGET_PATH" ] && exit 0
+
+# Resolve relative paths against the session cwd.
+if [[ "$TARGET_PATH" != /* ]]; then
+    CWD=$(jq -r '.cwd // empty' <<<"$INPUT")
+    [ -n "$CWD" ] && TARGET_PATH="$CWD/$TARGET_PATH"
+fi
+
+# Normalize, following symlinks so a symlink pointing into the read-only
+# directory is also caught. realpath is missing on stock macOS; python is
+# guaranteed here.
+NORM_PATH=$(python3 -c '
+import os, sys
+p = sys.argv[1]
+try:
+    print(os.path.realpath(p))
+except Exception:
+    print(os.path.normpath(p))
+' "$TARGET_PATH")
+
+case "$NORM_PATH" in
+    "$READONLY_ROOT"|"$READONLY_ROOT"/*)
+        cat >&2 <<EOF
+[deny-edits-in-readonly-dir] $TOOL_NAME on {{READONLY_DIR_NAME}}/** is denied.
+
+Target: $NORM_PATH
+
+{{READONLY_DIR_REASON}}
+
+What to do instead:
+{{ALTERNATIVE_LOCATIONS}}
+EOF
+        exit 2
+        ;;
+esac
+
+exit 0

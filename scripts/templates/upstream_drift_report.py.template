@@ -1,0 +1,336 @@
+#!/usr/bin/env python3
+"""Platform freshness report (read-only).
+
+Surfaces drift in the read-only `platform/` checkouts so agents do not
+reason from stale evidence. Never mutates anything under `platform/`;
+all git operations are read-only (`git log`, `git rev-parse`,
+`git ls-remote`). Sync state is recorded at workspace level
+(`scripts/.platform_sync_state.json`) so the platform/ tree stays
+strictly read-only.
+
+Reports two directions of drift:
+
+* **Forward drift**: your local checkout is N commits behind the
+  upstream `develop` (or `master`) branch. Means agents may be looking
+  at code that's already been changed in production.
+* **Reverse drift**: files touched in `platform/talent_matching/`
+  since the last recorded sync. Means TM Backend shipped changes that
+  AI Backend / MCP may need to consume but haven't been notified
+  about.
+
+Also surfaces:
+
+* The dated UI-crawl directory name (e.g. `202605 match_career_markdown_output`)
+  with a "captured X days ago" annotation so agents know whether the
+  recruiter expectation evidence is current.
+
+Usage:
+
+    python3 scripts/platform_freshness.py              # text report
+    python3 scripts/platform_freshness.py --json       # machine-readable
+    python3 scripts/platform_freshness.py --record     # capture new
+                                                       # sync baseline
+    python3 scripts/platform_freshness.py --fetch      # ls-remote check
+                                                       # against upstream
+                                                       # (still read-only,
+                                                       # uses HTTPS not
+                                                       # `git fetch`)
+
+Embed in the agent session bootstrap so every Claude / Codex / Gemini
+session sees the freshness banner before reasoning about platform/
+context.
+"""
+from __future__ import annotations
+import argparse
+import json
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+# TEMPLATE: replace sentinels per scripts/templates/CUSTOMIZE.md
+WORKSPACE = Path(__file__).resolve().parent.parent
+PLATFORM = WORKSPACE / "{{UPSTREAM_DIR_NAME}}"  # e.g. "platform", "vendored", "upstream"
+STATE_FILE = WORKSPACE / "scripts" / ".{{UPSTREAM_DIR_NAME}}_sync_state.json"
+
+REPOS = {
+    # Map of friendly name -> path to a read-only checkout under PLATFORM.
+    # Add an entry per upstream repo you mirror. Empty dict skips the
+    # forward-drift probe and only reports reverse-drift + crawl staleness.
+    "{{REPO_ALIAS_1}}": PLATFORM / "{{REPO_DIR_1}}",
+    "{{REPO_ALIAS_2}}": PLATFORM / "{{REPO_DIR_2}}",
+}
+
+# Dated capture directories that age silently. Date is encoded in the dir name.
+# Format below assumes YYYYMM prefix; edit CRAWL_DATE_RE if your format differs.
+CRAWL_DIRS = [
+    PLATFORM / "{{CRAWL_DIR_NAME}}",  # e.g. "202605 some_capture"
+]
+CRAWL_DATE_RE = re.compile(r"(\d{4})(\d{2})")
+
+
+def git(repo: Path, *args: str, timeout: int = 15) -> tuple[int, str, str]:
+    try:
+        res = subprocess.run(
+            ["git", "-C", str(repo), *args],
+            capture_output=True, text=True, timeout=timeout,
+        )
+        return res.returncode, res.stdout.strip(), res.stderr.strip()
+    except Exception as exc:
+        return -1, "", str(exc)
+
+
+def repo_head(repo: Path) -> dict:
+    if not (repo / ".git").exists():
+        return {"present": False}
+    code, sha, _ = git(repo, "rev-parse", "HEAD")
+    if code != 0:
+        return {"present": True, "error": "rev-parse failed"}
+    code, branch, _ = git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+    code, last_date, _ = git(repo, "log", "-1", "--format=%cs")  # YYYY-MM-DD
+    code, last_subject, _ = git(repo, "log", "-1", "--format=%s")
+    code, last_author, _ = git(repo, "log", "-1", "--format=%an")
+    return {
+        "present": True,
+        "head": sha[:10],
+        "branch": branch,
+        "last_commit_date": last_date,
+        "last_commit_subject": last_subject,
+        "last_commit_author": last_author,
+    }
+
+
+def upstream_head(repo: Path) -> dict:
+    """Read-only: ls-remote HEAD of the remote without fetching."""
+    if not (repo / ".git").exists():
+        return {"reachable": False}
+    code, remotes, _ = git(repo, "remote")
+    if code != 0 or not remotes:
+        return {"reachable": False, "error": "no remote configured"}
+    remote = remotes.split("\n")[0]
+    code, lines, err = git(repo, "ls-remote", "--symref", remote, "HEAD", timeout=20)
+    if code != 0:
+        return {"reachable": False, "error": err[:160]}
+    upstream_branch = None
+    upstream_sha = None
+    for line in lines.split("\n"):
+        if line.startswith("ref:"):
+            m = re.search(r"refs/heads/(\S+)\s+HEAD", line)
+            if m:
+                upstream_branch = m.group(1)
+        else:
+            parts = line.split("\t")
+            if parts and len(parts[0]) >= 7:
+                upstream_sha = parts[0][:10]
+    return {
+        "reachable": True,
+        "remote": remote,
+        "upstream_branch": upstream_branch,
+        "upstream_head": upstream_sha,
+    }
+
+
+def commits_behind(repo: Path, upstream_sha: str) -> int:
+    """Count commits the local HEAD is behind the upstream SHA."""
+    if not upstream_sha:
+        return -1
+    # The upstream SHA may not exist in local refs (no fetch performed).
+    # When that's the case, ls-remote gave us the remote's true HEAD;
+    # we can't compute the count without fetching. Report -1 to signal
+    # "unknown without a fetch".
+    code, _, _ = git(repo, "cat-file", "-e", upstream_sha)
+    if code != 0:
+        return -1
+    code, count, _ = git(repo, "rev-list", "--count", f"HEAD..{upstream_sha}")
+    if code != 0:
+        return -1
+    return int(count) if count.isdigit() else -1
+
+
+def reverse_drift(repo: Path, last_sync_sha: str) -> dict:
+    """Files touched in this repo since the last recorded sync SHA."""
+    if not last_sync_sha:
+        return {"available": False, "reason": "no recorded sync baseline"}
+    code, _, _ = git(repo, "cat-file", "-e", last_sync_sha)
+    if code != 0:
+        return {"available": False, "reason": f"recorded SHA {last_sync_sha[:10]} not in local repo"}
+    code, files, _ = git(repo, "diff", "--name-only", f"{last_sync_sha}..HEAD")
+    code, count, _ = git(repo, "rev-list", "--count", f"{last_sync_sha}..HEAD")
+    file_list = [f for f in files.split("\n") if f]
+    return {
+        "available": True,
+        "commits_since_sync": int(count) if count.isdigit() else 0,
+        "files_touched": len(file_list),
+        "sample_files": file_list[:10],
+    }
+
+
+def crawl_age(crawl_dir: Path) -> dict:
+    if not crawl_dir.exists():
+        return {"present": False, "name": crawl_dir.name}
+    m = CRAWL_DATE_RE.search(crawl_dir.name)
+    if not m:
+        return {"present": True, "name": crawl_dir.name, "parsed_date": None}
+    year, month = int(m.group(1)), int(m.group(2))
+    try:
+        captured = datetime(year, month, 1, tzinfo=timezone.utc)
+    except ValueError:
+        return {"present": True, "name": crawl_dir.name, "parsed_date": None}
+    now = datetime.now(timezone.utc)
+    days = (now - captured).days
+    return {
+        "present": True,
+        "name": crawl_dir.name,
+        "captured_year_month": f"{year:04d}-{month:02d}",
+        "days_since_captured": days,
+        "stale_flag": days > 90,
+    }
+
+
+def load_state() -> dict:
+    if STATE_FILE.exists():
+        try:
+            return json.loads(STATE_FILE.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
+def save_state(state: dict) -> None:
+    STATE_FILE.parent.mkdir(exist_ok=True)
+    STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True))
+
+
+def build_report(do_fetch: bool) -> dict:
+    state = load_state()
+    report = {
+        "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "repos": {},
+        "crawls": [],
+    }
+    for name, repo in REPOS.items():
+        head = repo_head(repo)
+        rec = {"repo": name, "path": str(repo.relative_to(WORKSPACE)), **head}
+        if head.get("present") and do_fetch:
+            up = upstream_head(repo)
+            rec["upstream"] = up
+            if up.get("reachable") and up.get("upstream_head"):
+                rec["behind"] = commits_behind(repo, up["upstream_head"])
+        last_sync = state.get(name, {}).get("sha")
+        rec["last_sync_sha"] = (last_sync or "")[:10] or None
+        rec["last_sync_at"] = state.get(name, {}).get("at")
+        if head.get("present") and last_sync:
+            rec["reverse_drift"] = reverse_drift(repo, last_sync)
+        report["repos"][name] = rec
+    for c in CRAWL_DIRS:
+        report["crawls"].append(crawl_age(c))
+    return report
+
+
+def render_text(report: dict) -> str:
+    lines = [
+        f"# Platform freshness ({report['generated']})",
+        "",
+    ]
+    for name, rec in report["repos"].items():
+        lines.append(f"## platform/{name}/")
+        if not rec.get("present"):
+            lines.append("  (no .git checkout present)")
+            lines.append("")
+            continue
+        lines.append(f"  HEAD: `{rec.get('head')}` on `{rec.get('branch')}`")
+        lines.append(f"  last commit: {rec.get('last_commit_date')}: "
+                     f"{rec.get('last_commit_subject', '')[:80]} "
+                     f"({rec.get('last_commit_author')})")
+        if "upstream" in rec:
+            up = rec["upstream"]
+            if up.get("reachable"):
+                behind = rec.get("behind", -1)
+                behind_str = ("unknown (no local fetch)" if behind < 0
+                              else f"{behind} commits behind")
+                lines.append(f"  upstream: `{up.get('upstream_head')}` on "
+                             f"`{up.get('upstream_branch')}` ({behind_str})")
+            else:
+                lines.append(f"  upstream: unreachable "
+                             f"({up.get('error', 'unknown')})")
+        if rec.get("last_sync_sha"):
+            lines.append(f"  last recorded sync: `{rec['last_sync_sha']}` at "
+                         f"{rec.get('last_sync_at')}")
+            rd = rec.get("reverse_drift", {})
+            if rd.get("available"):
+                lines.append(f"  reverse drift: {rd['commits_since_sync']} "
+                             f"commits since sync touching {rd['files_touched']} "
+                             f"file(s)")
+                if rd.get("sample_files"):
+                    lines.append("    files (sample):")
+                    for f in rd["sample_files"][:8]:
+                        lines.append(f"      - {f}")
+            else:
+                lines.append(f"  reverse drift: unavailable "
+                             f"({rd.get('reason')})")
+        else:
+            lines.append("  last recorded sync: (never; run "
+                         "`platform_freshness.py --record` to capture a baseline)")
+        lines.append("")
+    if report["crawls"]:
+        lines.append("## UI crawl snapshots")
+        for c in report["crawls"]:
+            if not c.get("present"):
+                lines.append(f"  (missing) {c['name']}")
+                continue
+            stale = " [STALE]" if c.get("stale_flag") else ""
+            lines.append(
+                f"  - {c['name']} captured "
+                f"{c.get('captured_year_month', '?')} "
+                f"({c.get('days_since_captured', '?')} days ago){stale}"
+            )
+        lines.append("")
+        lines.append(
+            "  Stale flag fires when capture is >90 days old. Recapture "
+            "via `platform/crawl8v/` is a deliberate workspace operation; "
+            "this script never auto-refreshes the crawl."
+        )
+    return "\n".join(lines)
+
+
+def record_sync(report: dict) -> None:
+    state = load_state()
+    for name, rec in report["repos"].items():
+        if not rec.get("present"):
+            continue
+        state[name] = {
+            "sha": rec.get("head"),
+            "at": report["generated"],
+            "branch": rec.get("branch"),
+        }
+    save_state(state)
+    print(f"Recorded sync state to {STATE_FILE.relative_to(WORKSPACE)}.")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--json", action="store_true",
+                        help="Emit JSON instead of text report.")
+    parser.add_argument("--fetch", action="store_true",
+                        help="Read-only ls-remote check against upstream "
+                             "(no `git fetch`, no ref updates).")
+    parser.add_argument("--record", action="store_true",
+                        help="Capture the current HEADs as the new sync "
+                             "baseline (writes scripts/.platform_sync_state.json).")
+    args = parser.parse_args()
+
+    report = build_report(do_fetch=args.fetch)
+    if args.record:
+        record_sync(report)
+        return 0
+    if args.json:
+        print(json.dumps(report, indent=2))
+    else:
+        print(render_text(report))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

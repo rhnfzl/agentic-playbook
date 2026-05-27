@@ -1,0 +1,11 @@
+{
+  "command": "npx",
+  "args": [
+    "-y",
+    "@modelcontextprotocol/server-slack"
+  ],
+  "env": {
+    "SLACK_BOT_TOKEN": "{{REPLACE_WITH_YOUR_SLACK_BOT_TOKEN}}",
+    "SLACK_TEAM_ID": "{{REPLACE_WITH_YOUR_SLACK_TEAM_ID}}"
+  }
+}

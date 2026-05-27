@@ -1,0 +1,436 @@
+#!/usr/bin/env python3
+"""Single-screen workspace drift dashboard.
+
+Aggregates seven independent signals so a new session can answer
+"is this workspace healthy enough to work in?" with one command:
+
+    python3 scripts/workspace_status.py
+
+The seven signals:
+  1. platform/ freshness        (scripts/platform_freshness.py --json)
+  2. docs drift                 (~/.agents/skills/docs-drift)
+  3. meetings index             (scripts/build_meetings_index.py --check)
+  4. conversation log age       (filesystem mtime of latest entry)
+  5. agents-md lifecycle audit  (scripts/agents_md_audit.py --json)
+  6. launchd agents             (launchctl list grep com.8vance)
+  7. meetings/.env keys         (presence of OPENAI/REVO keys)
+
+Each probe reports one of: ok, warn, fail, skip, unknown.
+Exit codes:
+  0 = all ok/skip/unknown
+  1 = at least one fail
+  2 = warn but no fail (only with --strict)
+
+Flags:
+  --json        machine-readable output
+  --strict      treat warn as a fail-like signal for the exit code
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
+
+# TEMPLATE: replace sentinels per scripts/templates/CUSTOMIZE.md
+# Original docstring is preserved above. Edit the constants below
+# (DEFAULT_ROOT, EXPECTED_LAUNCHD, EXPECTED_ENV_KEYS) and optionally the
+# seven probe functions if you want to swap individual signals.
+DEFAULT_ROOT = Path("{{WORKSPACE_ROOT}}")
+
+STATUS_OK = "ok"
+STATUS_WARN = "warn"
+STATUS_FAIL = "fail"
+STATUS_SKIP = "skip"
+STATUS_UNKNOWN = "unknown"
+
+EXPECTED_LAUNCHD = (
+    # Replace with the launchd labels you expect to be loaded on this machine.
+    # Use `launchctl list | grep YOUR_PREFIX` to enumerate, then list them
+    # here so the probe reports any missing ones.
+    "{{LAUNCHD_LABEL_1}}",
+    "{{LAUNCHD_LABEL_2}}",
+)
+
+EXPECTED_ENV_KEYS = (
+    # Env keys that meetings/ or other workspace tooling expects.
+    # Set to () to skip the env-keys probe entirely.
+    "{{ENV_KEY_1}}",
+    "{{ENV_KEY_2}}",
+)
+
+
+def run_capture(
+    cmd: list[str], cwd: Path | None = None, timeout: int = 30
+) -> tuple[int, str, str]:
+    try:
+        out = subprocess.run(
+            cmd,
+            cwd=str(cwd) if cwd else None,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        return out.returncode, out.stdout, out.stderr
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        return 124 if isinstance(e, subprocess.TimeoutExpired) else 127, "", str(e)
+
+
+def probe_platform_freshness(root: Path) -> dict[str, Any]:
+    script = root / "scripts" / "platform_freshness.py"
+    if not script.is_file():
+        return {"status": STATUS_SKIP, "detail": "platform_freshness.py missing"}
+    rc, out, err = run_capture(["python3", str(script), "--json"], cwd=root)
+    if rc != 0:
+        return {"status": STATUS_UNKNOWN, "detail": f"freshness exit {rc}: {err.strip()[:120]}"}
+    try:
+        data = json.loads(out)
+    except json.JSONDecodeError as e:
+        return {"status": STATUS_UNKNOWN, "detail": f"json parse: {e}"}
+
+    drift_total = 0
+    behind: list[str] = []
+    for name, repo in data.get("repos", {}).items():
+        if not repo.get("present"):
+            behind.append(f"{name}=missing")
+            continue
+        rd = repo.get("reverse_drift") or {}
+        commits = rd.get("commits_since_sync") or 0
+        if commits:
+            drift_total += int(commits)
+            behind.append(f"{name}=+{commits}")
+
+    if drift_total == 0:
+        return {
+            "status": STATUS_OK,
+            "detail": f"both repos at recorded sync ({len(data.get('repos', {}))} checkouts)",
+            "raw": data,
+        }
+    return {
+        "status": STATUS_WARN,
+        "detail": f"reverse drift: {', '.join(behind)}",
+        "raw": data,
+    }
+
+
+_DRIFT_RE = re.compile(r"^(missing frontmatter|parse errors|type mismatch):\s*(\d+)\s*$", re.M)
+
+
+def probe_docs_drift(root: Path) -> dict[str, Any]:
+    drift_main = Path.home() / ".agents" / "skills" / "docs-drift" / "__main__.py"
+    if not drift_main.is_file():
+        return {"status": STATUS_SKIP, "detail": "docs-drift skill not installed"}
+    rc, out, err = run_capture(["python3", str(drift_main), "--root", str(root)], cwd=root)
+    if rc != 0 and not out:
+        return {"status": STATUS_UNKNOWN, "detail": f"drift exit {rc}: {err.strip()[:120]}"}
+
+    counters: dict[str, int] = {}
+    for match in _DRIFT_RE.finditer(out):
+        counters[match.group(1)] = int(match.group(2))
+    if not counters:
+        return {"status": STATUS_UNKNOWN, "detail": "could not parse drift output"}
+
+    parse_errors = counters.get("parse errors", 0)
+    type_mm = counters.get("type mismatch", 0)
+    missing_fm = counters.get("missing frontmatter", 0)
+
+    BASELINE_PARSE = 6
+    if parse_errors > BASELINE_PARSE or type_mm > 0:
+        return {
+            "status": STATUS_FAIL,
+            "detail": f"new drift: parse_errors={parse_errors} (baseline {BASELINE_PARSE}), type_mismatch={type_mm}",
+            "raw": counters,
+        }
+    if missing_fm == 0 and parse_errors == 0:
+        return {"status": STATUS_OK, "detail": "all docs clean", "raw": counters}
+    return {
+        "status": STATUS_OK,
+        "detail": f"baseline: missing_fm={missing_fm}, parse={parse_errors}, types_ok",
+        "raw": counters,
+    }
+
+
+def probe_meetings_index(root: Path) -> dict[str, Any]:
+    script = root / "scripts" / "build_meetings_index.py"
+    if not script.is_file():
+        return {"status": STATUS_SKIP, "detail": "build_meetings_index.py missing"}
+    rc, _, err = run_capture(["python3", str(script), "--check"], cwd=root)
+    if rc == 0:
+        return {"status": STATUS_OK, "detail": "meetings index up to date"}
+    return {
+        "status": STATUS_WARN,
+        "detail": f"meetings index stale (rc={rc}); run build_meetings_index.py",
+        "raw": err.strip()[:200],
+    }
+
+
+def probe_conversation_log(root: Path, warn_days: int = 14) -> dict[str, Any]:
+    log_root = root / "conversation_log"
+    if not log_root.is_dir():
+        return {"status": STATUS_SKIP, "detail": "conversation_log/ missing"}
+
+    latest: float = 0
+    latest_path: Path | None = None
+    for path in log_root.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.suffix not in (".json", ".md", ".jsonl"):
+            continue
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        if mtime > latest:
+            latest = mtime
+            latest_path = path
+    if latest_path is None:
+        return {"status": STATUS_WARN, "detail": "no log entries found"}
+    age = (datetime.now(tz=timezone.utc) - datetime.fromtimestamp(latest, tz=timezone.utc)).days
+    rel = latest_path.relative_to(root)
+    status = STATUS_OK if age <= warn_days else STATUS_WARN
+    return {
+        "status": status,
+        "detail": f"latest entry {age}d ago ({rel})",
+        "raw": {"latest_path": str(rel), "age_days": age},
+    }
+
+
+def probe_agents_audit(root: Path) -> dict[str, Any]:
+    script = root / "scripts" / "agents_md_audit.py"
+    if not script.is_file():
+        return {"status": STATUS_SKIP, "detail": "agents_md_audit.py missing"}
+    rc, out, err = run_capture(["python3", str(script), "--json"], cwd=root)
+    if rc not in (0, 1) or not out:
+        return {"status": STATUS_UNKNOWN, "detail": f"audit exit {rc}: {err.strip()[:120]}"}
+    try:
+        data = json.loads(out)
+    except json.JSONDecodeError as e:
+        return {"status": STATUS_UNKNOWN, "detail": f"json parse: {e}"}
+
+    counters = data.get("counters", {})
+    rot = counters.get("rot", 0)
+    stale = counters.get("stale-active", 0)
+    remove = counters.get("remove", 0)
+    unaudited = counters.get("unaudited", 0)
+    total = counters.get("total", 0)
+
+    if rot or stale or remove:
+        return {
+            "status": STATUS_FAIL,
+            "detail": f"rot={rot}, stale-active={stale}, remove={remove} (run agents_md_audit.py)",
+            "raw": counters,
+        }
+    if unaudited:
+        return {
+            "status": STATUS_OK,
+            "detail": f"{total - unaudited}/{total} tagged; {unaudited} unaudited (intentional)",
+            "raw": counters,
+        }
+    return {"status": STATUS_OK, "detail": f"all {total} files tagged active", "raw": counters}
+
+
+def probe_launchd_agents() -> dict[str, Any]:
+    rc, out, err = run_capture(["launchctl", "list"])
+    if rc != 0:
+        return {"status": STATUS_UNKNOWN, "detail": f"launchctl exit {rc}: {err.strip()[:120]}"}
+    loaded = set()
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 3:
+            label = parts[2]
+            if label.startswith("com.8vance."):
+                loaded.add(label)
+    missing = [name for name in EXPECTED_LAUNCHD if name not in loaded]
+    if not missing:
+        return {
+            "status": STATUS_OK,
+            "detail": f"{len(loaded)}/{len(EXPECTED_LAUNCHD)} agents loaded",
+            "raw": sorted(loaded),
+        }
+    if len(missing) == len(EXPECTED_LAUNCHD):
+        return {
+            "status": STATUS_WARN,
+            "detail": f"0/{len(EXPECTED_LAUNCHD)} agents loaded; run scripts/install_meeting_agents.sh + install_clawpatch_agents.sh + install_agent_harness_agents.sh",
+            "raw": {"missing": missing},
+        }
+    return {
+        "status": STATUS_WARN,
+        "detail": f"{len(loaded)}/{len(EXPECTED_LAUNCHD)} loaded; missing: {', '.join(missing)}",
+        "raw": {"loaded": sorted(loaded), "missing": missing},
+    }
+
+
+_CLAWPATCH_RE = re.compile(
+    r"^## (.+?)\n(?:.*\n)*?open findings:\s*(\d+)\s*$", re.M
+)
+
+
+def probe_clawpatch(root: Path) -> dict[str, Any]:
+    script = root / "scripts" / "clawpatch_controller.py"
+    if not script.is_file():
+        return {"status": STATUS_SKIP, "detail": "clawpatch_controller.py missing"}
+    rc, out, err = run_capture(
+        [
+            "python3",
+            str(script),
+            "status",
+            "--include-worktrees",
+            "--finding-limit",
+            "0",
+        ],
+        cwd=root,
+        timeout=60,
+    )
+    if rc != 0 or not out:
+        return {
+            "status": STATUS_UNKNOWN,
+            "detail": f"clawpatch exit {rc}: {err.strip()[:120]}",
+        }
+    counts = [(m.group(1).strip(), int(m.group(2))) for m in _CLAWPATCH_RE.finditer(out)]
+    if not counts:
+        return {"status": STATUS_UNKNOWN, "detail": "could not parse clawpatch output"}
+    total = sum(n for _, n in counts)
+    if total == 0:
+        return {
+            "status": STATUS_OK,
+            "detail": f"0 open findings across {len(counts)} branches",
+            "raw": dict(counts),
+        }
+    detail_parts = ", ".join(f"{p}={n}" for p, n in counts if n)
+    return {
+        "status": STATUS_WARN,
+        "detail": f"{total} open findings: {detail_parts}",
+        "raw": dict(counts),
+    }
+
+
+def probe_meetings_env(root: Path) -> dict[str, Any]:
+    env_path = root / "meetings" / ".env"
+    if not env_path.is_file():
+        return {"status": STATUS_WARN, "detail": "meetings/.env missing"}
+    try:
+        text = env_path.read_text(encoding="utf-8", errors="replace")
+    except OSError as e:
+        return {"status": STATUS_UNKNOWN, "detail": f"read error: {e}"}
+    present: list[str] = []
+    missing: list[str] = []
+    for key in EXPECTED_ENV_KEYS:
+        if re.search(rf"^{key}=\S+", text, re.M):
+            present.append(key)
+        else:
+            missing.append(key)
+    if not missing:
+        return {
+            "status": STATUS_OK,
+            "detail": f"{len(present)}/{len(EXPECTED_ENV_KEYS)} keys present",
+            "raw": {"present": present},
+        }
+    return {
+        "status": STATUS_WARN,
+        "detail": f"{len(present)}/{len(EXPECTED_ENV_KEYS)} keys; missing: {', '.join(missing)}",
+        "raw": {"present": present, "missing": missing},
+    }
+
+
+PROBES: list[tuple[str, Callable[..., dict[str, Any]]]] = [
+    ("platform freshness", probe_platform_freshness),
+    ("clawpatch", probe_clawpatch),
+    ("docs drift", probe_docs_drift),
+    ("meetings index", probe_meetings_index),
+    ("conversation log", probe_conversation_log),
+    ("agents-md audit", probe_agents_audit),
+    ("launchd agents", probe_launchd_agents),
+    ("meetings/.env", probe_meetings_env),
+]
+
+
+def run_all_probes(root: Path) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    for name, fn in PROBES:
+        try:
+            if fn is probe_launchd_agents:
+                result = fn()
+            else:
+                result = fn(root)
+        except Exception as e:  # noqa: BLE001 - never fail the whole dashboard
+            result = {"status": STATUS_UNKNOWN, "detail": f"probe error: {e}"}
+        result["probe"] = name
+        results.append(result)
+    return results
+
+
+SYMBOL = {
+    STATUS_OK: "ok  ",
+    STATUS_WARN: "warn",
+    STATUS_FAIL: "FAIL",
+    STATUS_SKIP: "skip",
+    STATUS_UNKNOWN: "?   ",
+}
+
+
+def format_human(results: list[dict[str, Any]], root: Path) -> str:
+    lines: list[str] = []
+    lines.append(f"# Workspace status -- {root}")
+    lines.append(f"generated: {datetime.now(tz=timezone.utc).isoformat()}")
+    lines.append("")
+    counters: dict[str, int] = {}
+    for r in results:
+        counters[r["status"]] = counters.get(r["status"], 0) + 1
+        sym = SYMBOL.get(r["status"], "?")
+        lines.append(f"[{sym}] {r['probe']:20s}  {r['detail']}")
+    lines.append("")
+    lines.append("Summary: " + ", ".join(f"{k}={counters[k]}" for k in sorted(counters)))
+    return "\n".join(lines)
+
+
+def overall_exit(results: list[dict[str, Any]], strict: bool) -> int:
+    statuses = {r["status"] for r in results}
+    if STATUS_FAIL in statuses:
+        return 1
+    if strict and STATUS_WARN in statuses:
+        return 2
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Single-screen workspace drift dashboard."
+    )
+    parser.add_argument("--root", default=str(DEFAULT_ROOT), type=Path)
+    parser.add_argument("--json", action="store_true", help="machine-readable JSON")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit 2 on warn (default: warns do not affect exit code)",
+    )
+    args = parser.parse_args(argv)
+
+    if not args.root.is_dir():
+        sys.stderr.write(f"root not a directory: {args.root}\n")
+        return 2
+
+    root = args.root.resolve()
+    os.chdir(root)
+    results = run_all_probes(root)
+
+    if args.json:
+        payload = {
+            "root": str(root),
+            "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+            "results": results,
+        }
+        print(json.dumps(payload, indent=2))
+    else:
+        print(format_human(results, root))
+
+    return overall_exit(results, args.strict)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,14 @@
+{
+  "_comment_runtime": "Run via the playbook-symlinked source dir. The .venv path resolves after `uv sync` inside the bundle dir; the README documents that bootstrap step. Until then, manual `pip install fastmcp` against system python3 is the fallback.",
+  "_comment_scope": "Default --allowed-dir is the target project (resolved at install time). Home-wide access is an explicit opt-in: add another --allowed-dir entry pointing at $HOME or any path you want to expose. Wider scope is risky under prompt injection because the bundle also exposes passthrough write_file / create_directory / move_file tools.",
+  "command": "{{AGENT_SHARED_MCP_DIR}}/.venv/bin/python",
+  "args": [
+    "{{AGENT_SHARED_MCP_DIR}}/server.py",
+    "--allowed-dir",
+    "{{PLAYBOOK_TARGET}}"
+  ],
+  "env": {
+    "PYTHONPATH": "{{AGENT_SHARED_MCP_DIR}}"
+  },
+  "cwd": "{{AGENT_SHARED_MCP_DIR}}"
+}

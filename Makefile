@@ -1,0 +1,106 @@
+.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor
+
+PYTHON ?= python3
+
+help:
+	@echo "Coding Agents Playbook - available targets:"
+	@echo ""
+	@echo "  make install                       Interactive: detect installed agents, materialize files"
+	@echo "                                     (prompts for target project directory)"
+	@echo "  make install TARGET=/path          Non-interactive target, still prompts for agents"
+	@echo "  make install AGENTS=auto           Use all detected agents (requires TARGET)"
+	@echo "  make install AGENTS=auto TARGET=/path"
+	@echo "                                     Fully non-interactive install"
+	@echo "  make list                          List installed playbook content per adapter"
+	@echo "  make status                        Show installed vs playbook drift summary"
+	@echo "  make update                        Re-materialize playbook content into current adapters"
+	@echo "  make remove                        Remove materialized playbook content per adapter"
+	@echo "  make audit                         Run external-skill security audit (block-by-default)"
+	@echo "  make sync-mattpocock               Pull mattpocock/skills updates into skills/imported/mattpocock/"
+	@echo "  make sync-distribution MANIFEST=/path/to/manifest.toml"
+	@echo "                                     Sync base/ to external destination per ADR-0042 (manifest-driven)"
+	@echo "  make sync-distribution-memory MANIFEST=/path/to/manifest.toml"
+	@echo "                                     Port curated memory entries to external destination"
+	@echo "  make init TARGET=/path             Per-project init: scaffold AGENTS.md + .playbook-config.yaml"
+	@echo "  make check                         Full check: frontmatter, AGENTS.md, audit, size, decay, em-dash, no-versions"
+	@echo "  make eval                          Run skill eval suites (LLM-judge driven; slower)"
+	@echo "  make test                          Adapter smoke tests + pytest lifecycle scenarios"
+	@echo "  make new SKILL=<name>              Scaffold a new skill (in skills/<category>/<name>/)"
+	@echo "                                     Optional: CATEGORY=engineering|productivity|observability|meta"
+	@echo "  make doctor                        Diagnose setup: which agents detected, which not, why"
+	@echo "  make doctor-verify                 Layer-3 verify: lockfile vs native config vs on-disk (ADR-0036)"
+	@echo "  make targets-list                  Multi-project: list every target where init has been run"
+	@echo "  make targets-doctor                Multi-project: report registry state (read-only by default)"
+	@echo "  make targets-doctor PRUNE=1        Multi-project: report + prune entries pointing at missing dirs"
+	@echo ""
+
+install:
+	@$(PYTHON) scripts/install.py \
+		$(if $(filter auto,$(AGENTS)),--non-interactive) \
+		$(if $(TARGET),--target $(TARGET)) \
+		$(if $(PROFILE),--profile $(PROFILE))
+
+list:
+	@$(PYTHON) scripts/install.py --list
+
+status:
+	@$(PYTHON) scripts/install.py --status \
+		$(if $(TARGET),--target $(TARGET)) \
+		$(if $(PROFILE),--profile $(PROFILE))
+
+update:
+	@$(PYTHON) scripts/install.py --update \
+		$(if $(TARGET),--target $(TARGET)) \
+		$(if $(PROFILE),--profile $(PROFILE))
+
+remove:
+	@$(PYTHON) scripts/install.py --remove \
+		$(if $(TARGET),--target $(TARGET))
+
+audit:
+	@$(PYTHON) scripts/audit_external_skill.py
+
+sync-mattpocock:
+	@bash scripts/sync_mattpocock.sh
+
+sync-curated-skills:
+	@$(PYTHON) scripts/sync_curated_skills.py
+
+sync-distribution:
+	@if [ -z "$(MANIFEST)" ]; then echo "Usage: make sync-distribution MANIFEST=/path/to/manifest.toml [DRY_RUN=1]"; exit 1; fi
+	@$(PYTHON) scripts/sync_distribution.py --manifest "$(MANIFEST)" $(if $(DRY_RUN),--dry-run,)
+
+sync-distribution-memory:
+	@if [ -z "$(MANIFEST)" ]; then echo "Usage: make sync-distribution-memory MANIFEST=/path/to/manifest.toml [DRY_RUN=1]"; exit 1; fi
+	@$(PYTHON) scripts/sync_distribution.py memory --manifest "$(MANIFEST)" $(if $(DRY_RUN),--dry-run,)
+
+init:
+	@if [ -z "$(TARGET)" ]; then echo "Usage: make init TARGET=/path/to/project"; exit 1; fi
+	@$(PYTHON) scripts/playbook_init.py --target "$(TARGET)"
+
+check:
+	@$(PYTHON) scripts/check.py
+
+eval:
+	@$(PYTHON) scripts/eval_runner.py
+
+test:
+	@$(PYTHON) scripts/test_adapters.py
+	@$(PYTHON) -m pytest tests/ -q
+
+new:
+	@if [ -z "$(SKILL)" ]; then echo "Usage: make new SKILL=<name> [CATEGORY=<cat>] [SCOPE=base|team]"; exit 1; fi
+	@$(PYTHON) scripts/new_skill.py --name "$(SKILL)" --category "$(if $(CATEGORY),$(CATEGORY),engineering)" --scope "$(if $(SCOPE),$(SCOPE),base)"
+
+doctor:
+	@$(PYTHON) scripts/install.py --diagnose
+
+doctor-verify:
+	@$(PYTHON) scripts/install.py --verify \
+		$(if $(TARGET),--target $(TARGET))
+
+targets-list:
+	@$(PYTHON) -c "import sys; sys.path.insert(0, 'scripts'); from target_registry import cmd_targets_list; sys.exit(cmd_targets_list())"
+
+targets-doctor:
+	@$(PYTHON) -c "import os, sys; sys.path.insert(0, 'scripts'); from target_registry import cmd_targets_doctor; sys.exit(cmd_targets_doctor(prune=os.environ.get('PRUNE', '').lower() in {'1', 'true', 'yes', 'on'}))"

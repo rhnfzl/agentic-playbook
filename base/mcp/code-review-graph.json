@@ -1,0 +1,10 @@
+{
+  "enabled": false,
+  "command": "uvx",
+  "args": [
+    "code-review-graph",
+    "serve",
+    "--repo",
+    "{{REPLACE_WITH_YOUR_WORKSPACE_PATH}}"
+  ]
+}

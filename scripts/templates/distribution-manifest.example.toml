@@ -1,0 +1,134 @@
+# Example manifest for scripts/sync_distribution.py (ADR-0042).
+#
+# Copy this file to a path OUTSIDE the playbook repo and edit the values
+# to match your destination. The script reads --manifest <path> at run
+# time; the manifest is operator-owned and stays out of the playbook
+# itself.
+#
+# Recommended location: anywhere outside the playbook checkout. The
+# manifest contains a destination path; treat it like a config file, not
+# like content.
+
+[destination]
+# Absolute path to the destination repo on disk. Must already exist and
+# be a clean git working tree (override with --allow-dirty).
+path = "/Users/<you>/path/to/destination/repo"
+
+# When true, the script refuses to run if the destination has any
+# uncommitted changes. Default true; use --allow-dirty on the CLI to
+# override for one run without editing this value.
+require_clean_git = true
+
+
+[sources]
+# Files / dirs (relative to the source playbook root) that flow to the
+# destination. Directories are walked recursively; everything under them
+# is included unless matched by denylist.
+allowlist = [
+  "base/",
+  "scripts/sync_distribution.py",
+  "scripts/install.py",
+  "scripts/install_lifecycle.py",
+  "scripts/install_lockfile.py",
+  "scripts/install_bundles.py",
+  "scripts/install_orphans.py",
+  "scripts/playbook_init.py",
+  "scripts/playbook_update.py",
+  "scripts/playbook_profile.py",
+  "scripts/scope_resolution.py",
+  "scripts/target_materializer.py",
+  "scripts/target_registry.py",
+  "scripts/agents_md.py",
+  "scripts/adapters/",
+  "scripts/checks/",
+  "scripts/hook_registration/",
+  "scripts/sync_curated_skills.py",
+  "scripts/sync_mattpocock.sh",
+  "scripts/new_skill.py",
+  "scripts/promote_skill.py",
+  "scripts/check_em_dashes.py",
+  "scripts/check_agents_md.py",
+  "scripts/size_check.py",
+  "scripts/decay_check.py",
+  "scripts/frontmatter_lint.py",
+  "scripts/audit_external_skill.py",
+  "scripts/check_skill_description.py",
+  "scripts/hook_source_unification.py",
+  "scripts/hook_metadata.py",
+  "scripts/eval_runner.py",
+  "scripts/bulk_import.py",
+  "scripts/templates/",
+  "tests/",
+  "docs/adr/",
+  "Makefile",
+  "VERSION",
+  ".gitattributes",
+  "CONTEXT.md",
+  "CHANGELOG.md",
+  "TOOLS.md",
+  "AGENTS.md",
+]
+
+# Files matching denylist entries are skipped even if covered by allowlist.
+# Use this for paths the destination should not see at all.
+denylist = [
+  # "tests/fixtures/source_specific.toml",
+]
+
+
+[scrubs]
+# Each pattern is a single regex substitution applied to text files (.md,
+# .py, .toml, .sh, .json, etc.). Patterns run in declared order; the
+# output of one feeds the next.
+#
+# Binary files (anything not in TEXT_EXTENSIONS in sync_distribution.py)
+# are copied byte-for-byte with no scrub.
+#
+# Default is case-insensitive matching. Set case_insensitive = false for
+# whole-word patterns that should match exact casing only.
+patterns = [
+  # Ticket-tracker IDs (any project prefix).
+  { match = "\\b(R8|MATCH|JIRA|TICKET)-\\d+\\b", replace = "[ticket]" },
+
+  # Team identifiers. Replace with a generic placeholder so the rule's
+  # logic survives and only the identity is anonymized.
+  { match = "\\bteam\\b", replace = "the team", case_insensitive = false },
+  { match = "\\binternal-host\\b", replace = "internal-host", case_insensitive = false },
+
+  # VCS / CI / observability vendor mentions used as examples.
+  { match = "VCS", replace = "VCS" },
+  { match = "CI", replace = "CI" },
+  { match = "code-quality", replace = "code-quality" },
+  { match = "error-tracking", replace = "error-tracking" },
+
+  # Internal product / vendor names that flow through skill examples.
+  # Add more as the first sync's diff surfaces them.
+  # { match = "<internal-product-name>", replace = "<placeholder>" },
+]
+
+
+# Optional. The memory sub-command (`sync_distribution.py memory`) uses
+# these fields; leave the block out if you only sync content, not memory.
+[memory]
+# Source: the running project's memory directory (the host filesystem
+# location where ~/.claude/projects/<project-slug>/memory/ lives for the
+# current playbook checkout).
+source_dir = "/Users/<you>/.claude/projects/<source-project-slug>/memory/"
+
+# Destination: the corresponding memory directory for the destination
+# project slug. Created automatically if missing.
+destination_dir = "/Users/<you>/.claude/projects/<destination-project-slug>/memory/"
+
+# Allowlist of entry slugs to port. Empty list means "port everything
+# except entries in denylist". A non-empty list restricts to those entries.
+allowlist = [
+  # "feedback_writing_style",
+  # "feedback_no_em_dashes",
+  # ... fill in the entries you want at the destination
+]
+
+# Denylist runs after allowlist. Use this to keep specific entries home
+# even when the broad allowlist would include them.
+denylist = [
+  # "project_specific_ticket_status",
+]

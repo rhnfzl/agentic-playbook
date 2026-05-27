@@ -1,0 +1,60 @@
+# anchored-fs configuration
+# Lives at ~/.config/agent-shared/anchored-fs.toml
+# Each validator is independently togglable.
+
+[daemon]
+socket_path = "~/.config/agent-shared/run/anchored-fs.sock"
+launchd_label = "com.anchored-fs.daemon"
+loglevel = "info"
+
+[validators.edit_anchor]
+enabled = true
+mode = "auto_rescue"                       # "auto_rescue" (ship default) | "force_reject" (auto-graduated)
+oversize_threshold_lines = 25              # below: pass through; above: rescue OR force-reject per mode
+hard_reject_threshold_lines = 50           # only honored when mode = "force_reject"
+emit_post_hoc_reminder = true              # nudge the LLM about [upto] syntax after auto-rescue
+escape_sequence = "\\[upto\\]"             # users can literal-include [upto] via backslash escape
+
+[validators.anchor_failure_rescue]
+enabled = true
+candidate_count = 3
+fuzzy_min_similarity = 0.65
+
+[validators.path_resolver]
+enabled = true
+silent_rewrite = false                     # v1 default: surface candidate to LLM, never silently substitute
+silent_rewrite_threshold = 0.92            # only honored when silent_rewrite = true
+candidate_count = 5
+applies_to_pretool = ["Edit", "MultiEdit", "Write"]   # Read uses PostToolUse-only (no PreToolUse latency)
+enforce_allowed_root = true                # reject candidates outside workspace root (cannot be disabled)
+similarity_algorithm = "sequencematcher"   # difflib.SequenceMatcher.ratio() + basename-match bonus
+
+[validators.stale_read_guard]
+enabled = true
+mode = "warn"                              # v1 default; auto-graduates to "block" per graduation policy
+content_hash = "sha256"                    # "none" | "sha256"; sha256 catches same-mtime concurrent writes
+require_recent_read_seconds = 0            # 0 = no recency requirement; >0 = additionally require a Read within N seconds
+allow_edit_without_prior_read = true       # true = new-file flows pass; false = always require a Read first
+include_diff_in_warning = true
+normalize_line_endings = true              # treat \r\n vs \n as equivalent when hashing
+
+[graduation]
+# Auto-graduation runs daily via the daemon. No user prompt; transitions log to graduation-state.json
+# and surface in install.py status.
+enabled = true
+
+[graduation.edit_anchor]
+trigger = "voluntary_adoption_below"       # current_mode auto_rescue -> force_reject if condition holds
+threshold_pct = 30                         # voluntary [upto] use under 30% of edits over oversize_threshold
+window_days = 28
+min_sample_size = 100                      # require at least N qualifying edits before flipping
+
+[graduation.stale_read_guard]
+trigger = "warn_quality_above"             # current_mode warn -> block if condition holds
+threshold_pct = 95                         # >=95% of warns followed by Re-Read-then-Edit
+window_days = 28
+min_sample_size = 50
+
+[graduation.stale_read_guard.reversal]
+trigger = "user_bypass_count"              # block -> warn if condition holds
+threshold = 3

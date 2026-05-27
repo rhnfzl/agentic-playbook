@@ -1,0 +1,43 @@
+# Profile: Tech Lead
+name = "tech-lead"
+description = "Tech lead with broad coverage. Includes all skills, all rules, all hooks, all MCP configs. Use for the playbook owner / primary maintainer."
+requires_overlays = ["team"]
+
+[skills]
+include = [
+  "engineering/VCS-pr-review",
+  "engineering/ci-failure-triage",
+  "engineering/sonar-pr-gate",
+  "engineering/post-iter-review",
+  "engineering/match-ticket-grounding",
+  "engineering/mcp-first-boundary-check",
+  "engineering/chat-transcript-debug",
+  "engineering/agentic-scenario-triage",
+  "productivity/grill-me",
+  "productivity/handoff",
+  "productivity/stakeholder-slack-brief",
+  "productivity/slack-inbound-reply",
+  "observability/k8s-state-sweep",
+  "observability/vpn-connectivity-check",
+  "meta/write-a-skill",
+]
+
+[rules]
+include = [
+  "label-policy",
+  "mcp-first-boundary",
+  "no-em-dashes",
+  "no-ticket-ids-in-code",
+  "VCS-not-github",
+  "writing-style",
+  "jira-priority-scheme",
+  "full-request-chain",
+  "never-push-to-develop",
+  "direct-acc-first",
+]
+
+[hooks]
+include = ["sonar-advisory", "lint-guard", "never-push-to-develop", "human-html-autoindex"]
+
+[mcp]
+include = ["code-review-graph", "atlassian", "slack", "error-tracking", "tavily", "VCS", "code-quality"]

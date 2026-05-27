@@ -1,0 +1,33 @@
+# Profile: Frontend Developer
+name = "frontend-developer"
+description = "Frontend developer working on the team web app. Lighter than backend profile; excludes backend-specific skills (CI/Sonar/k8s-state-sweep) and MCP-first boundary check."
+requires_overlays = ["team"]
+
+[skills]
+include = [
+  "engineering/VCS-pr-review",
+  "engineering/post-iter-review",
+  "productivity/grill-me",
+  "productivity/handoff",
+  "productivity/stakeholder-slack-brief",
+  "productivity/slack-inbound-reply",
+  "meta/write-a-skill",
+]
+
+[rules]
+include = [
+  "label-policy",
+  "no-em-dashes",
+  "no-ticket-ids-in-code",
+  "VCS-not-github",
+  "writing-style",
+  "jira-priority-scheme",
+  "full-request-chain",
+  "never-push-to-develop",
+]
+
+[hooks]
+include = ["lint-guard", "never-push-to-develop", "human-html-autoindex"]
+
+[mcp]
+include = ["atlassian", "slack", "tavily", "VCS"]

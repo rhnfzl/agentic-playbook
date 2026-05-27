@@ -1,0 +1,48 @@
+# Profile: DevOps (team)
+name = "devops"
+description = "DevOps engineer working across team projects. Bundles 4 native skills covering the team-specific surface (AWS Secrets Manager configmaps, error-tracking triage, k8s dashboard verification, CI pipeline debugging) plus the AGENTS.md curator. External-tool skills (Terraform, Packer, k8s tooling) are documented in profiles/devops.README.md for opt-in install via `npx skills add <upstream>`."
+requires_overlays = ["team"]
+owner = "rehan"
+last_reviewed = "2026-05-26"
+
+[skills]
+include = [
+  # team-native DevOps skills
+  "devops/aws-secrets-configmap-apply",
+  "devops/error-tracking-issue-triage",
+  "devops/k8s-dashboard-verify",
+  "devops/CI-pipeline-debug",
+
+  # Onboarding + lifecycle from the playbook
+  "meta/agents-md-curator",
+  "meta/playbook-promote",
+  "meta/playbook-retrospective",
+
+  # Cross-role observability + productivity
+  "observability/k8s-state-sweep",
+  "observability/vpn-connectivity-check",
+  "productivity/handoff",
+]
+
+[rules]
+include = [
+  "writing-style",
+  "no-em-dashes",
+  "no-ticket-ids-in-code",
+  "direct-acc-first",
+  "never-push-to-develop",
+]
+
+[hooks]
+include = [
+  "never-push-to-develop",
+  "agent-memory-session-brief",
+]
+
+[mcp]
+include = [
+  "atlassian",
+  "error-tracking",
+  "code-quality",
+  "slack",
+]
