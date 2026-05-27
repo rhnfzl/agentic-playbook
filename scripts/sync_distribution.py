@@ -107,8 +107,14 @@ class Manifest:
     memory_denylist: list[str] = field(default_factory=list)
 
     def scrub_rules_hash(self) -> str:
+        # Include compiled flags so case_insensitive flips trigger drift
+        # warnings on the next sync. Without `p.pattern.flags` in the
+        # payload, switching `case_insensitive = false` -> true (or vice
+        # versa) produced an identical hash and drift detection stayed
+        # silent. (Second-eye review 2026-05-27.)
         payload = "\n".join(
-            f"{p.pattern.pattern}::{p.replacement}" for p in self.scrubs
+            f"{p.pattern.pattern}::flags={p.pattern.flags}::{p.replacement}"
+            for p in self.scrubs
         )
         return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -256,6 +262,39 @@ def _validate_clean_git(repo: Path) -> bool:
     return result.stdout.strip() == ""
 
 
+def _validate_clean_source(repo: Path) -> tuple[bool, str]:
+    """Return (clean, detail). source dirty = reproducibility hazard.
+
+    The audit records `source_commit` from `git rev-parse HEAD`, but if
+    the working tree has uncommitted edits, the synced content reflects
+    those edits while the audit claims it came from HEAD. A future
+    operator who tries to reproduce the destination from `source_commit`
+    will see different content. Second-eye review (2026-05-27) caught
+    this as a HIGH reproducibility hole.
+
+    Returns (True, "") for a clean source, (False, "<detail>") otherwise.
+    """
+    if not (repo / ".git").exists():
+        # Source might be a non-git checkout (extracted tarball, vendored).
+        # In that case the audit's source_commit is "unknown" anyway and
+        # the reproducibility risk is operator-acknowledged.
+        return (True, "")
+    result = subprocess.run(
+        ["git", "-C", str(repo), "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return (False, f"git status failed: {result.stderr.strip()}")
+    if result.stdout.strip() != "":
+        # Trim the porcelain to two lines so the stderr message stays
+        # operator-readable; the full diff is one `git status` away.
+        sample = "\n".join(result.stdout.strip().splitlines()[:2])
+        return (False, f"uncommitted changes:\n  {sample}")
+    return (True, "")
+
+
 def _source_commit(repo: Path) -> tuple[str, str]:
     """Return (sha, branch) for the source repo's current HEAD."""
     sha_result = subprocess.run(
@@ -349,6 +388,15 @@ def _resolve_sources(
     Entries that escape source_root via traversal (e.g. `../notes.md`)
     are rejected with a stderr warning rather than silently writing
     outside the destination repo.
+
+    Default-excluded dir names (`__pycache__`, `.git`, `.pytest_cache`,
+    etc.) are rejected even when explicitly named in the allowlist. The
+    walker already prunes them as children, but a top-level allowlist
+    entry like `"scripts/__pycache__/"` would otherwise bypass the
+    prune by starting the walk INSIDE the excluded dir. Second-eye
+    review (2026-05-27) caught this gap. The default-exclude policy is
+    firm: cache and metadata dirs should never flow to a destination
+    regardless of operator manifest.
     """
     result: list[Path] = []
     seen: set[Path] = set()
@@ -359,6 +407,15 @@ def _resolve_sources(
             _stderr(
                 f"WARN: allowlist entry escapes source_root and will be "
                 f"ignored: {entry}"
+            )
+            continue
+        # Reject explicit allowlist of a default-excluded dir. We check
+        # by name (not the resolved location) so the policy is operator-
+        # visible in the manifest entry itself.
+        if candidate.name in DEFAULT_EXCLUDED_DIR_NAMES:
+            _stderr(
+                f"WARN: allowlist entry {entry!r} names a default-excluded "
+                f"dir; refusing to ship cache / metadata content"
             )
             continue
         if candidate.is_file():
@@ -399,7 +456,11 @@ def _scrub_text(text: str, scrubs: list[ScrubPattern]) -> str:
 
 
 def _copy_file(
-    src: Path, dst: Path, scrubs: list[ScrubPattern], dry_run: bool
+    src: Path,
+    dst: Path,
+    scrubs: list[ScrubPattern],
+    dry_run: bool,
+    source_root: Path | None = None,
 ) -> tuple[bool, str | None]:
     """Copy `src` to `dst` with optional scrub.
 
@@ -411,10 +472,35 @@ def _copy_file(
     Without this, materializing a symlink as a plain copy of its target's
     bytes produces a duplicate-content file at the destination, which the
     hook-source-unification check correctly flags as drift.
+
+    Safety (adversarial review 2026-05-27): a symlink inside an
+    allowlisted directory could point outside `source_root` and, when
+    preserved verbatim, leak the path string + create an attacker-
+    controlled link at the destination. When `source_root` is provided
+    the resolved target is checked against it; symlinks escaping the
+    source tree are rejected with an error.
     """
     try:
         if src.is_symlink():
             target = os.readlink(src)
+            if source_root is not None:
+                # Resolve the symlink target relative to the symlink's
+                # parent (per POSIX symlink semantics). If the resolved
+                # path leaves source_root, reject.
+                target_path = Path(target)
+                if target_path.is_absolute():
+                    resolved = target_path
+                else:
+                    resolved = (src.parent / target_path)
+                try:
+                    resolved_abs = resolved.resolve(strict=False)
+                except OSError:
+                    return (False, f"unreadable symlink target for {src}")
+                if not _within(resolved_abs, source_root.resolve()):
+                    return (
+                        False,
+                        f"symlink {src} -> {target} escapes source_root; refusing to preserve",
+                    )
             if dst.is_symlink() and os.readlink(dst) == target:
                 return (False, None)
             if dry_run:
@@ -544,17 +630,50 @@ def _delete_stale_files(
     the destination." Leaving it produces silent drift between
     `.sync-manifest.json` and the destination's working tree.
 
+    Safety: each prior `synced_files` entry is validated before deletion.
+    Absolute paths and entries whose resolved target escapes `destination`
+    are rejected with a stderr warning. A corrupted or malicious audit
+    file containing `../etc/passwd` or `/absolute/path` therefore cannot
+    make the next sync delete files outside the destination repo. The
+    adversarial review (2026-05-27) surfaced this hole: the prior pass
+    only validated writes, not deletions.
+
     Returns the list of files that were actually deleted (excluding
     those already absent at the destination, which is a no-op).
     """
     if prior is None:
         return []
-    prior_files = set(prior.get("synced_files") or [])
+    prior_files = prior.get("synced_files") or []
+    if not isinstance(prior_files, list):
+        _stderr(
+            f"WARN: prior audit at {destination / AUDIT_FILENAME} has "
+            "malformed synced_files (not a list); skipping stale-delete"
+        )
+        return []
     current_set = set(current_files)
-    stale = sorted(prior_files - current_set)
+    destination_resolved = destination.resolve()
     deleted: list[str] = []
-    for rel in stale:
-        target = destination / rel
+    for rel in sorted(set(prior_files) - current_set):
+        if not isinstance(rel, str) or not rel:
+            _stderr(f"WARN: prior synced_files entry is not a string; skipping")
+            continue
+        # Reject absolute paths and any traversal that resolves outside
+        # destination. Without this, `synced_files: ["../etc/passwd"]`
+        # in a corrupted audit would make the next sync unlink that path.
+        rel_path = Path(rel)
+        if rel_path.is_absolute():
+            _stderr(
+                f"WARN: prior synced_files contains absolute path {rel!r}; "
+                "refusing to delete; audit may be corrupted"
+            )
+            continue
+        target = (destination / rel_path)
+        if not _within(target, destination_resolved):
+            _stderr(
+                f"WARN: prior synced_files path {rel!r} resolves outside "
+                f"destination; refusing to delete"
+            )
+            continue
         if target.is_symlink() or target.is_file():
             try:
                 target.unlink()
@@ -648,6 +767,21 @@ def run_distribution(args: argparse.Namespace) -> int:
             _stderr("destination working tree is not clean; use --allow-dirty to override")
             return 1
 
+    # Source dirty state breaks the audit's reproducibility contract:
+    # the recorded source_commit doesn't include uncommitted edits in
+    # the working tree. Default-on; --allow-source-dirty overrides for
+    # the operator who knowingly wants to sync a WIP state.
+    if not getattr(args, "allow_source_dirty", False):
+        clean, detail = _validate_clean_source(source_root)
+        if not clean:
+            _stderr(
+                f"source working tree is not clean ({detail}); "
+                "the audit's source_commit will not reproduce the "
+                "synced content. Commit or stash, or pass "
+                "--allow-source-dirty to override."
+            )
+            return 1
+
     source_sha, source_branch = _source_commit(source_root)
     sources = _resolve_sources(source_root, manifest.allowlist, manifest.denylist)
     if not sources:
@@ -672,7 +806,9 @@ def run_distribution(args: argparse.Namespace) -> int:
                 f"destination path escapes destination_path: {rel}"
             )
             continue
-        was_changed, err = _copy_file(src, dst, manifest.scrubs, args.dry_run)
+        was_changed, err = _copy_file(
+            src, dst, manifest.scrubs, args.dry_run, source_root=source_root
+        )
         if err is not None:
             errors.append(err)
             continue
@@ -762,12 +898,18 @@ def run_memory(args: argparse.Namespace) -> int:
 
     deleted_count = 0
     index_written = False
+    prior_memory_audit = _read_prior_audit(manifest.memory_destination_dir)
     if not args.dry_run:
         deleted_count = _delete_stale_memory_entries(
-            manifest.memory_destination_dir, ported
+            manifest.memory_destination_dir, ported, prior_memory_audit
         )
         index_written = _write_memory_index_if_changed(
             manifest.memory_destination_dir, ported
+        )
+        # Track which entries this run ported so the next run knows what
+        # IT previously wrote and can stale-delete safely.
+        _write_memory_audit(
+            manifest.memory_destination_dir, ported, manifest.scrubs
         )
 
     print(f"Memory source:      {manifest.memory_source_dir}")
@@ -779,28 +921,106 @@ def run_memory(args: argparse.Namespace) -> int:
     return 0
 
 
-def _delete_stale_memory_entries(memory_dir: Path, ported_slugs: list[str]) -> int:
-    """Delete entries the destination has that the current sync didn't port.
+def _delete_stale_memory_entries(
+    memory_dir: Path,
+    ported_slugs: list[str],
+    prior_audit: dict | None,
+) -> int:
+    """Delete memory entries the PRIOR sync wrote that the current sync did not.
 
-    Mirrors the content-sync stale-delete pattern: a memory entry that
-    the operator's allowlist no longer includes (or that the denylist
-    started covering) should be removed from the destination, not left
-    as silent drift. MEMORY.md is excluded from the comparison; it's
-    rewritten by `_write_memory_index_if_changed`.
+    Second-eye review (2026-05-27): the v1 form deleted EVERY destination
+    `*.md` not in current `ported`, which would wipe destination-owned
+    notes the operator authored directly. The fixed form tracks "files
+    we ourselves wrote on the prior sync" via the memory audit and
+    deletes only those that left the current port. Files the operator
+    created at the destination (never in our prior `ported` list) stay.
+
+    First-time runs against a memory dir that has no prior audit delete
+    nothing. The operator's manual prep work is safe.
     """
-    ported_filenames = {f"{slug}.md" for slug in ported_slugs}
+    if prior_audit is None:
+        return 0
+    prior_ported = prior_audit.get("synced_files") or []
+    if not isinstance(prior_ported, list):
+        return 0
+    prior_set = {f"{p}.md" for p in prior_ported if isinstance(p, str)}
+    current_set = {f"{slug}.md" for slug in ported_slugs}
+    memory_dir_resolved = memory_dir.resolve()
     deleted = 0
-    for entry in memory_dir.glob("*.md"):
-        if entry.name == "MEMORY.md":
+    for filename in sorted(prior_set - current_set):
+        # The audit can only contain slugs (filenames without
+        # traversal), but apply the safety guard anyway for parity with
+        # _delete_stale_files. A bare filename like "feedback_a.md" can
+        # never escape memory_dir; absolute / traversal entries are
+        # malformed audit content and get refused with a warning.
+        candidate = (memory_dir / filename)
+        if not _within(candidate, memory_dir_resolved):
+            _stderr(
+                f"WARN: prior memory audit entry {filename!r} resolves outside "
+                f"memory_dir; refusing to delete"
+            )
             continue
-        if entry.name in ported_filenames:
-            continue
-        try:
-            entry.unlink()
-            deleted += 1
-        except OSError as exc:
-            _stderr(f"WARN: could not delete stale memory entry {entry}: {exc}")
+        if candidate.is_file() or candidate.is_symlink():
+            try:
+                candidate.unlink()
+                deleted += 1
+            except OSError as exc:
+                _stderr(
+                    f"WARN: could not delete stale memory entry {candidate}: {exc}"
+                )
     return deleted
+
+
+def _write_memory_audit(
+    memory_dir: Path, ported_slugs: list[str], scrubs: list[ScrubPattern]
+) -> None:
+    """Track which entries this sync ported so the next can stale-delete.
+
+    Mirrors the content `.sync-manifest.json` shape with a `synced_files`
+    list of slugs (NOT filenames; the slug-to-filename mapping is
+    fixed). Keeps memory + content audits parallel so a future
+    consolidation of the two formats is mechanical.
+
+    The audit is overwritten unconditionally per memory sync; idempotency
+    at the FILE level is preserved by the existing per-entry skip-when-
+    unchanged path in run_memory.
+    """
+    payload = {
+        "synced_files": sorted(ported_slugs),
+        "synced_at": datetime.now(UTC).isoformat(),
+        "scrub_rules_hash": _scrubs_hash(scrubs),
+        "tool_version": TOOL_VERSION,
+    }
+    target = memory_dir / AUDIT_FILENAME
+    # Skip write if existing matches semantically (ignore synced_at).
+    if target.is_file():
+        try:
+            prior = json.loads(target.read_text(encoding="utf-8"))
+            if (
+                prior.get("synced_files") == payload["synced_files"]
+                and prior.get("scrub_rules_hash") == payload["scrub_rules_hash"]
+            ):
+                return
+        except (OSError, json.JSONDecodeError):
+            pass
+    target.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _scrubs_hash(scrubs: list[ScrubPattern]) -> str:
+    """Helper: scrub-rules hash usable outside the Manifest dataclass.
+
+    Used by the memory audit which doesn't carry a full Manifest in scope
+    at write time. Same hash formula as Manifest.scrub_rules_hash so the
+    two audits compare consistently.
+    """
+    payload = "\n".join(
+        f"{p.pattern.pattern}::flags={p.pattern.flags}::{p.replacement}"
+        for p in scrubs
+    )
+    return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _build_memory_index(ported_slugs: list[str]) -> str:
@@ -868,6 +1088,12 @@ def main(argv: list[str] | None = None) -> int:
         "--allow-dirty",
         action="store_true",
         help="Run even if destination working tree is not clean",
+    )
+    parser.add_argument(
+        "--allow-source-dirty",
+        action="store_true",
+        help="Run even if source working tree has uncommitted changes "
+        "(breaks the audit's reproducibility contract; default-off)",
     )
     parser.add_argument(
         "--direction",

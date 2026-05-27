@@ -1,10 +1,10 @@
 {
   "allowlist_hash": "sha256:7e53d89da677247d9d8619ba6e13d203d016db474425e248fe477c88f81c11f8",
-  "scrub_rules_hash": "sha256:5b905efe427b7173600bc911263d8da027b3666f7fc71c2f8e6359fbbfc99c6a",
+  "scrub_rules_hash": "sha256:65ba9cbfb42f99831e9dead803a7c2b47a1ec4f68f83633689f0dec86513c327",
   "source_branch": "feat/v0-13-content-distribution",
-  "source_commit": "5c54ef9aed74ae92ca741453c69baed6a3600b0e",
+  "source_commit": "dc24ded155870b30fe06bedb21ee5825c566fe11",
   "source_repo": "git@<vcs-host>:<team>/coding-agents-playbook.git",
-  "synced_at": "2026-05-27T18:56:09.596935+00:00",
+  "synced_at": "2026-05-27T19:22:03.163827+00:00",
   "synced_files": [
     ".gitattributes",
     "Makefile",
