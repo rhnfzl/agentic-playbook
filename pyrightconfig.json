@@ -11,8 +11,8 @@
     "base/skills/imported",
     "base/skills/**/scripts",
     "base/skills/**/references",
-    "overlays/team/skills/**/scripts",
-    "overlays/team/skills/**/references",
+    "overlays/<name>/skills/**/scripts",
+    "overlays/<name>/skills/**/references",
     "graphify-out",
     ".worktrees"
   ],

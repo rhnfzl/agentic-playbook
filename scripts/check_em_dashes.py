@@ -11,7 +11,7 @@ Scope:
 
 Allowlist (files that may legitimately mention the character):
 - rules/no-em-dashes.md (the rule itself)
-- skills/engineering/VCS-pr-review/SKILL.md (review checklist references the char)
+- skills/engineering/code-review/SKILL.md (review checklist references the char)
 
 Exit code: 0 if clean (or only allowlisted files have hits), 1 if drift detected.
 """
@@ -29,9 +29,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 ALLOWLIST = {
     # Rules + skill bodies that legitimately reference the character.
-    # Post-v0.11 paths under base/ + overlays/team/ (ADR-0040).
+    # Post-v0.11 paths under base/ + overlays/<name>/ (ADR-0040).
     "base/rules/no-em-dashes.md",
-    "overlays/team/skills/engineering/VCS-pr-review/SKILL.md",
+    "overlays/<name>/skills/engineering/code-review/SKILL.md",
     # MCP source with the character inside a regex character class that parses
     # MEMORY.md entry rows where the user used an em-dash separator. Functional,
     # not authored prose.
@@ -45,7 +45,7 @@ VENDORED_PREFIXES = (
     "base/skills/imported/",
 )
 
-# Patterns enumerate the post-v0.11 base/ + overlays/team/ layout
+# Patterns enumerate the post-v0.11 base/ + overlays/<name>/ layout
 # (ADR-0040 mass git mv landed). Each pattern uses .glob from REPO_ROOT.
 PATTERNS = [
     # Top-level docs
@@ -64,13 +64,13 @@ PATTERNS = [
     "base/mcp/**/*.py",
     "base/mcp/**/*.md",
     "base/hooks/templates/*",
-    # overlays/team/ content (5 content types currently present)
-    "overlays/team/rules/*.md",
-    "overlays/team/prompts/*.md",
-    "overlays/team/skills/**/*.md",
-    "overlays/team/agents/*.md",
-    "overlays/team/hooks/*.sh",
-    "overlays/team/mcp/**/*.json",
+    # overlays/<name>/ content (5 content types currently present)
+    "overlays/<name>/rules/*.md",
+    "overlays/<name>/prompts/*.md",
+    "overlays/<name>/skills/**/*.md",
+    "overlays/<name>/agents/*.md",
+    "overlays/<name>/hooks/*.sh",
+    "overlays/<name>/mcp/**/*.json",
     # Scripts (Codex P3 #5: rules/no-em-dashes.md bans em dashes in
     # code comments and docstrings too, not just docs)
     "scripts/*.py",

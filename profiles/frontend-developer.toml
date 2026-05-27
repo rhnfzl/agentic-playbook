@@ -1,10 +1,11 @@
 # Profile: Frontend Developer
 name = "frontend-developer"
 description = "Frontend developer working on the team web app. Lighter than backend profile; excludes backend-specific skills (CI/Sonar/k8s-state-sweep) and MCP-first boundary check."
+requires_overlays = ["team"]
 
 [skills]
 include = [
-  # "engineering/code-review", # not shipped at v0.1.0; add when shipped
+  "engineering/code-review",
   "engineering/post-iter-review",
   "productivity/grill-me",
   "productivity/handoff",
@@ -29,4 +30,4 @@ include = [
 include = ["lint-guard", "never-push-to-develop", "human-html-autoindex"]
 
 [mcp]
-include = ["atlassian", "slack", "tavily", ]
+include = ["atlassian", "slack", "tavily", "VCS"]

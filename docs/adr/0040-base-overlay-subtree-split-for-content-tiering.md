@@ -40,7 +40,7 @@ Top-level structure becomes:
 
 ```
 base/                       # generic, vendor-neutral playbook infrastructure
-overlays/team/            # team-specific additions (skills, rules, references)
+overlays/<name>/            # team-specific additions (skills, rules, references)
 scripts/                    # install + utility scripts (stay at root)
 tests/                      # tests (cover both base and overlay)
 docs/                       # ADRs + human-html (stay at root)
@@ -54,9 +54,9 @@ The split rule is grep-driven as a starting point, not a verdict. Each grep matc
 
 1. **STRICT team** (file IS an team-only artifact, tied to internal services/tooling):
    - `skills/devops/error-tracking-issue-triage/`, `skills/devops/CI-pipeline-debug/`, `skills/devops/aws-secrets-configmap-apply/`, `skills/devops/k8s-dashboard-verify/`
-   - `skills/engineering/VCS-pr-review/` (uses VCS REST API)
+   - `skills/engineering/code-review/` (uses VCS REST API)
    - `rules/label-policy.md` (team label scheme), any rule that prescribes team-internal procedure
-   - Resolution: move to `overlays/team/`.
+   - Resolution: move to `overlays/<name>/`.
 
 2. **GENERIC with team examples** (universal rule, mentions team as concrete illustration):
    - `rules/no-em-dashes.md` (universal style rule)
@@ -67,7 +67,7 @@ The split rule is grep-driven as a starting point, not a verdict. Each grep matc
 
 3. **HYBRID** (mostly generic with a clear team-only section):
    - `skills/meta/agents-md-curator/` (one team bullet in an otherwise generic skill)
-   - Resolution: if practical, split the file (extract the team section into `overlays/team/`). If not (single short paragraph), classify by PRIMARY AUDIENCE.
+   - Resolution: if practical, split the file (extract the team section into `overlays/<name>/`). If not (single short paragraph), classify by PRIMARY AUDIENCE.
    - Decision rule: "if a base-only user gets value from this file, base; if value is only realized with team context, overlay."
 
 The `scope_boundary.py` check (see ADR-0041) enforces bucket 1: `base/` may not contain team markers except for files explicitly allowlisted with a rationale comment (bucket 2).
@@ -80,14 +80,14 @@ The `scope_boundary.py` check (see ADR-0041) enforces bucket 1: `base/` may not 
 @dataclass
 class ContentPaths:
     """Resolved content roots in load order. Later entries override earlier."""
-    roots: list[Path]  # e.g. [REPO/base, REPO/overlays/team]
+    roots: list[Path]  # e.g. [REPO/base, REPO/overlays/<name>]
 
 def resolve_content_paths(scope: list[str], repo_root: Path) -> ContentPaths:
     """Resolves scope name list to ordered ContentPaths. base/ is always first."""
     ...
 ```
 
-`PlaybookContent.load(repo_root, scope=None)` calls `resolve_content_paths`, walks each root in order, and merges with overlay-wins semantics. An overlay file at `overlays/team/skills/foo/SKILL.md` overrides a same-name file in `base/skills/foo/SKILL.md`.
+`PlaybookContent.load(repo_root, scope=None)` calls `resolve_content_paths`, walks each root in order, and merges with overlay-wins semantics. An overlay file at `overlays/<name>/skills/foo/SKILL.md` overrides a same-name file in `base/skills/foo/SKILL.md`.
 
 All content-touching scripts (install.py, install_lifecycle.py, target_materializer.py, playbook_init.py, playbook_update.py, eval_runner.py, new_skill.py, install_bundles.py, install_orphans.py, sync_curated_skills.py, sync_mattpocock.sh, and every `scripts/checks/*.py`) call through this seam. None hardcode `repo_root / "skills"` (or equivalent) post-v0.11. Path-scanning checks (em-dash lint, frontmatter lint, decay check, size check, audit external skill, skill description check, hook source unification) use the resolved roots.
 
@@ -187,7 +187,7 @@ This sidesteps the duplicate-ADR-number issue (ADR parsing breaks when two ADRs 
 
 ### Per-type AGENTS.md files move into `base/<type>/AGENTS.md`
 
-`skills/AGENTS.md`, `rules/AGENTS.md`, `hooks/AGENTS.md`, `mcp/AGENTS.md`, `agents/AGENTS.md` are governance documents about authoring. They move with their content type into `base/<type>/AGENTS.md`. The content describes generic authoring guidance and applies to BOTH base and overlay content of that type. If overlay-specific authoring rules emerge later (rare), add `overlays/team/<type>/AGENTS.md` separately.
+`skills/AGENTS.md`, `rules/AGENTS.md`, `hooks/AGENTS.md`, `mcp/AGENTS.md`, `agents/AGENTS.md` are governance documents about authoring. They move with their content type into `base/<type>/AGENTS.md`. The content describes generic authoring guidance and applies to BOTH base and overlay content of that type. If overlay-specific authoring rules emerge later (rare), add `overlays/<name>/<type>/AGENTS.md` separately.
 
 `profiles/AGENTS.md` is the exception: profiles do not move (they stay at root). `profiles/AGENTS.md` stays alongside `profiles/*.toml`.
 
@@ -195,7 +195,7 @@ This sidesteps the duplicate-ADR-number issue (ADR parsing breaks when two ADRs 
 
 Content updates during the v0.11 sweep:
 
-- `base/skills/AGENTS.md`: add section "Choosing base vs overlays/team" referencing the three-bucket classification.
+- `base/skills/AGENTS.md`: add section "Choosing base vs overlays/<name>" referencing the three-bucket classification.
 - `base/rules/AGENTS.md`: remove the current "no team-internal context, generic phrasing only" sentence (which contradicts reality post-refactor); replace with the overlay model.
 - `profiles/AGENTS.md`: remove the "no team-internal grouping" sentence; document `requires_overlays`.
 - `base/hooks/AGENTS.md`, `base/mcp/AGENTS.md`, `base/agents/AGENTS.md`: same treatment as needed.
@@ -206,11 +206,11 @@ Content updates during the v0.11 sweep:
 `evals/` stays at root. The current format is `evals/<suite>/cases.yaml` (each suite has a YAML file with a `cases:` list, plus `judge.md`). Eval cases gain an optional `required_scope` field as a per-case YAML key:
 
 ```yaml
-# evals/VCS-pr-review/cases.yaml
+# evals/code-review/cases.yaml
 cases:
-  - name: VCS-pr-review-happy-path
+  - name: code-review-happy-path
     required_scope: ["team"]
-    skill: overlays/team/skills/engineering/VCS-pr-review  # post-refactor path
+    skill: overlays/<name>/skills/engineering/code-review  # post-refactor path
     ...
 ```
 
@@ -228,7 +228,7 @@ The directory restructure is one atomic PR with one commit per content-type batc
 
 ### Good
 
-- Contributors see which files are team-shaped (`overlays/team/`) vs generic (`base/`) by directory alone. No frontmatter read required.
+- Contributors see which files are team-shaped (`overlays/<name>/`) vs generic (`base/`) by directory alone. No frontmatter read required.
 - Profile definitions are explicit about overlay needs (`requires_overlays`); install-time validation prevents stranded overlay-only skills.
 - Lockfile records scope; `make update` is deterministic, no re-detect surprise.
 - Code review gets a heuristic: "does this PR add to `base/`? Is the content actually generic?" The directory boundary doubles as a checklist item, complemented by `scope_boundary.py` (ADR-0041).
@@ -239,12 +239,12 @@ The directory restructure is one atomic PR with one commit per content-type batc
 
 - Every existing path reference changes. Wide sweep: `scripts/adapters/_reader.py`, `scripts/install.py`, `scripts/install_lifecycle.py`, `scripts/target_materializer.py`, `scripts/playbook_init.py`, `scripts/playbook_update.py`, `scripts/eval_runner.py`, `scripts/new_skill.py`, `scripts/install_bundles.py`, `scripts/install_orphans.py`, `scripts/sync_curated_skills.py`, `scripts/sync_mattpocock.sh`, every `scripts/checks/*.py`, `scripts/check_em_dashes.py`, `Makefile`, `README.md`, `CONTRIBUTING.md`, hook scripts, `profiles/*.toml`, per-type `AGENTS.md` files, ADR cross-references, test fixtures.
 - The v0.11 PR is large (~80% of content files moved). Reviewers cannot easily see "what changed" because the change is "where everything lives." Per-content-type commit batches help but do not eliminate visual noise.
-- Newcomers must learn the overlay concept before contributing. Documentation cost: a new section in `CONTRIBUTING.md` titled "Choosing base vs overlays/team" referencing this ADR.
+- Newcomers must learn the overlay concept before contributing. Documentation cost: a new section in `CONTRIBUTING.md` titled "Choosing base vs overlays/<name>" referencing this ADR.
 
 ### Trade-offs considered and rejected
 
 - **Manifest-tagged single tree**: each file gets a `scope: generic|team` frontmatter field. No file moves. Rejected because the boundary is soft (you have to read frontmatter to know what's what), harder to enforce in review, and per-file labor still adds up to ~150 files needing a one-time tag sweep.
-- **Root-as-base + small `overlays/team/` subdir**: keep most files at root, move only the team-specific minority. Less churn. Rejected because the boundary line drifts: where do you draw the line when a file is mostly-generic-with-a-few-team-mentions? The directory-as-boundary rule needs full coverage.
+- **Root-as-base + small `overlays/<name>/` subdir**: keep most files at root, move only the team-specific minority. Less churn. Rejected because the boundary line drifts: where do you draw the line when a file is mostly-generic-with-a-few-team-mentions? The directory-as-boundary rule needs full coverage.
 - **ADR-parsing for version drift**: rejected because ADR format is mixed ("landing in" / "landed in") and duplicate ADR numbers (the 0032 collision found during this design pass) break the parse. VERSION file as single source of truth is more robust.
 - **Hard-fail profiles missing `requires_overlays`**: rejected. Profiles without the field default to base-compatible. This avoids forcing every existing profile to be re-saved before v0.11 install works.
 
@@ -263,7 +263,7 @@ The directory restructure is one atomic PR with one commit per content-type batc
 - `scripts/playbook_init.py` (accepts `--scope`; writes to `.playbook-config.yaml`)
 - `scripts/playbook_update.py` (reads scope from lockfile)
 - `scripts/playbook_profile.py` (validates `requires_overlays`)
-- `scripts/new_skill.py` (accepts `--scope`; writes to `base/skills/` or `overlays/team/skills/`)
+- `scripts/new_skill.py` (accepts `--scope`; writes to `base/skills/` or `overlays/<name>/skills/`)
 - `scripts/eval_runner.py` (filters cases by scope)
 - `scripts/sync_curated_skills.py`, `scripts/sync_mattpocock.sh`
 
@@ -282,7 +282,7 @@ Without this conversion, post-refactor those checks silently scan nothing.
 ### Top-level documents
 
 - `README.md`: path references swept.
-- `CONTRIBUTING.md`: new section "Choosing base vs overlays/team" with the three-bucket policy.
+- `CONTRIBUTING.md`: new section "Choosing base vs overlays/<name>" with the three-bucket policy.
 - `profiles/AGENTS.md` (stays at root): rewritten to reflect overlay model.
 - `evals/AGENTS.md` (stays at root): updated to reflect `cases.yaml` + `judge.md` reality.
 - `base/skills/AGENTS.md`, `base/rules/AGENTS.md`, `base/hooks/AGENTS.md`, `base/mcp/AGENTS.md`, `base/agents/AGENTS.md` (moved with their content type): rewritten for overlay model.

@@ -5,7 +5,7 @@ Accepted (2026-05-24)
 
 ## Context
 
-The coding-agent ecosystem in mid-2026 has 28+ tools that consume agent rules and skills. Supporting all of them with full per-agent adapters would require ~3000-5000 lines of code. Supporting only the 4 most-used by the team team is simpler but contradicts the "support as many as possible" intent.
+The coding-agent ecosystem in mid-2026 has 28+ tools that consume agent rules and skills. Supporting all of them with full per-agent adapters would require ~3000-5000 lines of code. Supporting only the 4 most-used by the team is simpler but contradicts the "support as many as possible" intent.
 
 A key structural fact: as of mid-2026, AGENTS.md is read natively by ~20 tools (Claude Code, Codex, Cursor, Windsurf, Copilot, Gemini CLI, Aider, Cline, Kiro, Goose, Junie, Roo Code, Kilo Code, OpenCode, Zed, Amp, Augment, Tabnine, Continue.dev, plus more emerging). For those, generating an AGENTS.md is enough.
 
@@ -33,7 +33,7 @@ Tier the agent support by adapter depth:
 ## Promotion criteria
 
 Promote an agent from Tier 3 to Tier 2 when:
-- It is the primary editor for at least 1 team teammate, OR
+- It is the primary editor for at least 1 teammate, OR
 - The agent itself has added native skill support that we want to leverage.
 
 Promote from Tier 2 to Tier 1 when:

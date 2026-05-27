@@ -12,7 +12,7 @@ TOML schema (profiles/<name>.toml):
     description = "..."
 
     [skills]
-    include = ["engineering/VCS-pr-review", ...]
+    include = ["engineering/code-review", ...]
 
     [rules]
     include = ["label-policy", "no-em-dashes", ...]

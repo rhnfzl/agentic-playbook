@@ -68,7 +68,7 @@ KNOWN_TOOLS = {
 
 # Vendored content (per ADR-0019) keeps its upstream directory layout and naming.
 # We do not enforce parent-dir-match against vendored skills.
-# v0.11 (ADR-0040): skills moved into base/skills/ + overlays/team/skills/.
+# v0.11 (ADR-0040): skills moved into base/skills/ + overlays/<name>/skills/.
 # Vendored imports live under base/skills/imported/.
 VENDORED_PREFIX = "base/skills/imported/"
 
@@ -170,14 +170,14 @@ def lint_skill(skill_md: Path, repo_root: Path) -> list[str]:
 
 def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
-    # v0.11 (ADR-0040): skills moved to base/ + overlays/team/. Walk both.
+    # v0.11 (ADR-0040): skills moved to base/ + overlays/<name>/. Walk both.
     skill_roots = [
         repo_root / "base" / "skills",
         repo_root / "overlays" / "team" / "skills",
     ]
     skill_roots = [r for r in skill_roots if r.is_dir()]
     if not skill_roots:
-        print("  no skill roots found at base/skills/ or overlays/team/skills/; nothing to lint")
+        print("  no skill roots found at base/skills/ or overlays/<name>/skills/; nothing to lint")
         return 0
 
     issues: list[str] = []

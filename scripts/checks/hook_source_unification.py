@@ -31,7 +31,7 @@ from . import CheckContext, CheckResult
 def _skill_owned_hooks(repo_root: Path) -> dict[str, Path]:
     """Return basename -> canonical-path for every skill-owned hook source.
 
-    v0.11 (ADR-0040): skills moved to base/ + overlays/team/; walk both.
+    v0.11 (ADR-0040): skills moved to base/ + overlays/<name>/; walk both.
     """
     result: dict[str, Path] = {}
     for skill_root in (
@@ -65,7 +65,7 @@ def _wrapper_name_from_header(line: str) -> str:
 
 def run(ctx: CheckContext) -> CheckResult:
     repo_root = ctx.repo_root
-    # v0.11 (ADR-0040): hooks moved to base/ + overlays/team/. Walk both
+    # v0.11 (ADR-0040): hooks moved to base/ + overlays/<name>/. Walk both
     # for unification (skill-owned hooks live under base/skills/).
     hook_roots = [
         repo_root / "base" / "hooks",
@@ -75,7 +75,7 @@ def run(ctx: CheckContext) -> CheckResult:
     if not hook_roots:
         return CheckResult(
             status="ok",
-            summary="hook source unification (no hooks dirs at base/ or overlays/team/)",
+            summary="hook source unification (no hooks dirs at base/ or overlays/<name>/)",
             details=[],
         )
 

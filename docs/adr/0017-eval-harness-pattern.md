@@ -6,7 +6,7 @@ Accepted (2026-05-25)
 
 ## Context
 
-Some skills carry outsized impact when they misfire (VCS-pr-review, chat-transcript-debug, mcp-first-boundary-check, ci-failure-triage). Drift in these skills produces drift in code review, debugging, and CI triage across the whole team. v0.2.1 had no harness measuring whether a skill behaves as intended.
+Some skills carry outsized impact when they misfire (code-review, chat-transcript-debug, mcp-first-boundary-check, ci-failure-triage). Drift in these skills produces drift in code review, debugging, and CI triage across the whole team. v0.2.1 had no harness measuring whether a skill behaves as intended.
 
 ## Decision
 
@@ -32,7 +32,7 @@ Each suite owns its fixtures (`evals/<skill>/fixtures/`); the harness does not a
 ## v0.3 coverage
 
 Four reference suites authored:
-- `evals/VCS-pr-review/` (4 cases)
+- `evals/code-review/` (4 cases)
 - `evals/chat-transcript-debug/` (4 cases)
 - `evals/mcp-first-boundary-check/` (5 cases)
 - `evals/ci-failure-triage/` (5 cases)

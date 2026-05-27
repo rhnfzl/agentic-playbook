@@ -41,7 +41,7 @@ Block/Goose's distinction between "Rules" (behavioral constraints) and "Recipes"
 |---|---|---|
 | "Never use em dashes" | `rules/no-em-dashes.md` | Behavioral constraint, always-on |
 | "Use VCS not GitHub" | `rules/VCS-not-github.md` | Behavioral constraint |
-| "Steps to review a VCS PR with team rules" | `skills/engineering/VCS-pr-review/SKILL.md` | Workflow, invoked by name |
+| "Steps to review a VCS PR with team rules" | `skills/engineering/code-review/SKILL.md` | Workflow, invoked by name |
 | "Block direct pushes to develop" | `hooks/never-push-to-develop.sh` | Enforcement, no agent cooperation needed |
 
 ## Source

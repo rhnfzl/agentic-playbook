@@ -1,10 +1,11 @@
 # Profile: Backend Developer (team AI Backend + MCP)
 name = "backend-developer"
 description = "Backend developer working on team AI Backend or MCP projects. Includes all engineering + observability skills, full rule set, and all MCP integrations."
+requires_overlays = ["team"]
 
 [skills]
 include = [
-  # "engineering/code-review", # not shipped at v0.1.0; add when shipped
+  "engineering/code-review",
   "engineering/ci-failure-triage",
   "engineering/sonar-pr-gate",
   "engineering/post-iter-review",
@@ -39,4 +40,4 @@ include = [
 include = ["sonar-advisory", "lint-guard", "never-push-to-develop", "human-html-autoindex"]
 
 [mcp]
-include = ["code-review-graph", "atlassian", "slack", "error-tracking", "tavily", "code-quality"]
+include = ["code-review-graph", "atlassian", "slack", "error-tracking", "tavily", "VCS", "code-quality"]

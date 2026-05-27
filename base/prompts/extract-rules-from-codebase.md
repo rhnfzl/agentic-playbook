@@ -51,7 +51,7 @@ Report back as a table:
 | Source | Pattern | Recommendation | Filename |
 |---|---|---|---|
 | feedback_no_em_dashes.md | "Never use em dashes" | Lift as rule | rules/no-em-dashes.md |
-| feedback_bitbucket_not_github.md | "Use VCS not GitHub" | Lift as rule | rules/vcs-not-github.md |
+| feedback_bitbucket_not_github.md | "Use VCS not GitHub" | Lift as rule | rules/VCS-not-github.md |
 | (one-off workaround) | "Set FOO_BAR=1 for X" | Skip (project-specific noise) | -- |
 
 Ask me to confirm the table BEFORE writing any rule files. I want to review the

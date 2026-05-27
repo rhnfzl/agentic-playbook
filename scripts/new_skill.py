@@ -76,15 +76,15 @@ def main() -> int:
         help=(
             "v0.11 (ADR-0040): which tree to scaffold under. 'base' = "
             "base/skills/<cat>/<name>/ (generic, default). 'team' = "
-            "overlays/team/skills/<cat>/<name>/ (team-specific). See "
-            "CONTRIBUTING.md 'Choosing base vs overlays/team' for the policy."
+            "overlays/<name>/skills/<cat>/<name>/ (team-specific). See "
+            "CONTRIBUTING.md 'Choosing base vs overlays/<name>' for the policy."
         ),
     )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
     # v0.11 (ADR-0040): route the scaffold under base/skills/ or
-    # overlays/team/skills/ per --scope. Old skills/<cat>/<name>/ path
+    # overlays/<name>/skills/ per --scope. Old skills/<cat>/<name>/ path
     # is no longer walked by the loader.
     if args.scope == "team":
         skill_dir = repo_root / "overlays" / "team" / "skills" / args.category / args.name

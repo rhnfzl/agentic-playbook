@@ -85,21 +85,30 @@ denylist = [
 # are copied byte-for-byte with no scrub.
 #
 # Default is case-insensitive matching. Set case_insensitive = false for
-# whole-word patterns that should match exact casing only.
+# patterns where casing must match exactly.
+#
+# IMPORTANT: order matters. Compound forms (like "CI config") must come
+# BEFORE the bare token (like "CI") so the compound wins. Without
+# this, "CI" matches first and "CI config" becomes "CIfile".
 patterns = [
   # Ticket-tracker IDs (any project prefix).
-  { match = "\\b(R8|MATCH|JIRA|TICKET)-\\d+\\b", replace = "[ticket]" },
+  { match = "(R8|MATCH|JIRA|TICKET)-\\d+", replace = "[ticket]" },
 
   # Team identifiers. Replace with a generic placeholder so the rule's
-  # logic survives and only the identity is anonymized.
-  { match = "\\bteam\\b", replace = "the team", case_insensitive = false },
-  { match = "\\binternal-host\\b", replace = "internal-host", case_insensitive = false },
+  # logic survives and only the identity is anonymized. No word
+  # boundary on these tokens so compound forms (team_repo, team-cli)
+  # also get scrubbed; the case_insensitive default catches team too.
+  { match = "team", replace = "team" },
+  { match = "internal-host", replace = "internal-host" },
+
+  # Compound CI / vendor forms (must precede bare-token patterns).
+  { match = "CI config", replace = "CI config", case_insensitive = false },
 
   # VCS / CI / observability vendor mentions used as examples.
-  { match = "VCS", replace = "VCS" },
-  { match = "CI", replace = "CI" },
-  { match = "code-quality", replace = "code-quality" },
-  { match = "error-tracking", replace = "error-tracking" },
+  { match = "\\bBitbucket\\b", replace = "VCS" },
+  { match = "\\bJenkins\\b", replace = "CI" },
+  { match = "\\bSonarQube\\b", replace = "code-quality" },
+  { match = "\\bSentry\\b", replace = "error-tracking" },
 
   # Internal product / vendor names that flow through skill examples.
   # Add more as the first sync's diff surfaces them.

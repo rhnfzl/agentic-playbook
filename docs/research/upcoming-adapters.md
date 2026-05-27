@@ -3,7 +3,7 @@
 **Status**: Tracking list (not adapters; just future-proofing notes)
 **Last updated**: 2026-05-24
 
-Per Q5 v0.2 lock, adapters for agents that are NOT currently used by a named team teammate are deferred. The architecture (unified `agents/`, per-adapter pattern, frontmatter contract) makes adding them mechanical when adoption signal appears.
+Per Q5 v0.2 lock, adapters for agents that are NOT currently used by a named teammate are deferred. The architecture (unified `agents/`, per-adapter pattern, frontmatter contract) makes adding them mechanical when adoption signal appears.
 
 ## Google Antigravity
 
@@ -23,7 +23,7 @@ Per Q5 v0.2 lock, adapters for agents that are NOT currently used by a named tea
 
 ## JetBrains AI Assistant (Claude Agent in JetBrains)
 
-**Not deferred; out of v0.2 scope entirely.** JetBrains AI uses its own config surface inside `.idea/`. If team JetBrains adoption grows (currently Rehan + the AI Backend collaborator both primarily terminal / Cursor CLI), evaluate a Tier 2 adapter then.
+**Not deferred; out of v0.2 scope entirely.** JetBrains AI uses its own config surface inside `.idea/`. If team JetBrains adoption grows (currently Rehan + the maintainer both primarily terminal / Cursor CLI), evaluate a Tier 2 adapter then.
 
 ## Devin (Cognition)
 

@@ -6,7 +6,7 @@ Proposed (2026-05-27); landing in v0.13.
 
 ## Context
 
-ADR-0040 split the playbook into `base/` (generic, portable) and `overlays/team/` (workspace-specific). The split makes `base/` a clean candidate for external distribution: a downstream destination repo can receive the portable subtree without the team-specific layer.
+ADR-0040 split the playbook into `base/` (generic, portable) and `overlays/<name>/` (workspace-specific). The split makes `base/` a clean candidate for external distribution: a downstream destination repo can receive the portable subtree without the team-specific layer.
 
 Three reasons a maintainer might want to publish `base/` to an external destination:
 

@@ -21,14 +21,14 @@ BLOCK_DAYS = 180
 
 def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
-    # v0.11 (ADR-0040): skills moved to base/ + overlays/team/.
+    # v0.11 (ADR-0040): skills moved to base/ + overlays/<name>/.
     skill_roots = [
         repo_root / "base" / "skills",
         repo_root / "overlays" / "team" / "skills",
     ]
     skill_roots = [r for r in skill_roots if r.is_dir()]
     if not skill_roots:
-        print("  no skill roots found at base/skills/ or overlays/team/skills/; nothing to check")
+        print("  no skill roots found at base/skills/ or overlays/<name>/skills/; nothing to check")
         return 0
 
     today = date.today()

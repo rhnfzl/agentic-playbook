@@ -50,7 +50,7 @@ def test_resolve_content_paths_empty_scope_is_equivalent_to_none(
 def test_resolve_content_paths_with_overlay_appends_after_base(
     tmp_path: Path,
 ) -> None:
-    """scope=['team'] appends overlays/team/ AFTER base/."""
+    """scope=['team'] appends overlays/<name>/ AFTER base/."""
     from adapters._protocol import resolve_content_paths
 
     (tmp_path / "base").mkdir()

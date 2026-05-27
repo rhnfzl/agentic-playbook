@@ -34,7 +34,7 @@ Status definitions:
 - **risk_class**: docs-only (skills/, no scripts that touch credentials or network)
 - **reviewer**: Rehan
 - **last_reviewed**: 2026-05-25
-- **notes**: Foundational mattpocock skill library, format-aligned with playbook. Vendored as snapshot. Sync via `make sync-mattpocock` (monthly). Catalog status: recommended for all team teams.
+- **notes**: Foundational mattpocock skill library, format-aligned with playbook. Vendored as snapshot. Sync via `make sync-mattpocock` (monthly). Catalog status: recommended for all teams.
 
 ### jamiemill/layers-skills
 

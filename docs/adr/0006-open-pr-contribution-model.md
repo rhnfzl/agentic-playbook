@@ -13,9 +13,9 @@ The playbook is meant to be team-shared. Three contribution models were consider
 
 ## Decision
 
-Anyone on the team team can submit a skill, rule, hook, MCP config, or profile via VCS PR. Each artifact has an `owner:` field in frontmatter (defaults to the creator). Owner is responsible for upkeep.
+Anyone on the team can submit a skill, rule, hook, MCP config, or profile via VCS PR. Each artifact has an `owner:` field in frontmatter (defaults to the creator). Owner is responsible for upkeep.
 
-Initial reviewer pool: Rehan, the AI Backend collaborator. As the system grows, domain reviewers (frontend lead for frontend skills, etc.) are added.
+Initial reviewer pool: Rehan, the maintainer. As the system grows, domain reviewers (frontend lead for frontend skills, etc.) are added.
 
 A PR needs 1 reviewer approval to merge. Skill changes need approval from the owner OR a reviewer if the owner is unavailable.
 

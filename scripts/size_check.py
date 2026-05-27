@@ -34,13 +34,13 @@ BLOCK_LINES = 1000
 
 # Vendored content (per ADR-0019). Upstream optimizes length differently;
 # we surface them but do not block or count toward warn-total.
-# v0.11 (ADR-0040): skills moved into base/skills/ + overlays/team/skills/.
+# v0.11 (ADR-0040): skills moved into base/skills/ + overlays/<name>/skills/.
 # Vendored imports live under base/skills/imported/.
 VENDORED_PREFIX = "base/skills/imported/"
 
 
 def _skill_roots(repo_root: Path) -> list[Path]:
-    """v0.11: walk base/ + overlays/team/ skill subtrees (matches the
+    """v0.11: walk base/ + overlays/<name>/ skill subtrees (matches the
     PlaybookContent.load scope=["team"] union)."""
     return [
         repo_root / "base" / "skills",
@@ -94,7 +94,7 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
     roots = [r for r in _skill_roots(repo_root) if r.is_dir()]
     if not roots:
-        print("  no skill roots found at base/skills/ or overlays/team/skills/; nothing to check")
+        print("  no skill roots found at base/skills/ or overlays/<name>/skills/; nothing to check")
         return 0
 
     warnings: list[str] = []
