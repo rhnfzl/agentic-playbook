@@ -2,9 +2,9 @@
   "allowlist_hash": "sha256:42777f4772ed2418e48db56525618daad1730a31a1e2a27303dca5531114a966",
   "scrub_rules_hash": "sha256:f27dc9426d969f888fc90a84b13a1665b027af9f39094dc94fce15d08fa5a82b",
   "source_branch": "feat/v0-13-content-distribution",
-  "source_commit": "71da51b088103744b63b39015071369ab6d97968",
+  "source_commit": "97eaec2f4dee6d1e015e51b76bafa1696a79e236",
   "source_repo": "git@<vcs-host>:<team>/coding-agents-playbook.git",
-  "synced_at": "2026-05-27T18:05:04.742985+00:00",
+  "synced_at": "2026-05-27T18:13:22.268798+00:00",
   "synced_files": [
     "base/agents/AGENTS.md",
     "base/agents/README.md",

@@ -22,6 +22,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import os
@@ -487,8 +488,12 @@ def run_memory(args: argparse.Namespace) -> int:
         return 1
     manifest.memory_destination_dir.mkdir(parents=True, exist_ok=True)
 
-    allowlist = set(manifest.memory_allowlist)
-    denylist = set(manifest.memory_denylist)
+    allowlist = manifest.memory_allowlist
+    denylist = manifest.memory_denylist
+
+    def _matches(slug: str, patterns: list[str]) -> bool:
+        """Match against exact slugs OR fnmatch globs (project_*, etc.)."""
+        return any(slug == p or fnmatch.fnmatch(slug, p) for p in patterns)
 
     changed = 0
     ported: list[str] = []
@@ -496,9 +501,9 @@ def run_memory(args: argparse.Namespace) -> int:
         slug = entry.stem
         if slug == "MEMORY":
             continue
-        if allowlist and slug not in allowlist:
+        if allowlist and not _matches(slug, allowlist):
             continue
-        if slug in denylist:
+        if _matches(slug, denylist):
             continue
         try:
             content = entry.read_text(encoding="utf-8", errors="replace")
