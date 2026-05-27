@@ -12,10 +12,9 @@ Different from `tests/` (which checks installer behavior, not skill behavior) an
 
 | Eval suite | Skill under test |
 |---|---|
-| `code-review/` | `base/skills/engineering/code-review` |
-| `chat-transcript-debug/` | `skills/engineering/chat-transcript-debug` |
-| `ci-failure-triage/` | `skills/engineering/ci-failure-triage` |
-| `mcp-first-boundary-check/` | `skills/engineering/mcp-first-boundary-check` |
+| `ci-failure-triage/` | `base/skills/engineering/ci-failure-triage` |
+
+This is a starter set. More eval suites land as skills mature and the maintainer authors per-skill `prompts.yaml` + `criteria.yaml`.
 
 Each subdir has the same shape:
 
