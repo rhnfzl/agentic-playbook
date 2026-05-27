@@ -1,0 +1,36 @@
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# Virtualenv
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Agent-local artifacts
+.claude/projects/
+.claude/worktrees/
+.codex/sessions/
+
+# Logs
+*.log
+
+# Local config that should not flow
+.playbook-config.yaml
+.playbook-lock.json
+
+# Human-in-loop review artifacts (always per-workspace, never committed)
+docs/human-html/
