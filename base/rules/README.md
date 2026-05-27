@@ -12,7 +12,7 @@ Format: one rule per file, `.md`, single H1 title, plain-language body. No front
 
 | Rule | What it constrains | Why |
 |---|---|---|
-| `VCS-not-github.md` | Never use `gh` CLI for team repos | team repos live on VCS; the gh CLI silently no-ops or fails on them. |
+| `vcs-not-github.md` | Never use `gh` CLI for team repos | team repos live on VCS; the gh CLI silently no-ops or fails on them. |
 | `direct-acc-first.md` | Try direct `*.team.com` access before `ssh internal-host` fallback | Direct is faster and avoids stale-DNS / cached-response failure modes. |
 | `full-request-chain.md` | Always trace FE → TM Backend → AI Backend → MCP → Public API end-to-end when debugging recruiter issues | Prevents wrong-layer blame and misrouted Jira tickets. |
 | `jira-priority-scheme.md` | Use P0 through P4 priorities, not Low/Medium/High | team has a custom priority scheme; the default Jira values break leadership rollups. |

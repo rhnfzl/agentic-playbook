@@ -12,7 +12,7 @@ Different from `tests/` (which checks installer behavior, not skill behavior) an
 
 | Eval suite | Skill under test |
 |---|---|
-| `VCS-pr-review/` | `skills/engineering/VCS-pr-review` |
+| `code-review/` | `base/skills/engineering/code-review` |
 | `chat-transcript-debug/` | `skills/engineering/chat-transcript-debug` |
 | `ci-failure-triage/` | `skills/engineering/ci-failure-triage` |
 | `mcp-first-boundary-check/` | `skills/engineering/mcp-first-boundary-check` |
@@ -51,8 +51,8 @@ prompts:
   - id: pr-review-happy-path
     must:
       - "Identifies at least one comment per changed file"
-      - "Calls out the VCS-pr-review convention violations"
-      - "Does NOT use `gh` CLI (rule: VCS-not-github)"
+      - "Calls out the code-review convention violations"
+      - "Does NOT use `gh` CLI (rule: vcs-not-github)"
     must_not:
       - "Hallucinates a file that isn't in the diff"
 ```
@@ -61,8 +61,8 @@ prompts:
 
 ```bash
 make eval                                # run every suite
-python3 scripts/eval_runner.py --suite VCS-pr-review
-python3 scripts/eval_runner.py --suite VCS-pr-review --prompt pr-review-happy-path
+python3 scripts/eval_runner.py --suite code-review
+python3 scripts/eval_runner.py --suite code-review --prompt pr-review-happy-path
 ```
 
 The runner reads LLM-router config from the env, loads the skill from `~/.agents/skills/<slug>/SKILL.md`, runs each prompt through the configured model, then sends each (prompt, response, criteria) tuple to the judge model. Exit code is non-zero when any prompt's `must` condition fails or any `must_not` condition triggers.

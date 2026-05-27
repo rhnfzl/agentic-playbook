@@ -30,7 +30,7 @@ Report the classification as a table:
 
 | Skill | Classification | Suggested category | Notes |
 |---|---|---|---|
-| VCS-pr-review | TEAM-WORTHY | engineering | Lift |
+| code-review | TEAM-WORTHY | engineering | Lift |
 | ha-alert-triage | PERSONAL ONLY | -- | Skip |
 | tdd | REDUNDANT | -- | Skip (mattpocock has it) |
 

@@ -1,50 +1,27 @@
-# OWNERS Registry
+# Owners
 
-This file maps team aliases used in skill / rule / agent frontmatter `owner:`
-fields to the humans who maintain them. Per Q13 v0.2 lock, owner aliases let
-ownership scale with the team without forcing every artifact to name a single
-individual.
+This file lists owners of content areas. Each content artifact (skill, rule, hook, etc.) has its own `owner:` field in frontmatter; the entry here is the fallback when an artifact's owner is unset and the maintainer needs to route a question.
 
-## Aliases
+| Area | Owner | GitHub |
+|---|---|---|
+| Repo maintainer | Rehan Fazal | [@rhnfzl](https://github.com/rhnfzl) |
+| Skills (base/skills/) | Rehan Fazal | @rhnfzl |
+| Rules (base/rules/) | Rehan Fazal | @rhnfzl |
+| Hooks (base/hooks/) | Rehan Fazal | @rhnfzl |
+| MCP configs (base/mcp/) | Rehan Fazal | @rhnfzl |
+| Agents (base/agents/) | Rehan Fazal | @rhnfzl |
+| Commands (base/commands/) | Rehan Fazal | @rhnfzl |
+| Prompts (base/prompts/) | Rehan Fazal | @rhnfzl |
+| Profiles (profiles/) | Rehan Fazal | @rhnfzl |
 
-| Alias            | Members                | Scope |
-|------------------|------------------------|-------|
-| `research-team`  | Rehan, +TBD            | Research workflows: data profiling, experiments, papers, RAG eval |
-| `backend-team`   | Rehan, the AI Backend collaborator           | AI Backend + MCP engineering |
-| `ai-platform`    | Rehan, the AI Backend collaborator           | Cross-cutting AI platform work (skills, prompts, evals) |
-| `playbook-core`  | Rehan, the AI Backend collaborator           | This playbook repo itself; reviewer for all PRs |
-
-## Individual handles
-
-| Handle           | Name                   | VCS username |
-|------------------|------------------------|--------------------|
-| `rehan-8v`       | Rehan Fazal            | rehan-8v |
-| `the AI Backend collaborator-8v`       | the AI Backend collaborator (TBD)            | the AI Backend collaborator-8v |
-
-## Adding an alias
-
-1. Edit this file: add a row to the Aliases table.
-2. PR review per the standard contribution flow.
-3. Once merged, skills / rules / agents can use `owner: <alias>` in frontmatter.
-
-## Adding a member
-
-1. Add their handle + name to the Individual handles table.
-2. Add their handle to relevant alias rows.
-3. PR review.
+As the project grows, area-specific owners can be added (frontend lead for frontend skills, ops lead for hooks, etc.).
 
 ## What `owner:` means in practice
 
-- The owner (alias or individual) is the maintainer of last resort for that artifact.
+- The owner is the maintainer of last resort for that artifact.
 - `last_reviewed:` decay warnings ping the owner first.
-- Per CONTRIBUTING.md, PRs that change a skill/rule should be approved by the owner
-  OR by a generalist reviewer (with the owner getting tagged).
-- If an alias-owned artifact has no responding member, the playbook-core team
-  inherits it until reassigned.
+- Per `CONTRIBUTING.md`, PRs that change a skill / rule should be approved by the owner OR by a generalist reviewer (with the owner getting tagged).
 
 ## Auto-validation
 
-The frontmatter linter (`scripts/frontmatter_lint.py`) verifies that any `owner:`
-value listed in skill frontmatter exists in either the Aliases or Individual
-handles tables above. (Validation extension is in v0.2.1; for v0.2 this
-registry is human-curated only.)
+The frontmatter linter (`scripts/frontmatter_lint.py`) verifies that any `owner:` value listed in skill frontmatter exists in either the Aliases table above or as a known GitHub handle. Drift here would fail `make check`.

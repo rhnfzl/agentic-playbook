@@ -43,7 +43,7 @@ Please do the following:
 4. Validate: run `make check` and confirm frontmatter is complete.
 
 5. Suggest the first PR commit message and which reviewer to request
-   (default: rehan, the AI Backend collaborator).
+   (default: rehan, the maintainer).
 
 Important constraints:
 - No team prefix in the skill name.
@@ -67,7 +67,7 @@ Once your agent finishes, you should have:
 - A working `make check` that doesn't complain about the new skill.
 - A commit-ready change.
 
-Open a PR with `feat(skills): add <slug>` and tag rehan/the AI Backend collaborator for review.
+Open a PR with `feat(skills): add <slug>` and tag rehan/the maintainer for review.
 
 ## Tips for a successful skill
 

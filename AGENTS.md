@@ -1,47 +1,52 @@
-# Agents Contract for the Coding Agents Playbook Repo
+# Agents Contract for agentic-playbook
 
-Owner: Rehan
-last_reviewed: 2026-05-25
+This file is the per-repo `AGENTS.md` for the playbook itself. Any coding agent working in this repo reads it on entry and follows the conventions below. The same conventions land in projects that install the playbook via `make install` (the installer concatenates rules from `base/rules/` into the project's own `AGENTS.md`).
 
-This file is the per-repo AGENTS.md for the playbook itself. It tells any coding agent working in this repo what conventions apply.
-
-It is also a deliberate example: a per-subproject AGENTS.md is the architectural pattern the playbook recommends. This file is what one of those looks like in practice.
+Owner: rehan
+Last reviewed: 2026-05-27
 
 ## Repo purpose
 
-A tool-agnostic, team-shared system for coding agents. See `README.md` for the long form.
+A tool-agnostic, shareable system for working with coding agents. See `README.md` for the long form.
 
 ## Editing conventions
 
-- **No em dashes.** Use commas, parentheses, or separate sentences.
-- **No team prefix in file names.** The VCS workspace already prefixes ownership. Files are `VCS-pr-review.md`, not `team-VCS-pr-review.md`.
-- **VCS not GitHub.** When referencing version control workflows, default to VCS conventions (the team uses VCS).
+- **No em dashes.** Use commas, parentheses, or separate sentences. The `check_em_dashes.py` gate enforces this.
 - **Plain-language product context first.** When writing any explainer, lead with what something does for the user, then the technical detail.
+- **Match the existing voice.** This repo is deliberately written in clear, terse prose. New content should read at the same register.
 
 ## Skill authoring
 
-- Every skill is one directory under `skills/<category>/<skill-name>/`.
+- Every skill is one directory under `base/skills/<category>/<skill-name>/`.
 - Each skill has a `SKILL.md` with frontmatter (`name`, `description`, `version`, `owner`, `last_reviewed`, `tags`, `scope`).
-- See `skills/productivity/grill-me/SKILL.md` for a reference example.
+- See `base/skills/productivity/grill-me/SKILL.md` for a reference example.
 - Use `make new SKILL=<name>` to scaffold a new skill.
+- See `CONTRIBUTING.md` for the full workflow.
 
 ## Rule authoring
 
-- Each rule is one markdown file in `rules/`.
+- Each rule is one markdown file in `base/rules/`.
 - A rule is a behavioral constraint, not a workflow. If it is a sequence of steps, it is a skill, not a rule.
-- The installer concatenates selected rules into the per-subproject AGENTS.md it materializes.
+- The installer concatenates selected rules into the per-project `AGENTS.md` it materializes.
+- Rules should be portable (no workspace-specific examples in the body).
+
+## Hook authoring
+
+- Each hook is one shell script in `base/hooks/`.
+- The script must respond to the lifecycle events documented in `base/hooks/README.md`.
+- Test hooks locally before committing (`bash -n hooks/my-hook.sh` for syntax; manual invocation for behavior).
 
 ## Pre-commit discipline
 
 Before committing in this repo:
 
-1. `make check` (frontmatter lint + decay warnings) must pass.
-2. If any skill or rule was edited, update its `last_reviewed:` date to today.
-3. If a design decision changed, add an ADR under `docs/adr/`.
+1. `make check` must pass (frontmatter, decay, em-dashes, content tiering, ADR uniqueness).
+2. If any skill / rule / hook was edited, update its `last_reviewed:` date to today.
+3. If a design decision changed, add an ADR under `docs/adr/` with the next free number.
 
 ## Reviewer pool
 
-Initial reviewers: Rehan, the AI Backend collaborator. As the system grows, domain reviewers (frontend lead for frontend skills, etc.) will be added.
+Maintainer reviews are by Rehan. As the repo grows, content-area reviewers can be added (frontend lead for frontend skills, etc.). PRs are welcome; expect a turn-around within a few days.
 
 ## When you (the coding agent) are unsure
 
@@ -50,7 +55,7 @@ If you are an agent reading this and you are not sure whether to act:
 - For a skill that has a clear procedure: follow it.
 - For a rule that conflicts with what the user is asking: surface the conflict to the user before proceeding.
 - For an architecture decision not covered: read `docs/adr/` and `docs/research/` before guessing.
-- If you find a documented failure mode in `docs/research/failure-modes.md` that applies: prefer the documented mitigation.
+- For anything destructive (rm, force-push, schema migration): always confirm with the user first.
 
 ## Inspirations
 
@@ -61,4 +66,4 @@ This repo is heavily inspired by:
 - Stripe Minions (directory-scoped rules)
 - Microsoft code-with-engineering-playbook (rationale IS the value)
 
-Full lineage in `docs/research/inspirations.md` (to be written in week 3).
+Full lineage in `docs/research/inspirations.md`.

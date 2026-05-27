@@ -9,7 +9,6 @@ last_reviewed = "2026-05-26"
 # productivity/stakeholder-slack-brief). Without requires_overlays an
 # install with --scope none would silently drop them and produce a thin
 # PM target. validate_profile_scope catches that.
-requires_overlays = ["team"]
 
 [skills]
 include = [

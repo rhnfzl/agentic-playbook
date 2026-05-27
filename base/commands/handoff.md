@@ -63,7 +63,7 @@ You are the agent compacting the session. Write a single Markdown file to a `mkt
 
    **Suggested skills**
    - Which skills the next session should load (by name). Reference the skill name only, not its full body.
-   - Useful when the next session will likely need `VCS-pr-review`, `diagnose`, `lint-guard`, etc.
+   - Useful when the next session will likely need `code-review`, `diagnose`, `lint-guard`, etc.
 
 3. **Preserve load-bearing context.**
    - Active Jira ticket IDs and their state.

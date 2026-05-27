@@ -10,7 +10,7 @@ Always-on behavioral constraints. A rule is unconditional; a skill is conditiona
 ## What Lives Here
 
 - Generic rule files at `base/rules/`: never-push-to-develop, no-em-dashes, no-ticket-ids-in-code, writing-style.
-- team-specific rule files at `overlays/team/rules/` (per ADR-0040): VCS-not-github, direct-acc-first, full-request-chain, jira-priority-scheme, label-policy, mcp-first-boundary.
+- team-specific rule files at `overlays/<name>/rules/` (per ADR-0040): vcs-not-github, direct-acc-first, full-request-chain, jira-priority-scheme, label-policy, mcp-first-boundary.
 - `README.md` documents the rule contract and installer behavior.
 
 ## Local Commands
@@ -37,7 +37,7 @@ Always-on behavioral constraints. A rule is unconditional; a skill is conditiona
 ## Do Not
 
 - Promote a rule from a skill body without removing the skill content.
-- Land an team-specific rule in `base/rules/`. Strong markers (R8-/MATCH- ticket IDs, team org name, internal hostnames, VCS.org) belong under `overlays/team/rules/` per ADR-0040; `scope_boundary.py` enforces this. A universal rule that uses team as a CONCRETE EXAMPLE (e.g. `never-push-to-develop.md`) stays in `base/` and is allowlisted with rationale in `scripts/checks/scope_boundary_allowlist.toml`.
+- Land an team-specific rule in `base/rules/`. Strong markers (R8-/MATCH- ticket IDs, team org name, internal hostnames, VCS.org) belong under `overlays/<name>/rules/` per ADR-0040; `scope_boundary.py` enforces this. A universal rule that uses team as a CONCRETE EXAMPLE (e.g. `never-push-to-develop.md`) stays in `base/` and is allowlisted with rationale in `scripts/checks/scope_boundary_allowlist.toml`.
 - Use multi-page rules. If it needs subsections beyond what/why/how, it is a skill.
 
 ## Owner And Freshness

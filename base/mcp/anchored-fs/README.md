@@ -94,7 +94,7 @@ State files at `~/.config/agent-shared/state/` are preserved (not removed) so re
 
 ## Design spec
 
-See the architecture spec at `docs/human-html/2026-05-24-architecture-anchored-filesystem-framework-global-edit-anchor-path-resolver-stale-read-mcp.html` in the upstream workspace (`/Users/rehan-8v/team/team_LLM_Systems`).
+See the maintainerure spec at `docs/human-html/2026-05-24-architecture-anchored-filesystem-framework-global-edit-anchor-path-resolver-stale-read-mcp.html` in the upstream workspace (`/Users/rehan-8v/team/team_LLM_Systems`).
 
 ## Hook ownership (ADR-0035 / ADR-0036 / ADR-0037)
 

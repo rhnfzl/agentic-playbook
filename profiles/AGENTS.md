@@ -40,7 +40,7 @@ Per the profile-separation principle (see project memory entry of the same name)
 
 - Use profiles for ad-hoc grouping. Profiles are for portable, single-role bundles; multi-role composition happens via `make install PROFILE=a,b,c`.
 - Add tool secrets or credentials to a profile.
-- Require an overlay implicitly. A profile that includes overlay-only skills (under `overlays/team/skills/`) MUST declare `requires_overlays = ["team"]` (or the relevant overlay name) at the TOML root per ADR-0040. The installer validates this before materializing and rejects with a clear message if the active scope does not satisfy the requirement.
+- Require an overlay implicitly. A profile that includes overlay-only skills (under `overlays/<name>/skills/`) MUST declare `requires_overlays = ["team"]` (or the relevant overlay name) at the TOML root per ADR-0040. The installer validates this before materializing and rejects with a clear message if the active scope does not satisfy the requirement.
 
 ## Owner And Freshness
 

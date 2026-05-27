@@ -10,9 +10,9 @@ Per the profile-separation principle, each profile is single-role. A teammate wh
 
 | Profile | Audience | Default content selection |
 |---|---|---|
-| `backend-developer.toml` | AI Backend / MCP engineers | All engineering skills + backend-relevant rules + Sonar + VCS hooks + Jira/Slack/error-tracking MCP |
-| `frontend-developer.toml` | Frontend engineers | UI + presentation skills + VCS hooks + Slack MCP |
-| `qa.toml` | QA engineers | Test-discipline skills + bug-triage + VCS-pr-review + Jira MCP |
+| `backend-developer.toml` | AI Backend / MCP engineers | All engineering skills + backend-relevant rules + Sonar + VCS-host hooks + Jira/Slack/error-tracking MCP |
+| `frontend-developer.toml` | Frontend engineers | UI + presentation skills + VCS-host hooks + Slack MCP |
+| `qa.toml` | QA engineers | Test-discipline skills + bug-triage + code-review + Jira MCP |
 | `tech-lead.toml` | Tech leads | Everything in backend + meeting-brief + handoff + stakeholder-slack-brief + presentation + decay tooling |
 | `product-manager.toml` | Product managers | 15 curated PM skills (PRD, sprint, retro, roadmap, prioritization, stakeholder map) + AGENTS.md curator + Jira/Slack/Tavily MCP |
 | `research.toml` | Researchers, PMs running discovery | 7 research-curated skills (interview script + synthesis, competitor analysis, user personas, market sizing) + Tavily MCP |
@@ -31,7 +31,7 @@ last_reviewed = "2026-05-24"
 [skills]
 include = [
   "engineering/post-iter-review",
-  "engineering/VCS-pr-review",
+  # engineering/code-review,  # add when shipped
   "engineering/ci-failure-triage",
   # ...
 ]

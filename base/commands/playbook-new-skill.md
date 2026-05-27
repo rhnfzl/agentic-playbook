@@ -42,7 +42,7 @@ You are the agent driving the scaffold. Ask three questions, run one command, ed
    - Kebab-case slug, no spaces, no underscores.
    - No `team` prefix in the filename.
    - No ticket IDs (`R8-*`, `MATCH-*`).
-   - Specific over generic ("VCS-pr-review" beats "pr-review").
+   - Specific over generic ("code-review" beats "pr-review").
 
    Wait for the user to confirm.
 

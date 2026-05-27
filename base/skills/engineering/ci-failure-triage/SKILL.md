@@ -26,7 +26,7 @@ matching check locally.
 1. **Capture the failure identity.**
    - Repo, branch, commit SHA, PR, job name, stage name, and exact failed command.
    - If the log is truncated, ask for the missing part only after checking local
-     job scripts, Jenkinsfile, Makefile, pyproject.toml, package.json, Dockerfiles,
+     job scripts, CI config, Makefile, pyproject.toml, package.json, Dockerfiles,
      and CI config.
 
 2. **Classify the failure.**

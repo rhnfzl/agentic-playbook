@@ -1,7 +1,6 @@
 # Profile: QA
 name = "qa"
 description = "Quality Assurance engineer. Focused on chat transcript debugging, scenario triage, and CI failure triage. Light on architecture rules; heavy on debugging workflows."
-requires_overlays = ["team"]
 
 [skills]
 include = [

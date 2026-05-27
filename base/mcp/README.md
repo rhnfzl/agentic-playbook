@@ -24,7 +24,7 @@ The symlink-from-playbook pattern coexists with the user's `~/.config/agent-shar
 | File | What it connects to | Transport | Notes |
 |---|---|---|---|
 | `atlassian.json` | Atlassian Cloud (Jira, Confluence) | Remote SSE via `mcp-remote` | Uses team.atlassian.net |
-| `VCS.json` | VCS Cloud | stdio (disabled by default) | No vetted npm package is selected yet; use the VCS REST API or `VCS-pr-review` skill |
+| `code-review-host.json` | VCS host | stdio (disabled by default) | No vetted npm package is selected yet; use the host VCS REST API or `code-review` skill |
 | `code-review-graph.json` | Local code-review-graph service | stdio (`uvx code-review-graph serve`) | Disabled by default; enable only when graph tools are needed |
 | `error-tracking.json` | error-tracking (`error-tracker.internal`) | stdio | VPN-only (team internal) |
 | `slack.json` | Slack | stdio (npm `@modelcontextprotocol/server-slack`) | Workspace via SLACK_TEAM_ID |
@@ -77,7 +77,7 @@ The Tier 3 adapters (Goose, Junie, Zed, Amp, etc.) do not receive MCP configs fr
 2. Open `~/.claude.json` in your editor. Find the `mcpServers` block. The playbook wrote new server entries; preserve any existing entries (the adapter's MCP merge does not overwrite by name).
 3. For each server you want to use, replace the `{{REPLACE_WITH_*}}` placeholders with real values:
    - Atlassian: email + API token (Atlassian Cloud user settings, https://id.atlassian.com)
-   - VCS: disabled by default because this playbook has not selected a vetted MCP package yet; use VCS REST API commands or the `VCS-pr-review` skill unless you replace the command locally
+   - VCS: disabled by default because this playbook has not selected a vetted MCP package yet; use VCS REST API commands or the `code-review` skill unless you replace the command locally
    - error-tracking: API token from your error-tracking user settings
    - Slack: Bot token (xoxb-...) + Team ID (Slack workspace settings)
    - code-quality: token + URL (your code-quality instance)

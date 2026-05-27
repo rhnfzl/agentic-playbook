@@ -54,7 +54,7 @@ The TOML conversion uses LITERAL strings so backslash sequences in regex / escap
 | File | Role |
 |---|---|
 | `agentic-scenario-auditor.md` | Audits AI Backend / MCP scenario failures |
-| `VCS-pr-investigator.md` | Investigates VCS PRs (read-only) |
+| `code-review-investigator.md` | Investigates code-review PRs (read-only) |
 | `docs-harness-validator.md` | Validates documentation harnesses (research, drafts, ADRs) |
 | `homelab-drift-auditor.md` | Audits homelab config drift |
 | `literature-synthesizer.md` | Fetches + summarizes papers on a topic |
@@ -66,7 +66,7 @@ The TOML conversion uses LITERAL strings so backslash sequences in regex / escap
 ## How to add a new subagent
 
 1. Decide: does this fit the subagent shape (specialized role + own context window + invoked by name)? If it's a workflow you drive yourself, write a skill instead.
-2. Create `base/agents/<slug>.md` (or `overlays/team/agents/<slug>.md` for team-specific agents per ADR-0040) with the frontmatter + body per the schema above.
+2. Create `base/agents/<slug>.md` (or `overlays/<name>/agents/<slug>.md` for team-specific agents per ADR-0040) with the frontmatter + body per the schema above.
 3. Be specific in the description: "Use when the user pastes a paper URL and asks for a comparison vs prior work" beats "Use for papers."
 4. Run `make check` and `make test` (smoke tests will load the new agent and round-trip it through TOML to confirm Codex compatibility).
 5. PR per `CONTRIBUTING.md`.

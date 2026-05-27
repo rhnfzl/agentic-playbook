@@ -96,7 +96,7 @@ Fails if any match found. Default behavior when `$PLAYBOOK_CONTAINMENT_TERMS` is
 
 If the branch owner wants hard-fail when unconfigured (stricter local discipline), set `$PLAYBOOK_CONTAINMENT_STRICT=1`. Absence of `$PLAYBOOK_CONTAINMENT_TERMS` then fails the check.
 
-CI wiring note: VCS CI will NOT catch containment leaks unless the pipeline explicitly sets `$PLAYBOOK_CONTAINMENT_TERMS` to a file the CI runner can read. For server-side enforcement, the team owns wiring that env var in the Jenkinsfile / VCS Pipelines config. Pre-push hooks running locally pick up the user's per-developer config.
+CI wiring note: VCS CI will NOT catch containment leaks unless the pipeline explicitly sets `$PLAYBOOK_CONTAINMENT_TERMS` to a file the CI runner can read. For server-side enforcement, the team owns wiring that env var in the CI config / VCS Pipelines config. Pre-push hooks running locally pick up the user's per-developer config.
 
 Implementation note: cannot rely on `git ls-files` (excludes ignored). Use `os.walk` with explicit exclude_dirs, OR `rg --hidden --no-ignore -g '!.git/'` if available, with fallback to `find` + `grep`.
 

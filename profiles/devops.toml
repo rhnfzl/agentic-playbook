@@ -1,7 +1,6 @@
 # Profile: DevOps (team)
 name = "devops"
 description = "DevOps engineer working across team projects. Bundles 4 native skills covering the team-specific surface (AWS Secrets Manager configmaps, error-tracking triage, k8s dashboard verification, CI pipeline debugging) plus the AGENTS.md curator. External-tool skills (Terraform, Packer, k8s tooling) are documented in profiles/devops.README.md for opt-in install via `npx skills add <upstream>`."
-requires_overlays = ["team"]
 owner = "rehan"
 last_reviewed = "2026-05-26"
 
