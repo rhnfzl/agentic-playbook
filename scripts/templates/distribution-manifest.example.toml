@@ -141,3 +141,12 @@ allowlist = [
 denylist = [
   # "project_specific_ticket_status",
 ]
+
+
+# Optional placeholder table. v1 of sync_distribution.py reserves this
+# slot for the future direction-flip (sync from destination back to
+# source). The argument parser accepts --direction reverse today but
+# exits with code 4 ("not implemented"); when that lands, this block
+# will hold the reverse-direction analogue of [sources] + [scrubs].
+[reverse_direction]
+# placeholder for when sync from destination back to source is implemented

@@ -70,14 +70,14 @@ def _scan(hook_path: Path) -> tuple[bool, bool, set[str] | None]:
 
 def main(repo_root: Path | None = None) -> int:
     repo_root = repo_root or Path(__file__).resolve().parent.parent
-    # v0.11 (ADR-0040): hooks moved to base/ + overlays/<name>/. Walk both.
+    # v0.11 (ADR-0040): hooks moved to base/ + overlays/team/. Walk both.
     hook_roots = [
         repo_root / "base" / "hooks",
         repo_root / "overlays" / "team" / "hooks",
     ]
     hook_roots = [r for r in hook_roots if r.is_dir()]
     if not hook_roots:
-        print("  no hooks dirs at base/hooks/ or overlays/<name>/hooks/; nothing to check")
+        print("  no hooks dirs at base/hooks/ or overlays/team/hooks/; nothing to check")
         return 0
 
     missing_event: list[Path] = []

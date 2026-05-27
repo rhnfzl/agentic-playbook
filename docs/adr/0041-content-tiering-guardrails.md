@@ -14,7 +14,7 @@ The base + overlay ADR was initially numbered 0030, then 0031, then 0032, then f
 
 ### Gap 2: Content tier drift after the refactor
 
-With `base/` and `overlays/<name>/` as separate dirs, the boundary is enforced only by code review. A reviewer can miss an team reference landing in `base/` if not specifically looking for it. The mistake compounds because the next reviewer assumes prior reviews caught such drift. Without an automated check, the directory boundary is aspirational, not actual.
+With `base/` and `overlays/team/` as separate dirs, the boundary is enforced only by code review. A reviewer can miss an team reference landing in `base/` if not specifically looking for it. The mistake compounds because the next reviewer assumes prior reviews caught such drift. Without an automated check, the directory boundary is aspirational, not actual.
 
 ### Gap 3: Hidden / ignored file leakage
 
@@ -76,7 +76,7 @@ rationale = "Universal feature-branch discipline; mentions VCS as the example tr
 
 Each allowlist entry MUST have a non-empty rationale. The check fails if rationale is empty.
 
-The allowlist is intentionally small; growth in it is a smell that the file might belong in `overlays/<name>/` instead.
+The allowlist is intentionally small; growth in it is a smell that the file might belong in `overlays/team/` instead.
 
 ### scripts/checks/ignored_containment.py
 

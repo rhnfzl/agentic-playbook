@@ -34,7 +34,7 @@ def bundle_health_scripts(repo_root: Path) -> list[Path]:
     surfaces dead bundles (the v0.7 doctor-verify covers config + on-disk
     state; this layer covers runtime readiness specific to each bundle).
 
-    v0.11 (ADR-0040): MCP bundles moved to base/mcp/ + overlays/<name>/mcp/.
+    v0.11 (ADR-0040): MCP bundles moved to base/mcp/ + overlays/team/mcp/.
     Walks both roots so doctor reports the full surface.
     """
     results: list[Path] = []

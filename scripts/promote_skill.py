@@ -101,7 +101,7 @@ def create_feature_branch(playbook_home: Path, slug: str) -> str:
 def _scope_subdir(scope: str) -> str:
     """Map scope=base|team to its subtree prefix per ADR-0040."""
     if scope == "team":
-        return "overlays/<name>"
+        return "overlays/team"
     return "base"
 
 
@@ -115,7 +115,7 @@ def scaffold_skill(
     """Use the existing new_skill.py to scaffold a new skill folder + SKILL.md.
 
     v0.11 (ADR-0040): new_skill.py now scaffolds under base/skills/ or
-    overlays/<name>/skills/. Forward the scope so promotion lands in the
+    overlays/team/skills/. Forward the scope so promotion lands in the
     same tree the loader walks.
     """
     new_skill_py = playbook_home / "scripts" / "new_skill.py"
@@ -144,7 +144,7 @@ def write_rule(
 ) -> Path:
     """Write a new rule. Refuses to overwrite an existing rule.
 
-    v0.11 (ADR-0040): rules moved to base/rules/ + overlays/<name>/rules/.
+    v0.11 (ADR-0040): rules moved to base/rules/ + overlays/team/rules/.
     Scope decides which subtree the new rule lands in. Mirrors new_skill.py's
     refusal-on-collision discipline.
     """
@@ -165,7 +165,7 @@ def write_hook(
 ) -> Path:
     """Write a new hook. Refuses to overwrite.
 
-    v0.11 (ADR-0040): hooks moved to base/hooks/ + overlays/<name>/hooks/.
+    v0.11 (ADR-0040): hooks moved to base/hooks/ + overlays/team/hooks/.
     """
     hooks_dir = playbook_home / _scope_subdir(scope) / "hooks"
     hooks_dir.mkdir(parents=True, exist_ok=True)
@@ -207,7 +207,7 @@ def main() -> int:
         help=(
             "v0.11 (ADR-0040): which tree to promote into. 'base' (default) "
             "lands the draft in base/<type>/. 'team' lands in "
-            "overlays/<name>/<type>/."
+            "overlays/team/<type>/."
         ),
     )
     args = parser.parse_args()

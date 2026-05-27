@@ -1,7 +1,7 @@
 # Scripts
 
 Owner: Rehan
-last_reviewed: 2026-05-25
+last_reviewed: 2026-05-27
 
 ## Purpose
 
@@ -15,7 +15,8 @@ Python scripts that power the installer, linters, checks, and lifecycle commands
 - `bulk_import.py`, `new_skill.py`, `promote_skill.py`, `retrospective.py` for authoring lifecycle.
 - `test_adapters.py` smoke tests.
 - `playbook_init.py`, `playbook_update.py` for per-project init.
-- `templates/` Python script scaffolds.
+- `sync_distribution.py` for distributing `base/` to an external destination per ADR-0042. Scheduled via the wrapper in `templates/distribution-cron.example.sh`; runbook at `docs/runbooks/distribution-sync-cron.md`.
+- `templates/` Python script scaffolds + the distribution wrapper / manifest example.
 
 ## Local Commands
 
@@ -29,7 +30,7 @@ Python scripts that power the installer, linters, checks, and lifecycle commands
 
 - One concern per script. install.py is now orchestration-only (argparse + lifecycle commands + lock); shape contracts live in `hook_native_config.py`, verification in `install_verify.py`. New install-time concerns belong in their own module rather than further inline growth of install.py.
 - No PyYAML dependency for core scripts (parse YAML naively); the playbook targets dependency-light.
-- Exit codes: 0 pass, 1 fail. Warnings print but exit 0.
+- Exit codes: 0 pass, 1 fail. Warnings print but exit 0. **Carve-out for `sync_distribution.py`**: also uses 2 (lock held by another sync), 3 (IO error during copy), 4 (reverse direction not implemented) so the cron wrapper can distinguish operational from logical failures. Document any other carve-outs in the script's module docstring.
 - Output goes to stdout for normal flow, stderr for warnings/errors.
 - READMEs and AGENTS.md files must not name a playbook version. `check_no_versions_in_readmes.py` enforces this. Release-flavoured content belongs in `CHANGELOG.md`, `RELEASING.md`, or `docs/adr/`.
 
@@ -46,7 +47,7 @@ Python scripts that power the installer, linters, checks, and lifecycle commands
 ## Do Not
 
 - Add external dependencies casually. Each new dep is a new install burden.
-- Modify files outside the playbook repo from scripts run in the repo.
+- Modify files outside the playbook repo from scripts run in the repo. **Carve-out for distribution sync**: `sync_distribution.py` writes to an operator-configured external destination by design (ADR-0042). Its boundary is the manifest's `[destination].path` and the path-traversal safety check in `_resolve_sources`; nothing else in `scripts/` should reach outside `$PLAYBOOK_HOME`.
 - Skip `--help` when adding a new entry point.
 
 ## Owner And Freshness

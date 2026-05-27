@@ -159,7 +159,7 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
-    # v0.11 (ADR-0040): skills moved to base/ + overlays/<name>/. Imported
+    # v0.11 (ADR-0040): skills moved to base/ + overlays/team/. Imported
     # skills live at base/skills/imported/.
     target_dirs: list[Path] = []
     if args.all:

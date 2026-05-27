@@ -65,14 +65,14 @@ def _extract_description(text: str) -> str | None:
 
 def main(repo_root: Path | None = None) -> int:
     repo_root = repo_root or Path(__file__).resolve().parent.parent
-    # v0.11 (ADR-0040): skills moved to base/ + overlays/<name>/. Walk both.
+    # v0.11 (ADR-0040): skills moved to base/ + overlays/team/. Walk both.
     skill_roots = [
         repo_root / "base" / "skills",
         repo_root / "overlays" / "team" / "skills",
     ]
     skill_roots = [r for r in skill_roots if r.is_dir()]
     if not skill_roots:
-        print("  no skill roots found at base/skills/ or overlays/<name>/skills/; nothing to check")
+        print("  no skill roots found at base/skills/ or overlays/team/skills/; nothing to check")
         return 0
 
     failures: list[tuple[Path, int]] = []

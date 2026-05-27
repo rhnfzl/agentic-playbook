@@ -134,7 +134,7 @@ def test_bundle_health_aggregation_reports_unhealthy_bundles(
     from install_bundles import bundle_health_scripts, run_bundle_health
 
     fake_repo = tmp_path / "fake-repo"
-    # v0.11 (ADR-0040): bundle_health_scripts walks base/mcp/ + overlays/<name>/mcp/.
+    # v0.11 (ADR-0040): bundle_health_scripts walks base/mcp/ + overlays/team/mcp/.
     bundle_a = fake_repo / "base" / "mcp" / "alpha" / "bundle"
     bundle_b = fake_repo / "base" / "mcp" / "beta" / "bundle"
     bundle_a.mkdir(parents=True)
@@ -1307,7 +1307,7 @@ def test_hook_metadata_check_fails_on_unknown_adapter_slug(tmp_path: Path) -> No
     from check_hook_metadata import main as hook_metadata_main
 
     fake_root = tmp_path / "fake-root"
-    # v0.11 (ADR-0040): hook_metadata check walks base/hooks/ + overlays/<name>/hooks/.
+    # v0.11 (ADR-0040): hook_metadata check walks base/hooks/ + overlays/team/hooks/.
     (fake_root / "base" / "hooks").mkdir(parents=True)
     (fake_root / "base" / "hooks" / "typo-hook.sh").write_text(
         "#!/usr/bin/env bash\n"

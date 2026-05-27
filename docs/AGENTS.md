@@ -1,7 +1,7 @@
 # Documentation
 
 Owner: Rehan
-last_reviewed: 2026-05-25
+last_reviewed: 2026-05-27
 
 ## Purpose
 
@@ -12,6 +12,7 @@ Durable documentation: ADRs, research artifacts, human-review HTML, and external
 - `adr/` Architecture Decision Records (one per design choice).
 - `human-html/` HTML artifacts for human review (plans, reviews, syntheses).
 - `research/` long-form research, inspirations, failure-mode catalog, external-source catalog.
+- `runbooks/` operational runbooks for scheduled / long-running tools (e.g. distribution-sync-cron).
 - `tools/` operational tool documentation when not fitting elsewhere.
 - `templates/` doc scaffolds.
 

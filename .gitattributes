@@ -1,11 +1,11 @@
 # v0.12: mark vendored upstream content under base/mcp/anchored-fs/ so
-# GitHub and Bitbucket diff views collapse the 5,064 files by default and
+# GitHub and VCS diff views collapse the 5,064 files by default and
 # language statistics exclude them. The local MCP wrapper is small; the
 # bulk content under that path is upstream and managed by the MCP project
 # itself, not by playbook contributors.
 #
 # `linguist-vendored=true` is the canonical signal; both GitHub and
-# Bitbucket honor it in their diff renderers. Files are still tracked and
+# VCS honor it in their diff renderers. Files are still tracked and
 # diffable; they just don't dominate the "Files changed" tab on PRs.
 base/mcp/anchored-fs/** linguist-vendored=true
 

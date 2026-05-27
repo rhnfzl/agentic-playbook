@@ -12,7 +12,10 @@
 # Create ~/Library/LaunchAgents/com.<you>.playbook-distribution-sync.plist
 # with StartCalendarInterval Hour=9 Minute=0 + RunAtLoad=false.
 
-set -euo pipefail
+# `pipefail` makes the pipeline exit code reflect the python step (the
+# `tee` always succeeds). `set -e` is intentionally off inside the
+# branch so we can capture the exit code before the trap.
+set -uo pipefail
 
 # Edit these two paths before installing.
 PLAYBOOK_HOME="${PLAYBOOK_HOME:-/Users/<you>/path/to/playbook}"
@@ -24,10 +27,31 @@ mkdir -p "$LOG_DIR"
 
 cd "$PLAYBOOK_HOME"
 
-# Capture stdout + stderr; tee to log file. Use exit code from python.
-if ! python3 scripts/sync_distribution.py --manifest "$DISTRIBUTION_MANIFEST" 2>&1 | tee -a "$LOG_PATH"; then
-  rc=$?
-  # macOS native notification on failure.
-  /usr/bin/osascript -e "display notification \"Sync failed; tail $LOG_PATH for details\" with title \"Playbook distribution\"" || true
+# Stamp the log so each invocation is visible at the tail.
+{
+  echo ""
+  echo "--- $(date -u +%Y-%m-%dT%H:%M:%SZ) cron fire ---"
+} >> "$LOG_PATH"
+
+# Capture stdout + stderr; tee to log file. PIPESTATUS captures the
+# python step's exit code BEFORE `tee` (whose status is always 0).
+# Critical: don't use `if ! cmd | tee; then rc=$?`, because the `!` in
+# the predicate inverts the status, so $? inside the branch is 0 even
+# when the command failed, and the wrapper would exit 0 on failure.
+python3 scripts/sync_distribution.py --manifest "$DISTRIBUTION_MANIFEST" 2>&1 | tee -a "$LOG_PATH"
+rc=${PIPESTATUS[0]}
+
+if [ "$rc" -ne 0 ]; then
+  /usr/bin/osascript -e "display notification \"Sync failed (exit $rc); tail $LOG_PATH for details\" with title \"Playbook distribution\"" >/dev/null 2>&1 || true
   exit "$rc"
 fi
+
+# Optional: also sync curated memory entries on the same cadence. Memory
+# failures are surfaced but do not raise a notification (lower stakes
+# than content drift; the operator catches up next sync).
+python3 scripts/sync_distribution.py memory --manifest "$DISTRIBUTION_MANIFEST" 2>&1 | tee -a "$LOG_PATH"
+mem_rc=${PIPESTATUS[0]}
+if [ "$mem_rc" -ne 0 ]; then
+  /usr/bin/osascript -e "display notification \"Memory sync exit $mem_rc (non-blocking); tail $LOG_PATH\" with title \"Playbook distribution\"" >/dev/null 2>&1 || true
+fi
+exit "$rc"

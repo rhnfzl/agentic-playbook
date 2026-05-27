@@ -139,7 +139,7 @@ The v2 research materially changes two v1 recommendations and adds three new one
 
 **What changes from v1:**
 
-First, the "Windsurf-first team" framing (v1 gap #2) needs updating. Windsurf was acquired by Cognition in July 2025; its enterprise trajectory is now tied to Cognition's roadmap, and regulated-industry teams are scrutinizing whether previously-negotiated DPAs carry through the acquisition. For the team today (Windsurf + Claude Code + Codex), the practical architecture remains correct, but Windsurf's long-term enterprise tier should be monitored and a fallback evaluated quarterly.
+First, the "Windsurf-first team" framing (v1 gap #2) needs updating. Windsurf was acquired by Cognition in July 2025; its enterprise trajectory is now tied to Cognition's roadmap, and regulated-industry teams are scrutinizing whether previously-negotiated DPAs carry through the acquisition. For the team team today (Windsurf + Claude Code + Codex), the practical architecture remains correct, but Windsurf's long-term enterprise tier should be monitored and a fallback evaluated quarterly.
 
 Second, the agent landscape is wider than v1's four tools, but AGENTS.md convergence is the key structural fact: as of mid-2026, Claude Code, Codex, Cursor, Windsurf, Copilot, Gemini CLI, Kiro, Junie, Goose, Aider, Cline, and Roo Code all read AGENTS.md at the repo root. A canonical `AGENTS.md` per subproject (AI Backend + MCP) is genuinely cross-tool now, not just aspirationally. The Ruler CLI handles distribution to all 20+ tools; Packmind adds governance if team grows to a stage where drift detection and audit trails are required.
 

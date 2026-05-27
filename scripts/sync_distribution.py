@@ -35,13 +35,17 @@ import traceback
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import IO
+from typing import IO, Iterator
 
 
 LOCK_PATH = Path("/tmp/playbook-distribution-sync.lock")
 LOCK_STALE_AFTER_SECONDS = 3600  # 1 hour
-LOG_PATH = Path.home() / "Library" / "Logs" / "playbook-distribution-sync.log"
-TOOL_VERSION = "sync_distribution.py v1.0"
+LOG_PATH = (
+    Path(os.environ.get("PLAYBOOK_SYNC_LOG", ""))
+    if os.environ.get("PLAYBOOK_SYNC_LOG")
+    else Path.home() / "Library" / "Logs" / "playbook-distribution-sync.log"
+)
+TOOL_VERSION = "sync_distribution.py v1.1"
 
 # Files we will read+scrub+write as text. Binary files would mangle if
 # scrubbed; the conservative play is to copy them as bytes without
@@ -51,8 +55,30 @@ TEXT_EXTENSIONS = frozenset({
     ".md", ".py", ".toml", ".yaml", ".yml", ".json", ".sh",
     ".jinja", ".jinja2", ".j2", ".html", ".css", ".js", ".ts", ".tsx",
     ".txt", ".cfg", ".ini", ".conf", ".env", ".example",
-    ".gitignore", ".gitattributes",
 })
+
+# Files whose name (not suffix) marks them as text. Dotfiles + extension-
+# less files don't get caught by Path.suffix (".gitattributes" → suffix
+# ""); they're handled here explicitly. Without this, root dotfiles in
+# the allowlist take the binary copy path and bypass scrub even when the
+# operator clearly intended for their contents to be scrubbed.
+TEXT_FILENAMES = frozenset({
+    "Makefile", "Dockerfile", "LICENSE", "VERSION", "README",
+    ".gitignore", ".gitattributes", ".agents-md-ignore",
+    ".editorconfig", ".dockerignore",
+})
+
+# Default exclusions baked into the allowlist walker. These are caches
+# and metadata dirs that should never flow to a destination repo
+# regardless of operator manifest content. Public-facing destinations
+# would otherwise receive .pyc bytes when scripts/ or tests/ are
+# allowlisted whole.
+DEFAULT_EXCLUDED_DIR_NAMES = frozenset({
+    "__pycache__", ".git", ".pytest_cache", ".ruff_cache", ".mypy_cache",
+    "node_modules", ".venv", "venv", ".DS_Store",
+})
+
+AUDIT_FILENAME = ".sync-manifest.json"
 
 
 @dataclass
@@ -248,11 +274,17 @@ def _source_commit(repo: Path) -> tuple[str, str]:
 
 
 def _is_text_file(path: Path) -> bool:
-    """Whether the file extension marks it as a text file we will scrub."""
+    """Whether the file is treated as text (scrubbed) vs binary (raw bytes).
+
+    Checks the file's suffix first (covers `.md`, `.py`, etc.), then falls
+    back to the filename (`Makefile`, `LICENSE`, dotfiles like
+    `.gitattributes`). Dotfiles have an empty `Path.suffix`, so without
+    the filename fallback they take the binary copy path and bypass scrub
+    even when their content clearly contains scrubbable tokens.
+    """
     if path.suffix in TEXT_EXTENSIONS:
         return True
-    # Special-case files without extension that we know are text:
-    if path.name in {"Makefile", "Dockerfile", "LICENSE", "VERSION", "README"}:
+    if path.name in TEXT_FILENAMES:
         return True
     return False
 
@@ -265,6 +297,47 @@ def _is_path_under(path: str, prefix: str) -> bool:
     return path.startswith(prefix_norm + "/")
 
 
+def _within(path: Path, root: Path) -> bool:
+    """Return True if path resolves to a location inside root.
+
+    Used to reject manifest entries that escape source_root (e.g. a
+    `..` traversal). Resolves both sides via realpath so symlinks can't
+    smuggle paths outside the boundary.
+    """
+    try:
+        return path.resolve().is_relative_to(root.resolve())
+    except (OSError, ValueError):
+        return False
+
+
+def _walk_with_default_excludes(root: Path) -> Iterator[Path]:
+    """Iterator over files under root, skipping DEFAULT_EXCLUDED_DIR_NAMES.
+
+    Cheaper + safer than `root.rglob("*")` followed by post-filtering:
+    pruning at the directory level avoids walking large cache trees and
+    avoids any chance of yielding a file inside a denylisted dir that
+    later misses the substring check.
+    """
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        try:
+            entries = sorted(current.iterdir())
+        except OSError:
+            continue
+        for entry in entries:
+            if entry.is_dir() and not entry.is_symlink():
+                if entry.name in DEFAULT_EXCLUDED_DIR_NAMES:
+                    continue
+                stack.append(entry)
+                continue
+            # Files (including symlinks) yield. iterdir() also returns
+            # symlinks pointing at directories; treat those as files
+            # (they'll be preserved as symlinks by _copy_file).
+            if entry.is_file() or entry.is_symlink():
+                yield entry
+
+
 def _resolve_sources(
     source_root: Path, allowlist: list[str], denylist: list[str]
 ) -> list[Path]:
@@ -272,20 +345,29 @@ def _resolve_sources(
 
     Files relative to source_root that match an allowlist entry (file or
     directory prefix) and do NOT match any denylist entry are returned.
+
+    Entries that escape source_root via traversal (e.g. `../notes.md`)
+    are rejected with a stderr warning rather than silently writing
+    outside the destination repo.
     """
     result: list[Path] = []
     seen: set[Path] = set()
+    source_root_resolved = source_root.resolve()
     for entry in allowlist:
-        candidate = source_root / entry.rstrip("/")
+        candidate = (source_root / entry.rstrip("/"))
+        if not _within(candidate, source_root_resolved):
+            _stderr(
+                f"WARN: allowlist entry escapes source_root and will be "
+                f"ignored: {entry}"
+            )
+            continue
         if candidate.is_file():
             if candidate not in seen:
                 result.append(candidate)
                 seen.add(candidate)
             continue
         if candidate.is_dir():
-            for file_path in sorted(candidate.rglob("*")):
-                if not file_path.is_file():
-                    continue
+            for file_path in _walk_with_default_excludes(candidate):
                 if file_path not in seen:
                     result.append(file_path)
                     seen.add(file_path)
@@ -296,7 +378,7 @@ def _resolve_sources(
         _stderr(f"WARN: allowlist entry not found in source: {entry}")
 
     if not denylist:
-        return result
+        return sorted(result)
 
     def _denied(rel: str) -> bool:
         return any(_is_path_under(rel, d) for d in denylist)
@@ -307,7 +389,7 @@ def _resolve_sources(
         if _denied(rel):
             continue
         filtered.append(file_path)
-    return filtered
+    return sorted(filtered)
 
 
 def _scrub_text(text: str, scrubs: list[ScrubPattern]) -> str:
@@ -380,20 +462,124 @@ def _copy_file(
     return (True, None)
 
 
-def _write_audit(
+def _read_prior_audit(destination: Path) -> dict | None:
+    """Return the prior .sync-manifest.json contents, or None if absent.
+
+    A missing audit file is the normal first-sync condition; a malformed
+    audit file is logged but treated like absent so the next sync can
+    rewrite it.
+    """
+    target = destination / AUDIT_FILENAME
+    if not target.is_file():
+        return None
+    try:
+        return json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        _stderr(f"WARN: prior audit at {target} is malformed; rewriting: {exc}")
+        return None
+
+
+def _semantically_equal_audit(prior: dict | None, current: dict) -> bool:
+    """Compare two audit payloads ignoring synced_at + tool_version.
+
+    Returns True if every load-bearing field matches: source_commit (the
+    source identity), source_repo + source_branch (after scrub), the
+    two hashes (manifest identity), and the synced_files set (what was
+    written). When True, the audit on disk is still accurate and we can
+    skip the rewrite (preserving the destination's git diff cleanliness
+    for unattended cron runs).
+    """
+    if prior is None:
+        return False
+    semantic_fields = (
+        "source_commit",
+        "source_repo",
+        "source_branch",
+        "scrub_rules_hash",
+        "allowlist_hash",
+    )
+    for field_name in semantic_fields:
+        if prior.get(field_name) != current.get(field_name):
+            return False
+    prior_files = set(prior.get("synced_files") or [])
+    current_files = set(current.get("synced_files") or [])
+    return prior_files == current_files
+
+
+def _warn_manifest_drift(prior: dict | None, current: dict) -> None:
+    """If the manifest's hashes changed since the prior sync, warn.
+
+    Recording hashes without comparing them is half an audit trail.
+    Surfacing the drift gives the operator a chance to re-read their
+    own scrub rule changes before the destination's working tree is
+    rewritten under different rules.
+    """
+    if prior is None:
+        return
+    if prior.get("scrub_rules_hash") != current.get("scrub_rules_hash"):
+        _stderr(
+            f"WARN: scrub_rules_hash differs from prior sync "
+            f"(prior={prior.get('scrub_rules_hash')}, "
+            f"current={current.get('scrub_rules_hash')}); "
+            f"every destination file may be rewritten under new rules"
+        )
+    if prior.get("allowlist_hash") != current.get("allowlist_hash"):
+        _stderr(
+            f"WARN: allowlist_hash differs from prior sync "
+            f"(prior={prior.get('allowlist_hash')}, "
+            f"current={current.get('allowlist_hash')}); "
+            f"manifest scope changed since last sync"
+        )
+
+
+def _delete_stale_files(
+    destination: Path, prior: dict | None, current_files: list[str]
+) -> list[str]:
+    """Delete files the prior sync wrote that the current sync did not.
+
+    A file that was in prior `synced_files` but is missing from current
+    is either: (a) removed from source allowlist, (b) added to denylist,
+    or (c) removed from upstream entirely. In every case the operator
+    intent is "this file should no longer live under managed paths at
+    the destination." Leaving it produces silent drift between
+    `.sync-manifest.json` and the destination's working tree.
+
+    Returns the list of files that were actually deleted (excluding
+    those already absent at the destination, which is a no-op).
+    """
+    if prior is None:
+        return []
+    prior_files = set(prior.get("synced_files") or [])
+    current_set = set(current_files)
+    stale = sorted(prior_files - current_set)
+    deleted: list[str] = []
+    for rel in stale:
+        target = destination / rel
+        if target.is_symlink() or target.is_file():
+            try:
+                target.unlink()
+                deleted.append(rel)
+            except OSError as exc:
+                _stderr(f"WARN: could not delete stale {target}: {exc}")
+    return deleted
+
+
+def _build_audit_payload(
     manifest: Manifest,
     source_root: Path,
     source_sha: str,
     source_branch: str,
     synced_files: list[str],
-) -> None:
-    # source_repo and source_branch are scrubbed through the manifest's
-    # patterns: the destination's audit metadata should not leak the
-    # team-identifier tokens the rest of the sync was specifically built
-    # to remove. The source_sha is left untouched; it is a hex string
-    # that cannot encode identity by itself.
+) -> dict:
+    """Compose the audit dict (without writing it).
+
+    source_repo and source_branch run through the manifest scrubs so the
+    destination's audit metadata doesn't leak the team-identifier tokens
+    the rest of the sync was built to remove. source_commit is a hex SHA
+    that cannot encode identity by itself; it stays untouched.
+    """
     raw_source_repo = _source_remote_url(source_root) or "unknown"
-    audit = {
+    return {
         "source_repo": _scrub_text(raw_source_repo, manifest.scrubs),
         "source_commit": source_sha,
         "source_branch": _scrub_text(source_branch, manifest.scrubs),
@@ -403,11 +589,28 @@ def _write_audit(
         "tool_version": TOOL_VERSION,
         "synced_files": synced_files,
     }
-    target = manifest.destination_path / ".sync-manifest.json"
+
+
+def _write_audit_if_changed(
+    destination: Path,
+    prior: dict | None,
+    current: dict,
+) -> bool:
+    """Write the audit JSON to disk only when the prior is missing or stale.
+
+    Returns True if a write happened. Skipping the write when no semantic
+    field changed preserves the destination's git diff cleanliness on
+    scheduled cron runs, so the operator sees real updates instead of
+    cosmetic synced_at churn.
+    """
+    if _semantically_equal_audit(prior, current):
+        return False
+    target = destination / AUDIT_FILENAME
     target.write_text(
-        json.dumps(audit, indent=2, sort_keys=True) + "\n",
+        json.dumps(current, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    return True
 
 
 def _source_remote_url(repo: Path) -> str | None:
@@ -420,10 +623,21 @@ def _source_remote_url(repo: Path) -> str | None:
     return result.stdout.strip() if result.returncode == 0 else None
 
 
+def _resolve_source_root(override: Path | None) -> Path:
+    """Return the source playbook root.
+
+    Tests pass an explicit override to avoid the `__file__`-based default,
+    which would otherwise force tests to monkeypatch the module global.
+    """
+    if override is not None:
+        return override
+    return Path(__file__).resolve().parent.parent
+
+
 def run_distribution(args: argparse.Namespace) -> int:
     manifest_path = Path(args.manifest).expanduser().resolve()
     manifest = _load_manifest(manifest_path)
-    source_root = Path(__file__).resolve().parent.parent
+    source_root = _resolve_source_root(getattr(args, "_source_root_override", None))
 
     if not manifest.destination_path.is_dir():
         _stderr(f"destination directory not found: {manifest.destination_path}")
@@ -443,9 +657,21 @@ def run_distribution(args: argparse.Namespace) -> int:
     changed = 0
     errors: list[str] = []
     synced_rel: list[str] = []
+    destination = manifest.destination_path
+    destination_resolved = destination.resolve()
     for src in sources:
         rel = src.relative_to(source_root)
-        dst = manifest.destination_path / rel
+        dst = destination / rel
+        # Belt-and-suspenders: even though _resolve_sources already
+        # rejected entries escaping source_root, recheck destination at
+        # write time. A malformed relative path that survives
+        # relative_to would still get caught before we touch the
+        # filesystem outside the destination.
+        if not _within(dst, destination_resolved):
+            errors.append(
+                f"destination path escapes destination_path: {rel}"
+            )
+            continue
         was_changed, err = _copy_file(src, dst, manifest.scrubs, args.dry_run)
         if err is not None:
             errors.append(err)
@@ -459,13 +685,25 @@ def run_distribution(args: argparse.Namespace) -> int:
             _stderr(f"ERROR: {e}")
         return 3
 
+    prior = _read_prior_audit(destination)
+    audit_payload = _build_audit_payload(
+        manifest, source_root, source_sha, source_branch, synced_rel
+    )
+    _warn_manifest_drift(prior, audit_payload)
+
+    deleted: list[str] = []
     if not args.dry_run:
-        _write_audit(manifest, source_root, source_sha, source_branch, synced_rel)
+        deleted = _delete_stale_files(destination, prior, synced_rel)
+        audit_written = _write_audit_if_changed(destination, prior, audit_payload)
+    else:
+        audit_written = False
 
     print(f"Source commit: {source_sha} ({source_branch})")
-    print(f"Destination:   {manifest.destination_path}")
+    print(f"Destination:   {destination}")
     print(f"Files scanned: {len(sources)}")
     print(f"Files changed: {changed}{' (dry-run)' if args.dry_run else ''}")
+    print(f"Stale removed: {len(deleted)}")
+    print(f"Audit updated: {'yes' if audit_written else 'no (idempotent)'}")
     print(f"Scrub rules:   {len(manifest.scrubs)}")
     if args.dry_run:
         print(
@@ -522,25 +760,59 @@ def run_memory(args: argparse.Namespace) -> int:
         changed += 1
         ported.append(slug)
 
+    deleted_count = 0
+    index_written = False
     if not args.dry_run:
-        _regenerate_memory_index(manifest.memory_destination_dir, ported)
+        deleted_count = _delete_stale_memory_entries(
+            manifest.memory_destination_dir, ported
+        )
+        index_written = _write_memory_index_if_changed(
+            manifest.memory_destination_dir, ported
+        )
 
     print(f"Memory source:      {manifest.memory_source_dir}")
     print(f"Memory destination: {manifest.memory_destination_dir}")
     print(f"Entries ported:     {len(ported)}{' (dry-run)' if args.dry_run else ''}")
     print(f"Entries changed:    {changed}")
+    print(f"Stale removed:      {deleted_count}")
+    print(f"Index updated:      {'yes' if index_written else 'no (idempotent)'}")
     return 0
 
 
-def _regenerate_memory_index(memory_dir: Path, ported_slugs: list[str]) -> None:
-    """Rebuild MEMORY.md as a minimal one-line-per-entry index.
+def _delete_stale_memory_entries(memory_dir: Path, ported_slugs: list[str]) -> int:
+    """Delete entries the destination has that the current sync didn't port.
 
-    The destination is responsible for curating richer descriptions over
-    time; the auto-regenerated form here is a starting point so the index
-    is not stale after the first port.
+    Mirrors the content-sync stale-delete pattern: a memory entry that
+    the operator's allowlist no longer includes (or that the denylist
+    started covering) should be removed from the destination, not left
+    as silent drift. MEMORY.md is excluded from the comparison; it's
+    rewritten by `_write_memory_index_if_changed`.
+    """
+    ported_filenames = {f"{slug}.md" for slug in ported_slugs}
+    deleted = 0
+    for entry in memory_dir.glob("*.md"):
+        if entry.name == "MEMORY.md":
+            continue
+        if entry.name in ported_filenames:
+            continue
+        try:
+            entry.unlink()
+            deleted += 1
+        except OSError as exc:
+            _stderr(f"WARN: could not delete stale memory entry {entry}: {exc}")
+    return deleted
+
+
+def _build_memory_index(ported_slugs: list[str]) -> str:
+    """Render the MEMORY.md index for the given slug list.
+
+    Pure function so we can compare against the destination's existing
+    file and skip the write when nothing changed.
     """
     lines = ["# Memory Index", ""]
-    by_type: dict[str, list[str]] = {"user": [], "project": [], "feedback": [], "reference": [], "other": []}
+    by_type: dict[str, list[str]] = {
+        "user": [], "project": [], "feedback": [], "reference": [], "other": []
+    }
     for slug in sorted(ported_slugs):
         kind = "other"
         for known in ("user", "project", "feedback", "reference"):
@@ -556,7 +828,28 @@ def _regenerate_memory_index(memory_dir: Path, ported_slugs: list[str]) -> None:
         for slug in entries:
             lines.append(f"- [{slug}]({slug}.md)")
         lines.append("")
-    (memory_dir / "MEMORY.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return "\n".join(lines) + "\n"
+
+
+def _write_memory_index_if_changed(memory_dir: Path, ported_slugs: list[str]) -> bool:
+    """Rebuild MEMORY.md only when its contents would change.
+
+    The destination is responsible for curating richer descriptions over
+    time; the auto-regenerated form here is a starting point. Skipping
+    the rewrite when content is identical preserves the destination's
+    git diff cleanliness on scheduled cron runs.
+    """
+    new_content = _build_memory_index(ported_slugs)
+    target = memory_dir / "MEMORY.md"
+    if target.is_file():
+        try:
+            existing = target.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            existing = None
+        if existing == new_content:
+            return False
+    target.write_text(new_content, encoding="utf-8")
+    return True
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -119,7 +119,7 @@ def load_rules(content_paths: ContentPaths) -> list[Rule]:
     """Load rules/*.md across all content roots with overlay-wins merge.
 
     v0.11 (ADR-0040): walks each root in `content_paths.roots`. Later
-    roots override earlier ones, so `overlays/<name>/rules/foo.md`
+    roots override earlier ones, so `overlays/team/rules/foo.md`
     overrides `base/rules/foo.md` when both exist.
 
     README.md is excluded (it's directory documentation, not a rule).
@@ -141,7 +141,7 @@ def load_hooks(content_paths: ContentPaths) -> list[Hook]:
     """Load hooks/*.sh across content roots with overlay-wins merge.
 
     v0.11 (ADR-0040): walks each root in `content_paths.roots`. Later
-    roots override earlier ones, so `overlays/<name>/hooks/X.sh`
+    roots override earlier ones, so `overlays/team/hooks/X.sh`
     overrides `base/hooks/X.sh` when both exist.
 
     v0.6: skip underscore-prefixed files (e.g. _cascade-translate.sh).
@@ -182,7 +182,7 @@ def load_mcp_configs(content_paths: ContentPaths) -> list[McpConfig]:
     # Single dict keyed by name across BOTH layouts (flat *.json and
     # subdir/server.json). v0.11 Codex second-eye fix: an earlier
     # implementation kept separate dicts and concatenated them, which
-    # let `base/mcp/foo.json` AND `overlays/<name>/mcp/foo/server.json`
+    # let `base/mcp/foo.json` AND `overlays/team/mcp/foo/server.json`
     # both survive instead of overlay winning by name. The order of
     # discovery within each root is flat-first-then-dir, so a same-name
     # collision inside ONE root prefers the dir layout (richer; has
@@ -225,7 +225,7 @@ def load_agents(content_paths: ContentPaths) -> list[Agent]:
     """Load agents/*.md across content roots with overlay-wins merge.
 
     v0.11 (ADR-0040): walks each root in `content_paths.roots`. Later
-    roots override earlier ones, so `overlays/<name>/agents/X.md`
+    roots override earlier ones, so `overlays/team/agents/X.md`
     overrides `base/agents/X.md` when both exist.
 
     Per ADR-0009 schema: YAML frontmatter + markdown body. Files lacking
@@ -247,7 +247,7 @@ def load_commands(content_paths: ContentPaths) -> list[Command]:
     """Load commands/*.md across content roots with overlay-wins merge.
 
     v0.11 (ADR-0040): walks each root in `content_paths.roots`. Later
-    roots override earlier ones, so `overlays/<name>/commands/X.md`
+    roots override earlier ones, so `overlays/team/commands/X.md`
     overrides `base/commands/X.md` when both exist. User-triggered
     slash actions (Cursor/Claude commands). Files lacking frontmatter
     name+description are silently skipped (README.md, AGENTS.md).
@@ -268,7 +268,7 @@ def load_prompts(content_paths: ContentPaths) -> list[Prompt]:
     """Load prompts/*.md across content roots with overlay-wins merge.
 
     v0.11 (ADR-0040): walks each root in `content_paths.roots`. Later
-    roots override earlier ones, so `overlays/<name>/prompts/X.md`
+    roots override earlier ones, so `overlays/team/prompts/X.md`
     overrides `base/prompts/X.md` when both exist.
 
     Existing prompts/*.md without frontmatter `name` are setup /

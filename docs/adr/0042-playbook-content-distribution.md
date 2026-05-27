@@ -2,11 +2,13 @@
 
 ## Status
 
-Proposed (2026-05-27); landing in v0.13.
+Accepted (2026-05-27); shipped in v0.13.
 
 ## Context
 
-ADR-0040 split the playbook into `base/` (generic, portable) and `overlays/<name>/` (workspace-specific). The split makes `base/` a clean candidate for external distribution: a downstream destination repo can receive the portable subtree without the team-specific layer.
+A maintainer who runs this playbook locally accumulates a year's worth of skills, rules, hooks, and other agentic content. Some of that content is workspace-specific (ticket-tracker IDs, internal hostnames, vendor-specific examples) and rightly stays private; the generic portion is valuable to anyone running coding agents and deserves a path to a public destination repo so other teams and the open-source community can pick it up.
+
+ADR-0040 already split the playbook into `base/` (generic, portable) and `overlays/team/` (workspace-specific). The split makes `base/` a clean candidate for distribution: a downstream destination can receive the portable subtree without the team-specific layer. What's missing is the mechanism that moves the content there, scrubs the periphery uniformly, records what was synced, and never auto-publishes without the operator's review.
 
 Three reasons a maintainer might want to publish `base/` to an external destination:
 
@@ -48,40 +50,7 @@ require_clean_git = true
 [sources]
 allowlist = [
   "base/",
-  "scripts/sync_distribution.py",
-  "scripts/install.py",
-  "scripts/install_lifecycle.py",
-  "scripts/install_lockfile.py",
-  "scripts/install_bundles.py",
-  "scripts/install_orphans.py",
-  "scripts/checks/",
-  "scripts/hook_registration/",
-  "scripts/playbook_init.py",
-  "scripts/playbook_update.py",
-  "scripts/playbook_profile.py",
-  "scripts/scope_resolution.py",
-  "scripts/target_materializer.py",
-  "scripts/target_registry.py",
-  "scripts/agents_md.py",
-  "scripts/install_lockfile.py",
-  "scripts/adapters/",
-  "scripts/sync_curated_skills.py",
-  "scripts/sync_mattpocock.sh",
-  "scripts/new_skill.py",
-  "scripts/promote_skill.py",
-  "scripts/check_em_dashes.py",
-  "scripts/check_agents_md.py",
-  "scripts/size_check.py",
-  "scripts/decay_check.py",
-  "scripts/frontmatter_lint.py",
-  "scripts/audit_external_skill.py",
-  "scripts/check_skill_description.py",
-  "scripts/hook_source_unification.py",
-  "scripts/hook_metadata.py",
-  "scripts/eval_runner.py",
-  "scripts/bulk_import.py",
-  "scripts/templates/",
-  "scripts/__init__.py",
+  "scripts/",
   "tests/",
   "docs/adr/",
   "Makefile",
@@ -93,33 +62,52 @@ allowlist = [
   "AGENTS.md",
 ]
 denylist = [
-  # specific files in allowlisted dirs that should not flow
+  # Specific files in allowlisted dirs that should NOT flow. The walker
+  # already prunes __pycache__ + .git + cache dirs by default; entries
+  # here are for content the operator wants to keep workspace-private
+  # even though it lives under an allowlisted path.
 ]
 
 [scrubs]
 patterns = [
-  # ticket-tracker IDs
-  { match = '\\b(R8|MATCH)-\\d+\\b', replace = "[ticket]" },
-  # team identifiers (case-sensitive whole-word)
-  { match = '\\bteam\\b', replace = "the team", case_insensitive = false },
-  { match = '\\binternal-host\\b', replace = "internal-host", case_insensitive = false },
-  # VCS / CI / observability vendor mentions
-  { match = "VCS", replace = "VCS" },
-  { match = "CI", replace = "CI" },
-  { match = "code-quality", replace = "code-quality" },
-  { match = "error-tracking", replace = "error-tracking" },
+  # Order matters: compound forms (CI config, code-review)
+  # must come BEFORE the bare-token form (CI, VCS) so the
+  # compound match wins.
+
+  # Ticket-tracker IDs.
+  { match = "(R8|MATCH|JIRA|TICKET)-\\d+", replace = "[ticket]" },
+
+  # Team identifiers. No word boundary so compound forms like
+  # team_repo or team-cli also scrub. Default is case-insensitive,
+  # so team in shouty-case fixtures is also caught.
+  { match = "team", replace = "team" },
+  { match = "internal-host", replace = "internal-host" },
+
+  # Compound CI / vendor forms (must precede bare-token patterns).
+  { match = "CI config", replace = "CI config" },
+
+  # VCS / CI / observability vendor mentions used as examples.
+  { match = "\\bBitbucket\\b", replace = "VCS" },
+  { match = "\\bJenkins\\b", replace = "CI" },
+  { match = "\\bSonarQube\\b", replace = "code-quality" },
+  { match = "\\bSentry\\b", replace = "error-tracking" },
   # internal hostnames + customer-specific example domains
   # (extended per-workspace; defaults shown here are starting point)
 ]
+
+# Optional. Reserves the schema slot for the future direction-flip;
+# v1 does not read this table.
+[reverse_direction]
+# placeholder for when sync from destination back to source is implemented
 ```
 
-Keys are TOML strings; values are documented inline. The manifest lives OUTSIDE the playbook repo (in the operator's own workspace) so each downstream maintains their own destination + scrub set. The playbook ships an example manifest in `docs/templates/distribution-manifest.example.toml` for reference.
+Keys are TOML strings; values are documented inline. The manifest lives OUTSIDE the playbook repo (in the operator's own workspace) so each downstream maintains their own destination + scrub set. The playbook ships an example manifest at `scripts/templates/distribution-manifest.example.toml` for reference.
 
 ### Idempotent three-phase execution
 
-1. **Validate:** destination is a clean git working tree (override via `--allow-dirty`), source is on an expected branch, manifest parses, lock file is not already held.
-2. **Copy with scrub:** each source file is read, run through every applicable scrub pattern in order, written to destination at the same relative path. Files in destination not in source allowlist are preserved (this is how destination-only content survives).
-3. **Audit:** write `.sync-manifest.json` to destination with source commit SHA, sync timestamp, scrub-rules content hash, allowlist content hash. Subsequent syncs compare hashes to flag manifest drift.
+1. **Validate:** destination is a clean git working tree (override via `--allow-dirty`), manifest parses, lock file is not already held. The source's HEAD SHA + branch are recorded for the audit trail; v1 does not gate on a specific branch (the operator's wrapper script can do that if needed).
+2. **Copy with scrub:** each source file is read, run through every applicable scrub pattern in order, written to destination at the same relative path. Byte-for-byte equality on the destination's existing file short-circuits the write. Files in destination not in the prior `synced_files` set are preserved (this is how destination-only content survives). Files in the prior `synced_files` but not in the current set are DELETED (stale-file removal); operator intent on tightening the allowlist or expanding the denylist propagates to the destination's working tree.
+3. **Audit:** read the destination's existing `.sync-manifest.json` (if any), compare every load-bearing field (`source_commit`, `source_repo`, `source_branch`, `scrub_rules_hash`, `allowlist_hash`, `synced_files`), and skip the write when nothing changed. When manifest hashes differ from the prior sync, surface a stderr warning so the operator knows the destination is about to be rewritten under different rules.
 
 ### Audit file schema
 
@@ -131,17 +119,28 @@ Keys are TOML strings; values are documented inline. The manifest lives OUTSIDE 
   "synced_at": "2026-05-27T09:00:00Z",
   "scrub_rules_hash": "sha256:...",
   "allowlist_hash": "sha256:...",
-  "tool_version": "sync_distribution.py v1.0"
+  "tool_version": "sync_distribution.py v1.1",
+  "synced_files": ["base/rules/no-em-dashes.md", "..."]
 }
 ```
+
+`synced_files` is the canonical list of files this sync wrote (under managed paths). The next sync diffs its current set against this list to detect stale files at the destination.
 
 ### Lock file + overlap prevention
 
 The script writes `/tmp/playbook-distribution-sync.lock` on start, removes on exit. A second invocation while the first is running aborts cleanly with exit code 2 and a clear message. Stale locks (older than 1 hour) auto-clear so a crash does not leave the system in a permanent locked state.
 
+### Path-traversal safety
+
+Every allowlist entry is resolved and checked against `source_root` before walking. An entry like `../notes.md` that escapes `source_root` is rejected with a stderr warning rather than silently writing outside the destination. A belt-and-suspenders check at write time also verifies each destination path stays within `destination_path`.
+
+### Default exclusions
+
+The walker prunes `__pycache__`, `.git`, `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, `node_modules`, `.venv`, `venv`, `.DS_Store` at the directory level. Without this, allowlisting `scripts/` or `tests/` whole would ship `.pyc` bytes to a public destination.
+
 ### Failure surface
 
-On non-zero exit (validation failure, scrub error, write error), the script writes the full traceback to `~/Library/Logs/playbook-distribution-sync.log` (creates the parent dir if absent) and calls `osascript -e 'display notification ...'` to surface a native macOS notification. The cron / launchd wrapper script captures the script's exit code and propagates.
+The wrapper script (`scripts/templates/distribution-cron.example.sh`) captures the Python script's exit code via `PIPESTATUS[0]` after a `tee` to the log file, then fires a macOS `osascript` notification on non-zero exit. The script itself logs validation traceback to `~/Library/Logs/playbook-distribution-sync.log` (or `$PLAYBOOK_SYNC_LOG` if set) on uncaught exceptions; validation-failure exits (1/3) print to stderr and the wrapper captures stderr via `tee`. Exit codes: 0 success, 1 validation error, 2 lock held, 3 IO error, 4 reverse direction (stub).
 
 ### Memory transfer sub-command
 
@@ -166,23 +165,11 @@ The same scrub engine applies to memory entries. The destination's `MEMORY.md` i
 
 ### Cron / launchd installation
 
-The playbook ships `scripts/templates/distribution-cron.example.sh` as a wrapper that:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-cd "$PLAYBOOK_HOME"
-python3 scripts/sync_distribution.py --manifest "$DISTRIBUTION_MANIFEST" || {
-  /usr/bin/osascript -e "display notification \"Sync failed; see ~/Library/Logs/playbook-distribution-sync.log\" with title \"Playbook distribution\""
-  exit 1
-}
-```
-
-The user installs this via `crontab -e` (or a `launchd` plist for wake-from-sleep catch-up behavior). Documented in `docs/runbooks/distribution-sync-cron.md`.
+The playbook ships `scripts/templates/distribution-cron.example.sh`, a wrapper that runs the Python script, tees output to the log, captures the exit code via `PIPESTATUS[0]` (so the inverted-status bug with `if ! cmd | tee` is avoided), and fires a macOS notification on non-zero. The user installs it via `crontab -e` (or a `launchd` plist for wake-from-sleep catch-up behavior). Full install / verify / failure-mode procedure is in `docs/runbooks/distribution-sync-cron.md`.
 
 ### Direction-flip preserved via flag stub
 
-The script accepts `--direction reverse` that initially exits with "not implemented." The argument parser, the help text, and a `[reverse_direction]` placeholder in the manifest all exist from day one. When a downstream becomes canonical, the implementation fills in; no re-architecture, no manifest schema break.
+The script accepts `--direction reverse` that initially exits with code 4 ("not implemented"). The argument parser and help text exist from day one; the example manifest carries a commented `[reverse_direction]` placeholder table so the schema doesn't break when the implementation lands. When a downstream becomes canonical, the implementation fills in; no re-architecture, no manifest schema break.
 
 ## Consequences
 
