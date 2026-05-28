@@ -1,0 +1,40 @@
+---
+name: trajectory-canary/canary
+description: Smoke-test trajectory used by the harness CI canary. Verifies a single Write call produces the expected artifact.
+skill: trajectory-canary
+scenario: canary
+version: 0.1.0
+owner: rehan
+last_reviewed: 2026-05-28
+tags: [meta, smoke-test]
+adapter_scope: [claude-code]
+model_pinned: claude-opus-4-7
+authoring_mode: recorded
+---
+
+input:
+  phrasings:
+    - "Run the trajectory canary"
+    - "Invoke the trajectory canary smoke test"
+    - "Execute trajectory-canary"
+    - "Trigger the canary skill"
+    - "/trajectory-canary"
+  variant_strategy: parallel
+
+assertions:
+  - first_skill_loaded: trajectory-canary
+  - must_invoke_tool: Write
+  - must_not_invoke_tool: Bash
+  - final_artifact_path: "*.md"
+  - max_total_tool_calls: 4
+  - min_total_tool_calls: 1
+
+llm_judge:
+  threshold: 0.6
+  rubric: |
+    Score the trajectory on:
+    1. Did the agent write a single short markdown file? (0-0.5)
+    2. Did the artifact contain the string "canary chirped"? (0-0.5)
+
+    Soft criteria; the DSL assertions cover the hard bits.
+  model: claude-sonnet-4-6

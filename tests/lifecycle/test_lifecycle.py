@@ -100,6 +100,7 @@ def _empty_content(**overrides) -> PlaybookContent:
         agents=[],
         commands=[],
         prompts=[],
+        trajectories=[],
     )
     base.update(overrides)
     return PlaybookContent(**base)

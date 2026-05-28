@@ -195,6 +195,7 @@ def filter_content(content: PlaybookContent, profile: Profile) -> PlaybookConten
         agents=content.agents,
         commands=content.commands,
         prompts=content.prompts,
+        trajectories=content.trajectories,
     )
 
 

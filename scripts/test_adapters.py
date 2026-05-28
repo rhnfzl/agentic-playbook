@@ -612,6 +612,7 @@ def test_hook_coverage_per_adapter(r: Reporter) -> None:
         agents=[],
         commands=[],
         prompts=[],
+        trajectories=[],
     )
 
     total = len(hooks)

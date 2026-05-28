@@ -2061,6 +2061,7 @@ def test_compute_managed_keys_records_empty_hooks_on_narrow() -> None:
         agents=[],
         commands=[],
         prompts=[],
+        trajectories=[],
     )
 
     def _empty_hook_factory(adapter, content, target):
@@ -2283,6 +2284,7 @@ def test_codex_narrow_removes_prior_managed_mcp_block(tmp_path: Path) -> None:
         agents=[],
         commands=[],
         prompts=[],
+        trajectories=[],
     )
 
     # Redirect HOME so the adapter writes into the test config.toml.

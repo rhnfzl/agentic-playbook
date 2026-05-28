@@ -4,7 +4,7 @@ A tool-agnostic, shareable system for working with coding agents. One canonical 
 
 This is also a teaching project. Clone it, study the ADRs, copy the patterns, build your own playbook with whatever conventions fit your team.
 
-## What it is (7 content types)
+## What it is (8 content types)
 
 - **Skills** (`base/skills/`): workflow orchestration ("how to scaffold a PRD", "how to review a PR with our conventions", "how to triage a CI failure")
 - **Rules** (`base/rules/`): behavioral constraints distributed as `AGENTS.md` fragments ("never use em dashes", "feature branch only, never push to default")
@@ -13,6 +13,7 @@ This is also a teaching project. Clone it, study the ADRs, copy the patterns, bu
 - **Subagents** (`base/agents/`): specialized AI assistants with their own context window; markdown source converts to the right native format per adapter
 - **Slash commands** (`base/commands/`): user-triggered actions ("/handoff", "/diagnose", "/playbook-promote") for Cursor + Claude Code
 - **Prompt templates** (`base/prompts/`): reusable `/name` expansion templates (Pi-flavored), plus onboarding docs
+- **Trajectories** (`base/trajectories/`): cross-adapter behavior assertions, one per (skill, scenario). Declare input phrasings, DSL assertions over the tool-call trace, and an LLM-judge rubric. Consumed by the trajectory harness (`make trajectory-check`), not materialized to adapters. Per ADR-0044.
 
 Profiles (`profiles/`) compose the 7 content types into per-role bundles: `tech-lead`, `engineering`, `devops`, `qa`, `research`, `product-manager`, `backend-developer`, `frontend-developer`. Each profile's TOML lists which skills, rules, hooks, and MCPs to install.
 
@@ -154,7 +155,8 @@ agentic-playbook/
 │   │   └── code-review-graph.json       graph-aware review MCP
 │   ├── agents/                          subagents (markdown frontmatter)
 │   ├── commands/                        user-triggered slash commands (Cursor + Claude Code)
-│   └── prompts/                         setup/onboarding + runtime templates
+│   ├── prompts/                         setup/onboarding + runtime templates
+│   └── trajectories/                    cross-adapter behavior assertions (ADR-0044)
 ├── evals/                               LLM-judge eval suites per skill
 ├── profiles/                            per-role install bundles
 ├── scripts/                             installer + lint + decay checks + bulk import

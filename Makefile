@@ -1,4 +1,4 @@
-.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor
+.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio
 
 PYTHON ?= python3
 
@@ -27,6 +27,8 @@ help:
 	@echo "  make test                          Adapter smoke tests + pytest lifecycle scenarios"
 	@echo "  make new SKILL=<name>              Scaffold a new skill (in skills/<category>/<name>/)"
 	@echo "                                     Optional: CATEGORY=engineering|productivity|observability|meta"
+	@echo "  make new TRAJECTORY=<skill>:<scenario>"
+	@echo "                                     Scaffold a new trajectory under base/trajectories/<skill>/"
 	@echo "  make doctor                        Diagnose setup: which agents detected, which not, why"
 	@echo "  make doctor-verify                 Layer-3 verify: lockfile vs native config vs on-disk (ADR-0036)"
 	@echo "  make targets-list                  Multi-project: list every target where init has been run"
@@ -89,8 +91,41 @@ test:
 	@$(PYTHON) -m pytest tests/ -q
 
 new:
-	@if [ -z "$(SKILL)" ]; then echo "Usage: make new SKILL=<name> [CATEGORY=<cat>] [SCOPE=base|team]"; exit 1; fi
-	@$(PYTHON) scripts/new_skill.py --name "$(SKILL)" --category "$(if $(CATEGORY),$(CATEGORY),engineering)" --scope "$(if $(SCOPE),$(SCOPE),base)"
+	@if [ -n "$(TRAJECTORY)" ]; then \
+		colons=$$(printf %s "$(TRAJECTORY)" | tr -cd ':' | wc -c | tr -d ' '); \
+		if [ "$$colons" != "1" ]; then \
+			echo "error: TRAJECTORY must be exactly <skill>:<scenario> with one colon (got $$colons)"; \
+			exit 1; \
+		fi; \
+		skill=$$(printf %s "$(TRAJECTORY)" | cut -d: -f1); \
+		scenario=$$(printf %s "$(TRAJECTORY)" | cut -d: -f2); \
+		if [ -z "$$skill" ] || [ -z "$$scenario" ]; then \
+			echo "Usage: make new TRAJECTORY=<skill>:<scenario>"; exit 1; \
+		fi; \
+		$(PYTHON) scripts/new_trajectory.py --skill "$$skill" --scenario "$$scenario"; \
+	elif [ -n "$(SKILL)" ]; then \
+		$(PYTHON) scripts/new_skill.py --name "$(SKILL)" --category "$(if $(CATEGORY),$(CATEGORY),engineering)" --scope "$(if $(SCOPE),$(SCOPE),base)"; \
+	else \
+		echo "Usage: make new SKILL=<name> [CATEGORY=<cat>] [SCOPE=base|team]"; \
+		echo "   or: make new TRAJECTORY=<skill>:<scenario>"; \
+		exit 1; \
+	fi
+
+trajectory-check:
+	@$(PYTHON) scripts/trajectory_harness.py \
+		$(if $(SKILL),--skill "$(SKILL)") \
+		$(if $(ADAPTER),--adapter "$(ADAPTER)") \
+		$(if $(STRICT),--strict)
+
+verify-trajectory:
+	@if [ -z "$(SKILL)" ] || [ -z "$(SCENARIO)" ]; then \
+		echo "Usage: make verify-trajectory SKILL=<name> SCENARIO=<name> FIXTURE=<path>"; exit 1; \
+	fi
+	@$(PYTHON) scripts/trajectory_verify.py --skill "$(SKILL)" --scenario "$(SCENARIO)" \
+		$(if $(FIXTURE),--fixture "$(FIXTURE)")
+
+trajectory-coverage-ratio:
+	@$(PYTHON) scripts/trajectory_coverage.py $(if $(JSON),--json)
 
 doctor:
 	@$(PYTHON) scripts/install.py --diagnose
