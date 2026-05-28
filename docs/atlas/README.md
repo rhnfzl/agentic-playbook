@@ -15,8 +15,8 @@ The index page lists every node by kind (ADRs, skills, trajectories) with badges
 
 | File or directory | What it is |
 |---|---|
-| `index.html` | Top-level browse view: ADRs (49), skills (140+), trajectories (8+). |
-| `graph.json` | Machine-readable graph payload (nodes + edges); ~150 nodes, ~60 edges in current build. |
+| `index.html` | Top-level browse view: ADRs (49), skills (109), trajectories (1). |
+| `graph.json` | Machine-readable graph payload (nodes + edges); count varies with the corpus size at build time. |
 | `static/` | CSS + JS for the site. |
 | `adr/<NNNN>.html` | One HTML page per ADR, with backlinks to skills + trajectories that reference it. |
 | `skill/<category>-<name>.html` | One HTML page per skill, with backlinks to ADRs that mention it + the skill's trajectories. |

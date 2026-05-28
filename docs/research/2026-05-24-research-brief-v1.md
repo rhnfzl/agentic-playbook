@@ -139,7 +139,7 @@ What it does not do: no governance layer, no contribution review process, no ver
 
 5. **Cursor Team Rules API gap.** Cursor has no API for Team Rules. For an enterprise enforcement layer (e.g., ensuring every Cursor user has the "never push to develop" rule), this is a manual process. Packmind's enterprise linter is the closest automation.
 
-6. **Skills decay tracking.** No current tool enforces a review cadence. An team-specific CI check flagging skills with `last_reviewed` older than 90 days is low-effort but high-signal.
+6. **Skills decay tracking.** No current tool enforces a review cadence. A team-specific CI check flagging skills with `last_reviewed` older than 90 days is low-effort but high-signal.
 
 7. **Context-appropriate activation.** The team codebase has two repos (AI Backend, MCP) with different rules. A monorepo-aware skill system (Ruler's nested rule loading) that applies backend-specific skills only when you're editing AI Backend files, and MCP-specific skills only when in `team_mcp/`, is the right architecture.
 

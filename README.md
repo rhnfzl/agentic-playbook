@@ -46,8 +46,6 @@ One `git clone` followed by one `make install` gives you:
 
 Profiles (`profiles/`) compose the 8 content types into per-role bundles: `tech-lead`, `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`. Each profile's TOML lists which skills, rules, hooks, and MCPs to install.
 
-Plugins (`plugins/`) are pre-built marketplace bundles (per ADR-0043) that mirror each profile but install through `/plugin install <pack>@8v-coding-agents-playbook` inside Claude Code or Cursor instead of through `make install`. Use plugins when you want a single-pack install with no Make tooling on the target machine; use profiles when you want the full `make install` lifecycle with lockfile + decay tracking. Both paths land equivalent content.
-
 The installer detects which agents are present on your machine, pre-selects them, and lets you toggle. Each agent gets the native files it expects: SKILL.md for Claude Code, .mdc for Cursor, `.windsurf/skills/` for Windsurf, TOML subagents for Codex, `~/.pi/agent/skills/` for Pi, `AGENTS.md` for the 20+ tools that read it natively.
 
 ## Why this exists
@@ -110,14 +108,6 @@ That pass is a prompt you paste into your coding agent of choice (Claude Code, C
 **For one specific project**: audit the current working directory and propose project-level files (`AGENTS.md`, `.cursor/rules/`, `.github/copilot-instructions.md`, `.windsurfrules`, project hooks). Paste prompt: [`base/prompts/project-audit.md`](base/prompts/project-audit.md).
 
 Both share the same shape: read the playbook, read your current setup, propose a phased plan with concrete commands. The agent does the matching; you keep the review and approval.
-
-### I want to install via the Claude Code or Cursor plugin marketplace
-
-```text
-/plugin install backend-developer@8v-coding-agents-playbook
-```
-
-Picks a role-specific bundle from `plugins/` (per ADR-0043) and installs it through your IDE's native plugin marketplace instead of `make install`. No Make tooling required on the target machine. Available packs mirror the profiles: `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`, `tech-lead`, and `meta` (the playbook-management pack).
 
 ### I want to add a new skill
 
@@ -203,7 +193,6 @@ agentic-playbook/
 │   └── trajectories/                    cross-adapter behavior assertions (ADR-0044)
 ├── evals/                               LLM-judge eval suites per skill
 ├── profiles/                            per-role install bundles (make install)
-├── plugins/                             pre-built marketplace bundles (/plugin install, ADR-0043)
 ├── scripts/                             installer + lint + decay checks + bulk import
 │   ├── adapters/                        per-agent install adapters (claude, codex, cursor, windsurf, pi, ...)
 │   ├── checks/                          make check gates (frontmatter, decay, em-dash, content tiering, ...)
@@ -250,7 +239,7 @@ To add or modify content, see `CONTRIBUTING.md` for the full workflow.
 
 ### What is agentic-playbook in one sentence?
 
-agentic-playbook is an open-source, tool-agnostic library of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install` or `/plugin install` command.
+agentic-playbook is an open-source, tool-agnostic library of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install`.
 
 ### Who is agentic-playbook for?
 
@@ -258,15 +247,15 @@ It is for engineering tech leads, individual engineers, product managers, resear
 
 ### Which coding agents does agentic-playbook support?
 
-Tier 1 (full adapter, hook-capable): Claude Code, Cursor IDE + CLI, Codex CLI, Windsurf, Cline, GitHub Copilot. Tier 2 (rules + skills only, no hook surface): Aider, Gemini CLI, Pi. Tier 3 (AGENTS.md-only, declarative TOML): 16 long-tail agents including Goose, Junie, Kiro, Zed, Amp, RooCode, and others. See `docs/adr/0030-tier-3-declarative-registry.md` for the full Tier 3 list.
+Tier 1 (full adapter, hook-capable): Claude Code, Cursor IDE + CLI, Codex CLI, Windsurf, Cline, GitHub Copilot. Tier 2 (rules + skills only, no hook surface): Aider, Gemini CLI, Pi. Tier 3 (AGENTS.md-only, declarative TOML): 20 long-tail agents including Goose, Junie, Kiro, Zed, Amp, Augment, OpenCode, Continue, Tabnine, Supermaven, and others. See [`docs/adr/0030-tier3-declarative-toml-registry.md`](docs/adr/0030-tier3-declarative-toml-registry.md) for the full Tier 3 list.
 
 ### How is agentic-playbook different from anthropics/skills or awesome-agent-skills?
 
-`anthropics/skills` is a curated bundle of skills from Anthropic. `awesome-agent-skills` (heilcheng, VoltAgent) is a curated index of external skill repositories. agentic-playbook is a **distribution-and-governance system**: it ships seven other content types (rules, hooks, MCP server configs, subagents, slash commands, prompt templates, behavior trajectories) alongside skills, with a multi-adapter installer, a 13-gate `make check` quality pipeline, a supply-chain security gate (`make audit`), opt-in OTel telemetry per skill (`make telemetry-report`), and an auto-generated knowledge graph (`make atlas`). It is a teaching project as much as a content library: 49 Architecture Decision Records explain why each choice was made.
+`anthropics/skills` is a curated bundle of skills from Anthropic. `awesome-agent-skills` (heilcheng, VoltAgent) is a curated index of external skill repositories. agentic-playbook is a **distribution-and-governance system**: it ships seven other content types (rules, hooks, MCP server configs, subagents, slash commands, prompt templates, behavior trajectories) alongside skills, with a multi-adapter installer, a 17-gate `make check` quality pipeline, a supply-chain security gate (`make audit`), opt-in OTel telemetry per skill (`make telemetry-report`), and an auto-generated knowledge graph (`make atlas`). It is a teaching project as much as a content library: 49 Architecture Decision Records explain why each choice was made.
 
 ### Is it safe to clone and install on my machine?
 
-The installer is dry-run by default in all destructive operations, writes lockfiles for every materialized path, and `make remove` cleanly uninstalls. External skills imported via `make sync-mattpocock` and `make sync-curated-skills` pass through a block-by-default security audit (`make audit`, ADR-0047) before they land in the playbook. The opt-in OpenTelemetry collector (ADR-0048) is off by default and records metadata only (skill name, latency, token counts); prompt bodies and response bodies are never stored. See `docs/security/ai-bom.json` for the current AI Bill of Materials.
+The installer writes a lockfile recording every materialized path, so `make remove` can cleanly uninstall without touching anything you authored by hand. External skills imported via `make sync-mattpocock` and `make sync-curated-skills` pass through a block-by-default security audit (`make audit`, ADR-0047) before they land in the playbook. The opt-in OpenTelemetry collector (ADR-0048) is off by default and records metadata only (skill name, latency, token counts); prompt bodies and response bodies are never stored. See `docs/security/ai-bom.json` for the current AI Bill of Materials. Review the proposed materialization before running `make install` on a machine with an established personal agent setup; use the `base/prompts/global-audit.md` flow for a thinking pass before any file lands.
 
 ### How do I uninstall agentic-playbook cleanly?
 
@@ -279,7 +268,7 @@ The lockfile records every file the installer wrote. `make remove` only deletes 
 
 ### Can I install just one skill or rule without taking the whole playbook?
 
-Yes, three ways. (1) Use a role profile: `make install PROFILE=<role>` filters the install to the 15-30 items that role needs. (2) Use a plugin pack: `/plugin install <pack>@8v-coding-agents-playbook` inside Claude Code or Cursor installs just that pack. (3) Copy the SKILL.md or rule file directly into your own playbook; the format is documented in `base/skills/README.md` and `base/rules/README.md`.
+Two ways. (1) Use a role profile: `make install PROFILE=<role>` filters the install to the 15-30 items that role needs (`backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`, `tech-lead`). (2) Copy the SKILL.md or rule file directly into your own playbook; the format is documented in `base/skills/README.md` and `base/rules/README.md`.
 
 ### Does agentic-playbook require GitHub?
 
@@ -287,7 +276,7 @@ No. The installer and the `make` pipeline work against a local checkout regardle
 
 ### Where do my hand-edits go on re-install?
 
-Anywhere outside the `<!-- coding-agents-playbook BEGIN/END -->` managed-block markers is preserved across `make update` and `make install`. The installer rewrites only the content inside the markers and records the file in the lockfile. For SKILL.md and rule files materialized into agent directories, the installer detects user-edits via mtime + content hash and prompts before overwriting.
+Anywhere outside the `<!-- coding-agents-playbook BEGIN/END -->` managed-block markers is preserved across `make update` and `make install`. The installer rewrites only the content inside the markers and records the file in the lockfile. For SKILL.md and other content materialized as whole files, re-running the installer overwrites the materialized copy with the canonical source from `base/`; treat the canonical source as the place to make changes, and never hand-edit the materialized copy.
 
 ### How do I track adoption of the playbook?
 
@@ -302,9 +291,8 @@ GitHub Insights → Traffic (admin-only) shows clones and views in 14-day window
 - [`base/skills/README.md`](base/skills/README.md), [`base/rules/README.md`](base/rules/README.md), [`base/hooks/README.md`](base/hooks/README.md), [`base/mcp/README.md`](base/mcp/README.md) for the four core content types.
 - [`base/agents/README.md`](base/agents/README.md), [`base/commands/README.md`](base/commands/README.md), [`base/prompts/README.md`](base/prompts/README.md), [`base/trajectories/README.md`](base/trajectories/README.md) for the four newer content types.
 - [`profiles/README.md`](profiles/README.md) for the per-role install bundles.
-- [`plugins/README.md`](plugins/README.md) for the marketplace plugin packs (Claude Code + Cursor).
-- [`evals/README.md`](evals/README.md) for the LLM-judge eval suites that gate skill quality.
-- [`scripts/README.md`](scripts/README.md) for the installer + 13-gate `make check` pipeline.
+- [`evals/README.md`](evals/README.md) for the per-skill eval suites that gate skill quality.
+- [`scripts/README.md`](scripts/README.md) for the installer + 17-gate `make check` pipeline.
 - [`docs/README.md`](docs/README.md), [`docs/adr/README.md`](docs/adr/README.md), [`docs/research/README.md`](docs/research/README.md), [`docs/atlas/README.md`](docs/atlas/README.md), [`docs/security/README.md`](docs/security/README.md) for the docs hub.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md), [`AGENTS.md`](AGENTS.md), [`CONTEXT.md`](CONTEXT.md), [`CHANGELOG.md`](CHANGELOG.md), [`RELEASING.md`](RELEASING.md), [`TOOLS.md`](TOOLS.md), [`OWNERS.md`](OWNERS.md) for governance and process.
 

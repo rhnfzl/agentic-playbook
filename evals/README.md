@@ -4,7 +4,7 @@ LLM-judge eval suites that exercise one playbook skill end-to-end against a held
 
 ## What an eval is
 
-An eval is a small directory containing structured cases and a judge rubric for one skill. The runner (`scripts/eval_runner.py`) walks each case and asserts the skill body satisfies the case's assertions (deterministic shape checks today; LLM-judge scoring on the dynamic-mode roadmap). Pass/fail is per-case; aggregate pass rate gates the skill's freshness for production use.
+An eval is a small directory containing structured cases and a judge rubric for one skill. The runner (`scripts/eval_runner.py`) walks each case and asserts the skill body satisfies the case's assertions. Today's static mode runs deterministic shape checks against the skill body without calling an LLM; the future dynamic mode will spawn a subagent per case and score the response against `judge.md`. Pass/fail is per-case; aggregate pass rate gates the skill's freshness for production use.
 
 Different from `tests/` (which checks installer behavior, not skill behavior) and from `make check` (which lints artifact shape, not skill quality). Evals answer: "does the SKILL.md still encode the discipline its author intended, including under cosmetic edits that don't change behavior?"
 
@@ -98,11 +98,10 @@ Fixture failures to add:
 
 ```bash
 make eval                                                # run every suite
-python3 scripts/eval_runner.py --suite ci-failure-triage # run one suite
-python3 scripts/eval_runner.py --suite ci-failure-triage --case "frontmatter complete"
+python3 scripts/eval_runner.py ci-failure-triage         # run one suite (positional)
 ```
 
-Today's static mode reads `cases.yaml`, walks each assertion against the skill body, and exits non-zero on any failure. The dynamic mode (v0.4) will additionally feed each case + the skill body to a judge LLM scored against `judge.md` for narrative quality, returning a `[0, 1]` rubric score per case.
+The runner accepts a positional `[suite]` argument; per-case filtering is not yet supported by the CLI. Today's static mode reads `cases.yaml`, walks each assertion against the skill body, and exits non-zero on any failure. The future dynamic mode will additionally feed each case + the skill body to a judge LLM scored against `judge.md` for narrative quality, returning a `[0, 1]` rubric score per case.
 
 ## How to add a new eval suite
 
@@ -121,7 +120,7 @@ Today's static mode reads `cases.yaml`, walks each assertion against the skill b
 
 ## How decay relates to evals
 
-A skill that fails its eval suite is not auto-marked decayed; decay is time-based (60-day notice / 90-day warn / 180-day block per `scripts/decay_check.py`). But a skill the eval flags should refresh `last_reviewed` only AFTER the eval passes again, otherwise the timer game-able. The CONTRIBUTING.md ships this as a quality bar: refresh `last_reviewed` when the skill is re-verified, not on schedule.
+A skill that fails its eval suite is not auto-marked decayed; decay is time-based (60-day notice / 90-day warn / 180-day block per `scripts/decay_check.py`). But a skill the eval flags should refresh `last_reviewed` only AFTER the eval passes again, otherwise the timer is gameable. The CONTRIBUTING.md ships this as a quality bar: refresh `last_reviewed` when the skill is re-verified, not on schedule.
 
 ## References
 

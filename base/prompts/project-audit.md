@@ -46,8 +46,8 @@ Walk in this order:
     b) Walk base/hooks/. List hooks that make sense at the project level (lint-guard,
        never-push-to-develop, sonar-advisory) vs hooks that are user-level only.
     c) Walk base/mcp/. Identify any MCP server configs that would help THIS project
-       (e.g. error-tracking MCP for a project with Sentry; Atlassian MCP for a project
-       with Jira issues referenced in commits).
+       (e.g. error-tracking MCP for a project with an error tracker wired up; Atlassian
+       MCP for a project with Jira issues referenced in commits).
     d) Walk profiles/. Identify which role profile best matches this project's primary
        workflow.
 

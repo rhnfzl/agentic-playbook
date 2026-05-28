@@ -1,8 +1,8 @@
-# agentic-playbook (full)
+# agentic-playbook (full summary)
 
-> A tool-agnostic, shareable repository of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ AI coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install` or `/plugin install`. Also a teaching project: 49 Architecture Decision Records explain why each design choice exists.
+> A tool-agnostic, shareable repository of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ AI coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install`. Also a teaching project: 49 Architecture Decision Records explain why each design choice exists.
 
-This is the long-form `llms-full.txt` companion to `llms.txt`. It embeds the canonical content of the highest-leverage documents so an AI agent can ingest the playbook's design in a single fetch.
+This is the long-form `llms-full.txt` companion to `llms.txt`. It is a curated **summary** of the playbook's design (not a raw concatenation of source files). Treat it as a single-fetch primer for an AI agent that wants the playbook's shape; fetch the linked source files for verbatim content.
 
 For the curated index of paths, fetch [`llms.txt`](llms.txt) instead. For the file-by-file browse, walk the repo or use `docs/atlas/index.html`.
 
@@ -48,7 +48,7 @@ One `git clone` followed by one `make install` gives you:
 
 **Tier 2** (rules + skills only, no hook surface): Aider, Gemini CLI, Pi.
 
-**Tier 3** (AGENTS.md-only, declarative TOML): 16 long-tail agents including Goose, Junie, Kiro, Zed, Amp, RooCode, Augment, OpenCode, Aide, Droid, Jules, Qodo, Q-Developer, SWE-Agent, Devon, Claude-Flow, Kilo, Continue, Tabnine, Supermaven.
+**Tier 3** (AGENTS.md-only, declarative TOML): 20 long-tail agents — Kiro, Goose, Junie, Zed, Amp, Augment, OpenCode, Aide, Droid, Jules, Qodo, Q-Developer, SWE-Agent, Devon, Claude-Flow, Kilo, Continue, Tabnine, Cline-CLI, Supermaven (per `scripts/adapters/tier3.toml`).
 
 ## The three-layer content contract (ADR-0036)
 
@@ -74,7 +74,7 @@ The opt-in OpenTelemetry collector records metadata only: skill name, adapter, m
 
 ## Quality gates that fire on `make check`
 
-13 gates: frontmatter validation, AGENTS.md governance, external-skill audit, skill body size budget, decay (60-day notice / 90-day warn / 180-day block), em-dash policy, no-versions-in-readmes, skill-description length, hook metadata presence, hook source unification, pyright zero, human-html allowlist, supply-chain skill security. Each gate is a pluggable module under `scripts/checks/`.
+17 gates (source of truth: `scripts/checks/__init__.py:CHECKS`): frontmatter validation, AGENTS.md governance, external-skill audit, supply-chain skill security, skill body size budget, decay (60-day notice / 90-day warn / 180-day block), em-dash policy, no-versions-in-readmes, skill-description length, hook metadata presence, hook source unification, pyright zero, human-html allowlist, ADR-number uniqueness, ignored-containment, playbook-version shape, trajectory shape. Each gate is a pluggable module under `scripts/checks/`.
 
 ## How content stays current (ADR-0008)
 
@@ -84,15 +84,9 @@ The three-layer capture system handles drift:
 2. **The next day**, the maintainer reviews drafts. Many "useful patterns" don't survive a second look.
 3. **When ready**, `/playbook-promote <slug>` runs a grill-me-style interview, scaffolds via `scripts/new_skill.py`, creates a feature branch, runs `make check`, and stops. Final commit + push + PR are the maintainer's.
 
-## How to install via the marketplace (ADR-0043)
+## Distribution paths
 
-Inside Claude Code or Cursor, no Make tooling required:
-
-```
-/plugin install backend-developer@8v-coding-agents-playbook
-```
-
-Available packs: `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`, `tech-lead`, `meta`.
+Today the canonical install path is `make install` from a local clone (with optional `PROFILE=<role>` filter). A future marketplace-based distribution per ADR-0043 is designed but not shipped in this public mirror.
 
 ## Inspirations
 

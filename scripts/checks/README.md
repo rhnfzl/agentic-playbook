@@ -1,6 +1,6 @@
 # scripts/checks/
 
-The 13 pluggable quality-gate modules that `make check` runs against the playbook. Each module exports a `run(ctx) -> CheckResult` function; `scripts/check.py` iterates the registry in `scripts/checks/__init__.py:CHECKS` and aggregates exit status.
+The 17 pluggable quality-gate modules that `make check` runs against the playbook. Each module exports a `run(ctx) -> CheckResult` function; `scripts/check.py` iterates the registry in `scripts/checks/__init__.py:CHECKS` and aggregates exit status.
 
 Module shape is split between:
 
@@ -24,6 +24,10 @@ Module shape is split between:
 | pyright-zero | `pyright_zero.py` | Self-contained. Pyright errors + warnings must be zero; every `# pyright: ignore` line must carry a `# justification:` note. |
 | human-html-allowlist | `human_html_allowlist.py` | Self-contained. `.human-html-allowlist` patterns must not contain shell-substitution risk characters. |
 | skill-security | `skill_security.py` | Self-contained. Walks `scripts/security/` wrappers (Snyk, agent-skill-evaluator, DDIPE) and aggregates findings into the BOM. Per ADR-0047. |
+| adr-number-unique | `adr_number_unique.py` | Self-contained. Walks `docs/adr/NNNN-*.md` and refuses duplicate ADR numbers. |
+| ignored-containment | `ignored_containment.py` | Self-contained. Refuses any content under gitignored paths that would surface in tracked artifacts (e.g. docs/human-html ↔ docs/atlas links). |
+| playbook-version | `playbook_version.py` | Self-contained. Validates the single source-of-truth `VERSION` file shape. |
+| trajectory | `trajectory.py` | Self-contained. Lints `base/trajectories/<skill>/<scenario>.yaml` files for required fields per ADR-0044. |
 
 ## How to add a new gate
 
@@ -36,29 +40,25 @@ Module shape is split between:
 ## CheckResult shape
 
 ```python
-@dataclass
+@dataclass(frozen=True)
 class CheckResult:
-    name: str            # gate slug, e.g. "frontmatter"
-    passed: bool
-    errors: list[str]    # one entry per violation; rendered with the file path + line
-    warnings: list[str]
-    notices: list[str]   # informational, surfaced but never blocking
+    status: Literal["ok", "warn", "fail"]
+    summary: str         # one-line headline rendered with the gate name
+    details: list[str]   # zero or more lines surfaced under the headline
 ```
 
-Errors fail the gate (`make check` exits non-zero). Warnings surface in the report but don't fail. Notices surface only when verbose.
+`status="fail"` fails the gate (`make check` exits non-zero). `status="warn"` surfaces in the report but does not fail. `status="ok"` passes silently unless verbose output is requested.
 
 ## CheckContext shape
 
 ```python
-@dataclass
+@dataclass(frozen=True)
 class CheckContext:
     repo_root: Path
-    scope: Literal["base", "overlay", "all"]
-    verbose: bool
-    fast: bool           # skip expensive sub-checks (pyright, BOM regen)
+    content: object      # PlaybookContent (per ADR-0024); typed as object to avoid import cycle
 ```
 
-`scope` lets a gate filter to base content or overlay content. `fast` mode skips multi-second checks for faster iteration.
+`content` is the pre-loaded inventory of the eight content types (skills, rules, hooks, mcp, agents, commands, prompts, trajectories), so gates that walk the content types do not re-load them.
 
 ## Related
 

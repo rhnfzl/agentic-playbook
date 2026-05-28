@@ -37,3 +37,18 @@ docs/human-html/
 
 # Brainstorming spec drafts (kept local until promoted to an ADR or merged feature)
 docs/superpowers/
+
+# Plugin / marketplace artifacts that the upstream sync may emit into the
+# portfolio destination. These are operator-owned outputs, not public
+# content; the portfolio repo keeps them untracked so an upstream
+# configuration carrying internal catalog names cannot leak them into
+# the public commit history.
+plugins/
+.claude-plugin/
+.cursor-plugin/
+.agents/plugins/
+gemini-extension.json
+
+# Sync / prep working area outside the portfolio tree should never land
+# inside it under any naming variation.
+_agentic-playbook-prep/

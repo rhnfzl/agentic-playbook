@@ -59,7 +59,10 @@ Walk in this order:
 
   Step 4 -- Propose phased rollout.
     Phase 1 (install now, high-confidence): the artifacts that obviously fit. Show me
-      the exact `make install --profile <role>` command or the per-artifact copy steps.
+      the exact `make install PROFILE=<role>` command or the per-artifact copy steps.
+      Note: the Makefile reads the profile via `PROFILE=<name>`, not `--profile`;
+      `--profile` is the underlying `scripts/install.py` flag and would fail at the
+      `make` layer.
     Phase 2 (try for a week, then keep or remove): items that are useful in theory but
       whose value depends on my actual workflow. Propose a one-week trial protocol.
     Phase 3 (worth discussing): items that conflict with my current setup, require a

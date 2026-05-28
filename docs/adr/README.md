@@ -114,7 +114,7 @@ The list below mirrors the files in this directory in numerical order. See each 
 | 0010 | Commands + prompts | `base/commands/`, `base/prompts/` |
 | 0024 | Adapter Protocol | `scripts/adapters/_protocol.py`, every `scripts/adapters/<tool>.py` |
 | 0025 | Profile | `profiles/`, `scripts/playbook_profile.py` |
-| 0027 | Hook metadata | `scripts/hook_registration.py`, `scripts/checks/hook_metadata.py` |
+| 0027 | Hook metadata | `scripts/hook_registration/` (package), `scripts/checks/hook_metadata.py` |
 | 0034 | Cross-agent hook contract | Every adapter that exposes hook registration |
 | 0036 | Three-layer contract | `scripts/install_verify.py`, `make doctor-verify` |
 | 0042 | Content distribution | `scripts/sync_distribution.py`, `.sync-manifest.json` |

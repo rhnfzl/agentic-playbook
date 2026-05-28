@@ -19,10 +19,10 @@ If you are a coding agent and your user has cloned this repo, the most useful en
 
 - [docs/adr/0036-three-layer-content-contract.md](docs/adr/0036-three-layer-content-contract.md): the canonical / materialization / runtime contract every adapter implements.
 - [docs/adr/0024-adapter-protocol-and-install-manifest.md](docs/adr/0024-adapter-protocol-and-install-manifest.md): how each per-tool adapter implements the same Protocol.
-- [docs/adr/0044-trajectories-as-eighth-content-type.md](docs/adr/0044-trajectories-as-eighth-content-type.md): cross-adapter behavior assertions (the eighth content type).
+- [docs/adr/0030-tier3-declarative-toml-registry.md](docs/adr/0030-tier3-declarative-toml-registry.md): the Tier 3 declarative TOML registry (20 long-tail agents).
 - [docs/adr/0040-base-overlay-subtree-split-for-content-tiering.md](docs/adr/0040-base-overlay-subtree-split-for-content-tiering.md): `base/` portable vs `overlays/` team-specific content tiering.
 - [docs/adr/0042-playbook-content-distribution.md](docs/adr/0042-playbook-content-distribution.md): the maintainer's upstream → downstream sync model.
-- [docs/adr/0043-marketplace-distribution.md](docs/adr/0043-marketplace-distribution.md): the Claude Code + Cursor plugin marketplace packs.
+- [docs/adr/0044-trajectories-as-eighth-content-type.md](docs/adr/0044-trajectories-as-eighth-content-type.md): cross-adapter behavior assertions (the eighth content type).
 - [docs/adr/0047-supply-chain-security-gate.md](docs/adr/0047-supply-chain-security-gate.md): the block-by-default external-skill audit.
 - [docs/adr/0048-skill-telemetry-privacy.md](docs/adr/0048-skill-telemetry-privacy.md): the opt-in OpenTelemetry collector and its privacy contract.
 - [docs/adr/0049-why-atlas-auto-generated.md](docs/adr/0049-why-atlas-auto-generated.md): the auto-generated knowledge graph.
@@ -42,8 +42,7 @@ If you are a coding agent and your user has cloned this repo, the most useful en
 ## Distribution and lifecycle
 
 - [profiles/README.md](profiles/README.md): per-role install bundles (tech-lead, backend-developer, frontend-developer, qa, research, product-manager, devops).
-- [plugins/README.md](plugins/README.md): pre-built marketplace plugin packs (`/plugin install`).
-- [scripts/README.md](scripts/README.md): installer + 13-gate `make check` pipeline + supporting tooling.
+- [scripts/README.md](scripts/README.md): installer + 17-gate `make check` pipeline + supporting tooling.
 - [evals/README.md](evals/README.md): LLM-judge eval suites that gate per-skill behavior.
 
 ## Operations

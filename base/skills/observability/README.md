@@ -19,7 +19,7 @@ For engineering workflows that fix the underlying code, use the engineering/ cat
 
 ## What's deliberately not here yet
 
-- A `sentry-issue-triage/` skill that mirrors the team's internal Sentry triage workflow lives in `overlays/team/` (per ADR-0040), not `base/`. The base version of error-tracking triage is intentionally generic.
+- An error-tracking-issue-triage skill that mirrors a team's internal error-tracker triage workflow lives in `overlays/team/` (per ADR-0040), not `base/`. The base version of error-tracking triage is intentionally generic.
 - Cloud-provider-specific dashboards (AWS CloudWatch, GCP Cloud Monitoring) are out of scope for `base/` because their UX and CLI differ enough that one skill would always overfit to one provider.
 
 ## Related

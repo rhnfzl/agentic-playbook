@@ -25,7 +25,7 @@ This directory holds the installer, lint scripts, decay checks, and content-mana
 
 ### Quality gates
 
-`make check` runs `scripts/check.py`, which iterates the `scripts/checks/` package. 12 gates today:
+`make check` runs `scripts/check.py`, which iterates the `scripts/checks/` package. 17 gates today (see `scripts/checks/__init__.py:CHECKS` for the source of truth):
 
 | Gate | Module | Implementation |
 |---|---|---|

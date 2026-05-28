@@ -24,7 +24,7 @@ These skills are **vendored** (per ADR-0014 + ADR-0018): the playbook copies the
 
 ## When to consume
 
-Use `make install PROFILE=product-manager` (or `/plugin install product-manager@8v-coding-agents-playbook`) to get this set materialized into your coding agent. Direct copy of individual skill directories is also supported; the SKILL.md format is documented in `base/skills/README.md`.
+Use `make install PROFILE=product-manager` to get this set materialized into your coding agent. Direct copy of individual skill directories is also supported; the SKILL.md format is documented in `base/skills/README.md`.
 
 ## When to NOT consume
 

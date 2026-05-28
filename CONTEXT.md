@@ -77,5 +77,5 @@ Notes:
 
 - **ADR**: Architecture Decision Record under `docs/adr/NNNN-title.md`. Short, dated, immutable. New decisions get new ADRs; superseded ADRs are marked, not deleted.
 - **Frontmatter**: the `---` YAML block at the top of a SKILL.md (or any other markdown content type). Required fields are validated by `scripts/frontmatter_lint.py`.
-- **Decay**: a skill / rule / hook is "decaying" when its `last_reviewed` date is older than the threshold (90d default, 180d for docs-like dirs). The `decay_check.py` gate warns or blocks.
+- **Decay**: a skill / rule / hook is "decaying" when its `last_reviewed` date is older than the threshold. The `decay_check.py` gate runs three bands: 60-day notice (informational), 90-day warn (`make check` flags but does not block), 180-day block (`make check` fails). Trajectories use the same bands per ADR-0044.
 - **Vendored**: content imported from upstream with a pinned SHA via `SOURCES.toml`. Lives under `base/skills/imported/` or `base/mcp/anchored-fs/`. Marked `linguist-vendored=true` in `.gitattributes`.

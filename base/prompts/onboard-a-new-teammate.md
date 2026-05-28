@@ -63,12 +63,24 @@ Walk in this order:
     `never-push-to-develop`). In a fresh chat session, ask me to paste a sentence
     that violates the rule and confirm the agent rejects or rewrites it.
 
-  Step 7 -- Verify one hook fires.
+  Step 7 -- Verify one hook fires (NEVER against a real remote).
     Identify a hook that's installed (e.g. `lint-guard.sh`, `never-push-to-develop.sh`).
-    Ask me to attempt a real action that should trigger it (e.g. edit a Python file
-    and save; attempt `git push origin develop`). Confirm the hook blocked or warned.
-    If it didn't fire, walk me through the three-layer debug checklist from
-    base/hooks/README.md.
+    Trigger the hook against a throwaway local remote, never against a real shared
+    upstream. Recipe for `never-push-to-develop.sh`:
+      1. Create a scratch dir + bare local remote:
+           tmp=$(mktemp -d); git init --bare "$tmp/remote.git"; cd "$tmp"
+           git clone "$tmp/remote.git" sandbox; cd sandbox
+           git checkout -b develop && git commit --allow-empty -m "init" && git push -u origin develop
+      2. Edit a file in the sandbox, stage it, attempt the push:
+           echo x > a && git add a && git commit -m t
+           git push origin develop
+      3. Confirm the hook blocked (non-zero exit + the never-push message on stderr).
+    For `lint-guard.sh`: edit a Python file under the sandbox and save; the hook
+    runs the project's linter against the file (read-only).
+    If neither fires, walk me through the three-layer debug checklist from
+    base/hooks/README.md. Do NOT attempt this verification against a real
+    origin/develop branch; that defeats the purpose of the hook by either
+    pushing or assuming the hook works without proof.
 
   Step 8 -- Bookmark the playbook.
     Show me the locations I should remember:
