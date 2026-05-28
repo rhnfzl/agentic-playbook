@@ -246,11 +246,87 @@ def test_provider_runs_in_isolated_cwd(tmp_path: Path) -> None:
     ), f"CWD does not look like a tempdir: {cwd_str}"
 
 
-def test_provider_passes_skip_permissions_flag(tmp_path: Path) -> None:
-    """Adversarial review-round-6 #4: headless mode must auto-approve
-    tool prompts or the subprocess hangs until timeout. The provider
-    passes --dangerously-skip-permissions explicitly so the choice is
-    visible in the source, not buried in env vars."""
+def test_provider_default_uses_allowed_tools_allowlist(tmp_path: Path) -> None:
+    """Security-review HIGH finding (2026-05-28): default headless mode
+    must use a tool allowlist, NOT --dangerously-skip-permissions. The
+    allowlist excludes Bash, WebFetch, WebSearch, SendMessage, Task by
+    default — a malicious trajectory phrasing should not be able to
+    instruct the agent to run arbitrary shell commands."""
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    captured: dict = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = list(args)
+        return _fake_completed()
+
+    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
+         patch("subprocess.run", side_effect=fake_run):
+        provider = ClaudeCodeProvider()
+        provider(_trajectory(), "x", "claude-code")
+
+    assert "--dangerously-skip-permissions" not in captured["args"]
+    assert "--allowedTools" in captured["args"]
+    allowlist_idx = captured["args"].index("--allowedTools") + 1
+    allowlist = captured["args"][allowlist_idx]
+    # Default tools that MUST be present:
+    for tool in ("Read", "Write", "Edit", "NotebookEdit", "Glob", "Grep"):
+        assert tool in allowlist, f"expected {tool!r} in default allowlist"
+    # Dangerous tools that MUST NOT be present:
+    for tool in ("Bash", "WebFetch", "WebSearch", "Task"):
+        assert tool not in allowlist, f"{tool!r} must NOT be in default allowlist"
+
+
+def test_provider_extra_allowed_tools_extends_default(tmp_path: Path) -> None:
+    """Trajectories that legitimately need Bash etc. opt in via the
+    provider's extra_allowed_tools constructor arg. The default tools
+    remain present; the extra ones are added."""
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    captured: dict = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = list(args)
+        return _fake_completed()
+
+    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
+         patch("subprocess.run", side_effect=fake_run):
+        provider = ClaudeCodeProvider(
+            extra_allowed_tools=frozenset({"Bash"}),
+        )
+        provider(_trajectory(), "x", "claude-code")
+
+    allowlist_idx = captured["args"].index("--allowedTools") + 1
+    allowlist = captured["args"][allowlist_idx]
+    assert "Bash" in allowlist
+    assert "Read" in allowlist  # default still in
+
+
+def test_provider_dangerous_arg_switches_to_skip_permissions(tmp_path: Path) -> None:
+    """Explicit dangerous_skip_perms=True opts back into the legacy
+    behavior. Use only inside a real sandbox (rootless container, gVisor)."""
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    captured: dict = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = list(args)
+        return _fake_completed()
+
+    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
+         patch("subprocess.run", side_effect=fake_run):
+        provider = ClaudeCodeProvider(dangerous_skip_perms=True)
+        provider(_trajectory(), "x", "claude-code")
+
+    assert "--dangerously-skip-permissions" in captured["args"]
+    assert "--allowedTools" not in captured["args"]
+
+
+def test_provider_dangerous_env_var_switches_to_skip_permissions(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """`PHASE2_LIVE_DANGEROUS=1` opts in via env (for CI runners)."""
+    monkeypatch.setenv("PHASE2_LIVE_DANGEROUS", "1")
     from adapters.claude_code_provider import ClaudeCodeProvider
 
     captured: dict = {}
@@ -265,6 +341,21 @@ def test_provider_passes_skip_permissions_flag(tmp_path: Path) -> None:
         provider(_trajectory(), "x", "claude-code")
 
     assert "--dangerously-skip-permissions" in captured["args"]
+
+
+def test_provider_dangerous_mode_warns_on_stderr(tmp_path: Path, capsys) -> None:
+    """When dangerous mode is active, every spawn must emit a warning
+    on stderr so a CI operator sees the escalation in their logs."""
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
+         patch("subprocess.run", return_value=_fake_completed()):
+        provider = ClaudeCodeProvider(dangerous_skip_perms=True)
+        provider(_trajectory(), "x", "claude-code")
+
+    captured = capsys.readouterr()
+    assert "dangerously-skip-permissions" in captured.err.lower()
+    assert "PHASE2_LIVE_DANGEROUS" in captured.err
 
 
 def test_provider_env_is_minimal_allowlist(tmp_path: Path, monkeypatch) -> None:

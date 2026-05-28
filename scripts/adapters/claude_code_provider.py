@@ -8,14 +8,25 @@ Contract: same as Phase 1's TraceProvider:
 
     provider(trajectory, phrasing, adapter) -> TraceRecord
 
-CLI invocation:
+CLI invocation (default; least-privilege per the security review):
+
+    claude -p "<phrasing>" --allowedTools Edit,Glob,Grep,NotebookEdit,Read,Write
+
+The default tool allowlist explicitly excludes Bash, WebFetch, WebSearch,
+SendMessage, and Task because a malicious or careless trajectory
+phrasing could otherwise instruct the agent to do arbitrary things
+with the host user's permissions. Trajectories that legitimately need
+those tools opt in via `extra_allowed_tools=` on the provider.
+
+Dangerous-skip opt-in (CI sandbox only):
 
     claude -p "<phrasing>" --dangerously-skip-permissions
 
-The `--dangerously-skip-permissions` flag auto-approves tool calls so a
-headless run does not block on interactive prompts. It is explicit in
-the args (not hidden in env vars) so a reader of the source knows the
-harness is running in skip-permission mode.
+Enabled when `PHASE2_LIVE_DANGEROUS=1` is set OR when the provider is
+constructed with `dangerous_skip_perms=True`. Auto-approves every tool
+call. Use ONLY inside an already-sandboxed environment (rootless
+container with no host mounts, gVisor, etc.). The provider emits one
+line to stderr per spawn in this mode so the escalation is visible.
 
 Environment overrides (set by the provider; baseline env is restricted
 to a minimal allowlist to avoid leaking parent secrets into the spawned
@@ -75,6 +86,49 @@ _ALLOWED_ADAPTERS = {"claude-code"}  # Phase 2B only.
 
 _DEFAULT_TIMEOUT_S = 300.0  # 5 minutes per cell; harness can override.
 
+# Default tool allowlist for the spawned `claude -p` session.
+#
+# Security-review (HIGH finding, 2026-05-28): the previous default was
+# `--dangerously-skip-permissions`, which auto-approved EVERY tool call.
+# A malicious or accidentally-misspelled trajectory phrasing (e.g.
+# "delete every file under ~") would have run unimpeded with the user's
+# permissions. The trajectory harness is a TEST surface, not a trusted
+# automation surface; we apply least-privilege by default.
+#
+# The default allowlist below lets the agent:
+#   - Read existing files inside its workdir (no exfil of the parent fs
+#     beyond what the env-allowlist already permits).
+#   - Write/Edit/NotebookEdit inside the workdir to produce the
+#     artifacts trajectories assert on.
+#   - Glob/Grep to navigate the workdir.
+#
+# Tools deliberately EXCLUDED from the default:
+#   - Bash             (arbitrary shell command execution)
+#   - WebFetch         (egress to attacker-controlled URLs)
+#   - WebSearch        (egress + content injection from search results)
+#   - SendMessage      (cross-agent escalation)
+#   - Task             (subagent spawn, recursive risk)
+#
+# Trajectories that legitimately need Bash etc. must opt-in via
+# `ClaudeCodeProvider(extra_allowed_tools=frozenset({"Bash"}))` or via
+# a future per-trajectory `allowed_tools:` frontmatter field. Doing it
+# explicitly keeps the threat model visible in the trajectory file.
+_DEFAULT_ALLOWED_TOOLS: frozenset[str] = frozenset({
+    "Read",
+    "Write",
+    "Edit",
+    "NotebookEdit",
+    "Glob",
+    "Grep",
+})
+
+# Opt-in env var that switches back to the legacy
+# `--dangerously-skip-permissions` behavior. Only honored when set to
+# exactly "1"; any other value is ignored. The provider emits a stderr
+# warning on every spawn in this mode so a CI operator sees the
+# escalation in their logs.
+_DANGEROUS_OPT_IN_VAR = "PHASE2_LIVE_DANGEROUS"
+
 # Minimal env passed to the spawned `claude`. Allowlist documented per
 # adversarial review-round-6 finding: a full `dict(os.environ)` was
 # leaking AWS_*, GITHUB_TOKEN, etc., into the spawned session. We
@@ -111,15 +165,44 @@ class ClaudeCodeProvider:
     """Live Claude Code trace_provider for the trajectory harness.
 
     Construction args:
-      claude_bin       -- override the binary path; default: shutil.which("claude")
-      timeout          -- subprocess timeout in seconds (default: 300).
-      keep_workdirs    -- True keeps the per-spawn temp dir for inspection.
-                          Default False cleans up after the run.
-      extra_env        -- additional env-var keys to forward from the
-                          parent process into the spawned session, on
-                          top of `_ALLOWED_ENV_KEYS`. Use sparingly.
+      claude_bin             -- override the binary path; default:
+                                shutil.which("claude").
+      timeout                -- subprocess timeout in seconds (default: 300).
+      keep_workdirs          -- True keeps the per-spawn temp dir for
+                                inspection. Default False cleans up after
+                                the run.
+      extra_env              -- additional env-var keys to forward from
+                                the parent process into the spawned
+                                session, on top of `_ALLOWED_ENV_KEYS`.
+                                Use sparingly.
+      extra_allowed_tools    -- additional Claude Code tool names to
+                                add to the default `--allowedTools` list.
+                                For example, frozenset({"Bash"}) when a
+                                trajectory needs shell execution. The
+                                addition is opt-in per provider instance.
+      dangerous_skip_perms   -- True passes `--dangerously-skip-permissions`
+                                INSTEAD of the allowlist. Equivalent to
+                                setting `PHASE2_LIVE_DANGEROUS=1`; the
+                                env var is checked at construction time
+                                if this arg is False. Both code paths
+                                emit a loud stderr warning per spawn.
 
     Callable: provider(trajectory, phrasing, adapter) -> TraceRecord.
+
+    Security:
+
+    The default mode constrains the spawned `claude -p` session to a
+    narrow tool allowlist (`Read,Write,Edit,NotebookEdit,Glob,Grep`).
+    Bash, WebFetch, WebSearch, SendMessage, and Task are NOT in the
+    default allowlist, because a malicious or careless trajectory
+    phrasing could otherwise instruct the agent to do arbitrary
+    things with the host user's permissions.
+
+    The dangerous-skip mode (env or arg) is a deliberate escape hatch
+    for environments that already provide a real sandbox
+    (e.g. a CI runner inside an ephemeral container). When enabled the
+    provider emits one line to stderr per spawn so the escalation is
+    visible in operational logs.
     """
 
     def __init__(
@@ -128,11 +211,18 @@ class ClaudeCodeProvider:
         timeout: float = _DEFAULT_TIMEOUT_S,
         keep_workdirs: bool = False,
         extra_env: frozenset[str] | None = None,
+        extra_allowed_tools: frozenset[str] | None = None,
+        dangerous_skip_perms: bool = False,
     ) -> None:
         self._claude_bin = claude_bin
         self._timeout = timeout
         self._keep_workdirs = keep_workdirs
         self._extra_env = extra_env or frozenset()
+        self._allowed_tools = _DEFAULT_ALLOWED_TOOLS | (
+            extra_allowed_tools or frozenset()
+        )
+        env_opt_in = os.environ.get(_DANGEROUS_OPT_IN_VAR) == "1"
+        self._dangerous_skip_perms = dangerous_skip_perms or env_opt_in
 
     def __call__(
         self,
@@ -164,11 +254,7 @@ class ClaudeCodeProvider:
         started_at = datetime.now(timezone.utc)
         try:
             env = self._build_env()
-            args = [
-                claude_bin,
-                "-p", phrasing,
-                "--dangerously-skip-permissions",
-            ]
+            args = self._build_args(claude_bin, phrasing)
             try:
                 result = subprocess.run(
                     args,
@@ -235,6 +321,38 @@ class ClaudeCodeProvider:
         env["OTEL_LOG_USER_PROMPTS"] = "0"
         env["OTEL_LOG_TOOL_DETAILS"] = "1"
         return env
+
+    def _build_args(self, claude_bin: str, phrasing: str) -> list[str]:
+        """Return the argv passed to subprocess.run.
+
+        Default: `-p <phrasing> --allowedTools Read,Write,Edit,...`
+        Dangerous opt-in: `-p <phrasing> --dangerously-skip-permissions`
+
+        The dangerous mode emits one line to stderr per spawn so the
+        escalation is visible in operational logs even when output is
+        captured by CI (security-review HIGH finding, 2026-05-28).
+        """
+        if self._dangerous_skip_perms:
+            print(
+                f"  warn  ClaudeCodeProvider spawning with "
+                f"--dangerously-skip-permissions ({_DANGEROUS_OPT_IN_VAR} "
+                f"or dangerous_skip_perms=True). The agent can run any "
+                f"tool unsupervised; only enable inside a real sandbox.",
+                file=sys.stderr,
+            )
+            return [
+                claude_bin,
+                "-p", phrasing,
+                "--dangerously-skip-permissions",
+            ]
+        # Sorted for deterministic args across runs; aids reproducibility
+        # of the trajectory harness output.
+        allowlist_csv = ",".join(sorted(self._allowed_tools))
+        return [
+            claude_bin,
+            "-p", phrasing,
+            "--allowedTools", allowlist_csv,
+        ]
 
 
 def _parse_otel_lines(text: str, start_seq: int = 0) -> list[TraceEvent]:
