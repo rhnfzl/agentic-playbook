@@ -10,7 +10,7 @@ Or via make:
 
 The scaffold writes a trajectory with 5 placeholder phrasings, a single
 example assertion, and a TODO-marked LLM-judge rubric. Authors fill in
-the real values before committing. The trajectory linter (ADR-0043) gates
+the real values before committing. The trajectory linter (ADR-0044) gates
 the result on shape; the harness (Phase 1) replays it across adapters.
 """
 
@@ -104,9 +104,13 @@ def main(
     if owner is None:
         owner = os.environ.get("USER", "unknown")
 
-    # After the argparse + defaults pass above, these are guaranteed non-None;
-    # narrow the types for pyright so downstream Path arithmetic typechecks.
-    assert skill is not None and scenario is not None
+    # After the argparse + defaults pass above, these are guaranteed non-None.
+    # Use an explicit guard rather than `assert` so behavior survives `python -O`,
+    # which strips asserts. Replaces a runtime-silent bug with a useful one.
+    if skill is None or scenario is None:
+        raise RuntimeError(
+            "unreachable: skill and scenario are guaranteed non-None after argparse"
+        )
     skill_str: str = skill
     scenario_str: str = scenario
 

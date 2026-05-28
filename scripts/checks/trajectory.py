@@ -1,16 +1,19 @@
-"""Trajectory shape + frontmatter linter (ADR-0043, ADR-0045).
+"""Trajectory shape + frontmatter linter (ADR-0044, ADR-0046).
 
 Self-contained check (per ADR-0024 sibling pattern). Reads the pre-loaded
 PlaybookContent.trajectories from the dispatcher and enforces:
 
   * Required frontmatter fields: name, description, skill, scenario, version,
     owner, last_reviewed, adapter_scope, model_pinned
-  * `name` matches `<skill>/<scenario>`
-  * `skill` resolves to an existing base/skills/<category>/<skill>/ directory
+  * No frontmatter value may begin with `TODO` (catches scaffolder placeholders)
+  * `name` matches `<skill>/<scenario>` (quotes are stripped before compare)
+  * `skill` resolves to an existing skill (first-party OR imported)
   * `scenario` matches the filename (stem)
-  * `adapter_scope` is a subset of the known Tier-1 + Tier-2 adapters
-  * `input.phrasings` has at least one entry
-  * `llm_judge.threshold` is in [0, 1] when present
+  * `adapter_scope` is a non-empty subset of the known adapters
+  * `input.phrasings` has at least one entry (warn if below 5)
+  * `assertions:` has at least one entry; the harness has nothing to assert without it
+  * `llm_judge.threshold`, `.rubric`, and `.model` are all present
+  * `llm_judge.threshold` is in [0, 1]
 
 The reader (_reader.load_trajectories) is intentionally permissive; THIS
 gate is where shape violations become CI failures.
@@ -41,8 +44,11 @@ REQUIRED_FRONTMATTER = (
 )
 
 
+REQUIRED_JUDGE_KEYS = ("threshold", "rubric", "model")
+
+
 # Known adapters the harness can run against (subset of the playbook's
-# install adapters). Updated when new trace shims land per ADR-0044.
+# install adapters). Updated when new trace shims land per ADR-0045.
 # v0.2 Phase 0: only adapter shape is locked; the actual shims arrive in
 # Phase 1 (Claude Code) and Phase 3-4 (Codex, Cursor, Windsurf).
 KNOWN_TRAJECTORY_ADAPTERS = {
@@ -56,21 +62,43 @@ KNOWN_TRAJECTORY_ADAPTERS = {
 MIN_PHRASING_COUNT_WARN = 5  # Anthropic best-practice: 5 phrasings for trigger tests
 
 
+def _unquote(value: str) -> str:
+    """Strip a single leading/trailing matching quote pair, if present.
+
+    Matches the convention in scripts/frontmatter_lint.py for SKILL.md.
+    Keeps the linter robust to quoted scalars like `skill: "demo-skill"`.
+    """
+    v = value.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in {'"', "'"}:
+        return v[1:-1]
+    return v
+
+
 def _skill_resolves(repo_root: Path, skill: str) -> bool:
-    """Does <root>/base/skills/<category>/<skill>/ exist for some category?"""
+    """Does some base/skills/<category>/<skill>/SKILL.md exist?
+
+    Handles both first-party skills (base/skills/<category>/<skill>/) and
+    imported skills (base/skills/imported/<source>/<skill>/). The imported
+    case is two directories deeper than first-party; we walk all eligible
+    paths rather than assuming layout.
+    """
     base_skills = repo_root / "base" / "skills"
     if not base_skills.is_dir():
         return False
+    # Fast path: first-party layout.
     for category_dir in base_skills.iterdir():
         if not category_dir.is_dir():
             continue
         if (category_dir / skill / "SKILL.md").exists():
             return True
-        # Imported skills layer one level deeper.
-        if (category_dir / skill).is_dir() and any(
-            (category_dir / skill).rglob("SKILL.md")
-        ):
-            return True
+    # Imported layout: base/skills/imported/<source>/<skill>/SKILL.md
+    imported = base_skills / "imported"
+    if imported.is_dir():
+        for source_dir in imported.iterdir():
+            if not source_dir.is_dir():
+                continue
+            if (source_dir / skill / "SKILL.md").exists():
+                return True
     return False
 
 
@@ -98,11 +126,19 @@ def run(ctx: CheckContext) -> CheckResult:
 
         fm = traj.frontmatter
 
+        # Required fields present and non-empty.
         for field in REQUIRED_FRONTMATTER:
-            if not fm.get(field, "").strip():
+            raw = fm.get(field, "")
+            if not raw.strip():
                 errors.append(f"{rel}: missing or empty frontmatter field '{field}'")
+                continue
+            if _unquote(raw).upper().startswith("TODO"):
+                errors.append(
+                    f"{rel}: frontmatter field '{field}' is still a TODO "
+                    f"placeholder ({raw!r}); fill it in before committing"
+                )
 
-        declared_name = fm.get("name", "").strip()
+        declared_name = _unquote(fm.get("name", ""))
         expected_name = f"{traj.skill}/{traj.scenario}"
         if declared_name and declared_name != expected_name:
             errors.append(
@@ -110,14 +146,14 @@ def run(ctx: CheckContext) -> CheckResult:
                 f"expected '{expected_name}' (skill/scenario from path)"
             )
 
-        declared_skill = fm.get("skill", "").strip()
+        declared_skill = _unquote(fm.get("skill", ""))
         if declared_skill and declared_skill != traj.skill:
             errors.append(
                 f"{rel}: frontmatter skill '{declared_skill}' does not match "
                 f"directory '{traj.skill}'"
             )
 
-        declared_scenario = fm.get("scenario", "").strip()
+        declared_scenario = _unquote(fm.get("scenario", ""))
         if declared_scenario and declared_scenario != traj.scenario:
             errors.append(
                 f"{rel}: frontmatter scenario '{declared_scenario}' does not match "
@@ -127,16 +163,26 @@ def run(ctx: CheckContext) -> CheckResult:
         if traj.skill and not _skill_resolves(ctx.repo_root, traj.skill):
             errors.append(
                 f"{rel}: skill '{traj.skill}' does not resolve to any "
-                f"base/skills/<category>/{traj.skill}/SKILL.md"
+                f"base/skills/<category>/{traj.skill}/SKILL.md "
+                f"(or imported/<source>/{traj.skill}/SKILL.md)"
             )
 
-        for adapter in traj.adapter_scope:
-            if adapter not in KNOWN_TRAJECTORY_ADAPTERS:
-                errors.append(
-                    f"{rel}: adapter_scope contains unknown adapter "
-                    f"'{adapter}' (known: {sorted(KNOWN_TRAJECTORY_ADAPTERS)})"
-                )
+        # adapter_scope must be non-empty AND every entry known.
+        if not traj.adapter_scope:
+            errors.append(
+                f"{rel}: adapter_scope is empty; trajectory will never be "
+                f"executed by the harness. Set adapter_scope: [claude-code, ...] "
+                f"as an inline list (block-list YAML is not supported)."
+            )
+        else:
+            for adapter in traj.adapter_scope:
+                if adapter not in KNOWN_TRAJECTORY_ADAPTERS:
+                    errors.append(
+                        f"{rel}: adapter_scope contains unknown adapter "
+                        f"'{adapter}' (known: {sorted(KNOWN_TRAJECTORY_ADAPTERS)})"
+                    )
 
+        # Body sections.
         if not traj.input_phrasings:
             errors.append(
                 f"{rel}: input.phrasings is empty (at least one phrasing required)"
@@ -146,6 +192,22 @@ def run(ctx: CheckContext) -> CheckResult:
                 f"{rel}: only {len(traj.input_phrasings)} phrasing(s); "
                 f"Anthropic best-practice is {MIN_PHRASING_COUNT_WARN}"
             )
+
+        if not traj.assertions:
+            errors.append(
+                f"{rel}: assertions is empty; trajectory has no deterministic "
+                f"checks for the harness to run (add at least one DSL primitive, "
+                f"e.g. first_skill_loaded: {traj.skill or '<skill>'})"
+            )
+
+        # llm_judge required keys all present.
+        for key in REQUIRED_JUDGE_KEYS:
+            if not traj.llm_judge.get(key):
+                errors.append(
+                    f"{rel}: llm_judge.{key} is missing or empty; the hybrid "
+                    f"match contract (ADR-0046) requires all three of "
+                    f"{list(REQUIRED_JUDGE_KEYS)}"
+                )
 
         threshold = traj.llm_judge.get("threshold")
         if threshold is not None:

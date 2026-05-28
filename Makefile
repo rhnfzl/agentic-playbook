@@ -92,9 +92,14 @@ test:
 
 new:
 	@if [ -n "$(TRAJECTORY)" ]; then \
-		skill=$$(echo "$(TRAJECTORY)" | cut -d: -f1); \
-		scenario=$$(echo "$(TRAJECTORY)" | cut -d: -f2); \
-		if [ -z "$$skill" ] || [ -z "$$scenario" ] || [ "$$skill" = "$$scenario" ]; then \
+		colons=$$(printf %s "$(TRAJECTORY)" | tr -cd ':' | wc -c | tr -d ' '); \
+		if [ "$$colons" != "1" ]; then \
+			echo "error: TRAJECTORY must be exactly <skill>:<scenario> with one colon (got $$colons)"; \
+			exit 1; \
+		fi; \
+		skill=$$(printf %s "$(TRAJECTORY)" | cut -d: -f1); \
+		scenario=$$(printf %s "$(TRAJECTORY)" | cut -d: -f2); \
+		if [ -z "$$skill" ] || [ -z "$$scenario" ]; then \
 			echo "Usage: make new TRAJECTORY=<skill>:<scenario>"; exit 1; \
 		fi; \
 		$(PYTHON) scripts/new_trajectory.py --skill "$$skill" --scenario "$$scenario"; \

@@ -1,6 +1,6 @@
 # trajectories/
 
-Cross-adapter trajectory specs for the trajectory harness (ADR-0043).
+Cross-adapter trajectory specs for the trajectory harness (ADR-0044).
 
 A trajectory binds one (skill, scenario) pair to:
 
@@ -54,6 +54,6 @@ validate.
 
 ## Related ADRs
 
-- ADR-0043: trajectories as the 8th content type
-- ADR-0044: cross-adapter trace contract (Phase 1)
-- ADR-0045: hybrid DSL + LLM-judge match semantics (Phase 1)
+- ADR-0044: trajectories as the 8th content type
+- ADR-0045: cross-adapter trace contract (Phase 1)
+- ADR-0046: hybrid DSL + LLM-judge match semantics (Phase 1)

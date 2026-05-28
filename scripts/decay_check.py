@@ -2,7 +2,8 @@
 """
 Warn on content with stale last_reviewed dates; block at hard cutoff.
 
-Two content classes with different bands (ADR-0043 added trajectories):
+Two content classes share the same decay bands today (ADR-0044 added
+trajectories):
 
   Skills (base/skills/<cat>/<name>/SKILL.md):
     - 60-day notice band
@@ -10,14 +11,16 @@ Two content classes with different bands (ADR-0043 added trajectories):
     - 180-day block
 
   Trajectories (base/trajectories/<skill>/<scenario>.yaml):
-    - 30-day notice band
-    - 60-day warn
-    - 90-day block
+    - 60-day notice (matches skills)
+    - 90-day warn
+    - 180-day block
 
-Trajectories rot faster than skills because they're tied to a specific
-model version (model_pinned frontmatter field); a 90-day-old trajectory
-recorded against a now-superseded model is signal that the trajectory
-should be re-recorded against the current model.
+The design intuition is that trajectories rot faster than skills because
+they're tied to a specific model version (`model_pinned` frontmatter).
+The first cut keeps trajectory bands identical to skills until the Phase
+1 harness produces actual drift data; tightening before then would
+generate noise the team is likely to stop reading. ADR-0044 lists this
+failure mode in its reject-if criteria.
 """
 
 from __future__ import annotations
@@ -36,7 +39,7 @@ class _DecayBands(NamedTuple):
 
 
 SKILL_BANDS = _DecayBands(notice=60, warn=90, block=180)
-TRAJECTORY_BANDS = _DecayBands(notice=30, warn=60, block=90)
+TRAJECTORY_BANDS = _DecayBands(notice=60, warn=90, block=180)
 
 # Back-compat aliases for any consumer that imports these constants directly.
 NOTICE_DAYS = SKILL_BANDS.notice
@@ -80,11 +83,11 @@ def _check_files(
 
         if age >= bands.block:
             errors.append(
-                f"{rel}: last_reviewed {age}d ago (>{bands.block}d, BLOCKING for {label})"
+                f"{rel}: last_reviewed {age}d ago (>={bands.block}d, BLOCKING for {label})"
             )
         elif age >= bands.warn:
             warnings.append(
-                f"{rel}: last_reviewed {age}d ago (>{bands.warn}d, {label})"
+                f"{rel}: last_reviewed {age}d ago (>={bands.warn}d, {label})"
             )
         elif age >= bands.notice:
             notices.append(
@@ -124,13 +127,22 @@ def _gather_trajectory_files(repo_root: Path) -> list[Path]:
     return paths
 
 
-def main(repo_root: Path | None = None) -> int:
-    """Entry point. `repo_root` lets tests aim the check at a tmp tree;
-    the CLI invocation discovers the playbook checkout automatically."""
+def main(
+    repo_root: Path | None = None,
+    today: date | None = None,
+) -> int:
+    """Entry point.
+
+    `repo_root` lets tests aim the check at a tmp tree; CLI invocation
+    discovers the playbook checkout automatically.
+
+    `today` lets tests fix the reference date so band-boundary assertions
+    do not rot as the calendar advances. CLI use leaves it None.
+    """
     if repo_root is None:
         repo_root = Path(__file__).resolve().parent.parent
-
-    today = date.today()
+    if today is None:
+        today = date.today()
     skill_paths = _gather_skill_files(repo_root)
     trajectory_paths = _gather_trajectory_files(repo_root)
 

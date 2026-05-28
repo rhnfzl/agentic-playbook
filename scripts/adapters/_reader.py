@@ -285,7 +285,7 @@ def _parse_inline_list(raw: str) -> list[str]:
 def _parse_trajectory_body(body: str) -> tuple[list[str], list[dict], dict]:
     """Parse trajectory YAML body into (phrasings, assertions, llm_judge).
 
-    Naive parser tuned to the documented trajectory shape (ADR-0043).
+    Naive parser tuned to the documented trajectory shape (ADR-0044).
     Out-of-shape content (deeply nested assertion values, etc.) is left for
     the trajectory linter (scripts/checks/trajectory.py) to surface; we
     return what we can read so the linter has an attribution path.
@@ -423,7 +423,7 @@ def _parse_trajectory_body(body: str) -> tuple[list[str], list[dict], dict]:
 def load_trajectories(content_paths: ContentPaths) -> list[Trajectory]:
     """Load trajectory YAML files across content roots with overlay-wins merge.
 
-    v0.2 (ADR-0043): the 8th content type. Trajectory files live at
+    v0.2 (ADR-0044): the 8th content type. Trajectory files live at
     `<root>/trajectories/<skill>/<scenario>.yaml`. The reader is permissive:
     files without frontmatter come back with empty frontmatter so the
     trajectory linter (scripts/checks/trajectory.py) can attribute failures

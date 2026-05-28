@@ -77,7 +77,7 @@ class Prompt(NamedTuple):
 
 
 class Trajectory(NamedTuple):
-    """Cross-adapter trajectory spec (ADR-0043, 8th content type).
+    """Cross-adapter trajectory spec (ADR-0044, 8th content type).
 
     Each Trajectory binds one (skill, scenario) to a 5-phrasings prompt
     set, a list of DSL assertions over the resulting tool-call trace,
@@ -92,7 +92,7 @@ class Trajectory(NamedTuple):
                           owner, last_reviewed, tags, etc.)
       body             -- everything after the closing --- of the frontmatter
       input_phrasings  -- ordered list of user-prompt variants (typically 5)
-      assertions       -- list of DSL-assertion dicts (see ADR-0045)
+      assertions       -- list of DSL-assertion dicts (see ADR-0046)
       llm_judge        -- judge config: {threshold, rubric, model}
       adapter_scope    -- which adapters must pass; subset of Tier-1 names
       model_pinned     -- model the reference was captured against (drift signal)
@@ -175,7 +175,7 @@ def resolve_content_paths(
 class PlaybookContent(NamedTuple):
     """All eight content types pre-loaded once by the dispatcher.
 
-    v0.2 (ADR-0043): trajectories joined the canonical content set. The
+    v0.2 (ADR-0044): trajectories joined the canonical content set. The
     install adapters still consume the original seven; trajectories are
     consumed by the harness (scripts/trajectory_harness.py) and the
     Phase 0 quality gates (scripts/checks/trajectory.py).
@@ -192,7 +192,7 @@ class PlaybookContent(NamedTuple):
     agents: list[Agent]
     commands: list[Command]
     prompts: list[Prompt]
-    trajectories: list[Trajectory] = []
+    trajectories: list[Trajectory]  # required: no mutable default to share across instances
 
     @classmethod
     def load(
@@ -200,7 +200,7 @@ class PlaybookContent(NamedTuple):
         repo_root: Path,
         scope: list[str] | None = None,
     ) -> "PlaybookContent":
-        """Load all eight content types via ContentPaths (ADR-0040, ADR-0043).
+        """Load all eight content types via ContentPaths (ADR-0040, ADR-0044).
 
         `scope` selects which overlays layer onto `base/` (None = base
         only). ALL load_*() functions are ContentPaths-shaped post-v0.11;

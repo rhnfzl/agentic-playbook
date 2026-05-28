@@ -64,8 +64,14 @@ def test_scaffold_refuses_to_overwrite_existing(tmp_path: Path) -> None:
     assert "exists" in out.lower()
 
 
-def test_scaffolded_yaml_passes_the_lint_check(tmp_path: Path) -> None:
-    """End-to-end: scaffold a trajectory, run the lint check, expect warn-or-ok."""
+def test_scaffolded_yaml_fails_lint_until_TODOs_are_replaced(tmp_path: Path) -> None:
+    """End-to-end: scaffold a trajectory, run the lint check.
+
+    The scaffolder intentionally writes `TODO-model-id` and TODO-prefixed
+    phrasings. The linter must REJECT this until the author fills them
+    in. This is the contract between scaffolder and linter; if it
+    silently passes, authors will commit unfilled placeholders.
+    """
     from adapters._loader import PlaybookContent
     from checks import CheckContext
     from checks import trajectory as trajectory_check
@@ -78,5 +84,44 @@ def test_scaffolded_yaml_passes_the_lint_check(tmp_path: Path) -> None:
         content=PlaybookContent.load(tmp_path),
     )
     result = trajectory_check.run(ctx)
-    # Scaffolded trajectory has the 5 placeholder phrasings, so it should be ok.
+    assert result.status == "fail", "\n".join(result.details)
+    joined = "\n".join(result.details).lower()
+    assert "todo" in joined or "model_pinned" in joined
+
+
+def test_scaffolded_yaml_passes_lint_after_TODOs_replaced(tmp_path: Path) -> None:
+    """Same end-to-end, with the TODO markers replaced. Demonstrates the
+    expected author workflow: scaffold, fill in, commit."""
+    from adapters._loader import PlaybookContent
+    from checks import CheckContext
+    from checks import trajectory as trajectory_check
+
+    _seed_skill(tmp_path, "demo-skill")
+    _invoke(tmp_path, "demo-skill", "happy-path")
+
+    traj_path = (
+        tmp_path / "base" / "trajectories" / "demo-skill" / "happy-path.yaml"
+    )
+    content = traj_path.read_text(encoding="utf-8")
+    content = content.replace("TODO-model-id", "claude-opus-4-7")
+    content = content.replace(
+        "TODO one-line description of what this trajectory verifies.",
+        "Verifies the demo-skill happy path.",
+    )
+    for i, label in enumerate(["first", "second", "third", "fourth", "fifth"]):
+        content = content.replace(
+            f'    - "TODO {label} phrasing"',
+            f'    - "phrasing variant {i + 1}"',
+        )
+    content = content.replace(
+        "    TODO Score the trajectory on:",
+        "    Score the trajectory on:",
+    )
+    traj_path.write_text(content, encoding="utf-8")
+
+    ctx = CheckContext(
+        repo_root=tmp_path,
+        content=PlaybookContent.load(tmp_path),
+    )
+    result = trajectory_check.run(ctx)
     assert result.status == "ok", "\n".join(result.details)

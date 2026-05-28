@@ -10,8 +10,8 @@ scope: [any]
 
 # Trajectory Canary
 
-A canonical skill used by the cross-adapter trajectory harness (ADR-0043,
-ADR-0044) as its end-to-end smoke target. The harness has its own self-tests
+A canonical skill used by the cross-adapter trajectory harness (ADR-0044,
+ADR-0045) as its end-to-end smoke target. The harness has its own self-tests
 covering the matcher, the trace adapters, and the schema; this skill exists
 so a real LLM run can be exercised against a frozen target without depending
 on production skills (which evolve and would invalidate the smoke fixture).

@@ -1,7 +1,7 @@
 """Trajectory linter (scripts/checks/trajectory.py) gate behavior.
 
 Phase 0 / Task 3 of the cross-adapter trajectory harness. The linter
-enforces ADR-0043 + ADR-0045 frontmatter and shape rules. The reader
+enforces ADR-0044 + ADR-0046 frontmatter and shape rules. The reader
 (test_load_trajectories.py) is permissive; this gate is strict.
 """
 
@@ -218,3 +218,113 @@ def test_lint_with_no_trajectories_is_ok(tmp_path: Path) -> None:
     )
     result = trajectory_check.run(ctx)
     assert result.status == "ok"
+
+
+# --- Review-fix regressions: review findings codified as gate tests ---
+
+
+def test_lint_fails_when_adapter_scope_is_empty(tmp_path: Path) -> None:
+    """Empty inline list adapter_scope = trajectory will never run. Hard fail."""
+    yaml = VALID_FRONTMATTER.replace(
+        "adapter_scope: [claude-code]",
+        "adapter_scope: []",
+    )
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    assert "empty" in "\n".join(result.details).lower()
+    assert "adapter_scope" in "\n".join(result.details)
+
+
+def test_lint_fails_when_assertions_block_is_empty(tmp_path: Path) -> None:
+    """A trajectory with no assertions has nothing for the harness to check."""
+    yaml = VALID_FRONTMATTER.replace(
+        "assertions:\n  - first_skill_loaded: demo-skill",
+        "assertions:",
+    )
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    assert "assertions" in "\n".join(result.details).lower()
+
+
+def test_lint_fails_when_llm_judge_threshold_missing(tmp_path: Path) -> None:
+    yaml = VALID_FRONTMATTER.replace("  threshold: 0.7\n", "")
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    assert "threshold" in "\n".join(result.details).lower()
+
+
+def test_lint_fails_when_llm_judge_rubric_missing(tmp_path: Path) -> None:
+    yaml = VALID_FRONTMATTER.replace('  rubric: "Score it."\n', "")
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    assert "rubric" in "\n".join(result.details).lower()
+
+
+def test_lint_fails_when_llm_judge_model_missing(tmp_path: Path) -> None:
+    yaml = VALID_FRONTMATTER.replace("  model: claude-sonnet-4-6\n", "")
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    assert "model" in "\n".join(result.details).lower()
+
+
+def test_lint_fails_when_frontmatter_field_is_TODO_placeholder(
+    tmp_path: Path,
+) -> None:
+    """The scaffolder leaves `model_pinned: TODO-model-id`. The linter must
+    refuse to accept a placeholder."""
+    yaml = VALID_FRONTMATTER.replace(
+        "model_pinned: claude-opus-4-7",
+        "model_pinned: TODO-model-id",
+    )
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    joined = "\n".join(result.details).lower()
+    assert "todo" in joined
+    assert "model_pinned" in joined
+
+
+def test_lint_accepts_quoted_frontmatter_values(tmp_path: Path) -> None:
+    """Quoted scalars like `skill: "demo-skill"` must not break slug comparisons."""
+    yaml = VALID_FRONTMATTER.replace(
+        "skill: demo-skill", 'skill: "demo-skill"'
+    ).replace(
+        "scenario: happy-path", "scenario: 'happy-path'"
+    ).replace(
+        "name: demo-skill/happy-path", 'name: "demo-skill/happy-path"'
+    )
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "ok", "\n".join(result.details)
+
+
+def test_lint_resolves_imported_skill(tmp_path: Path) -> None:
+    """Trajectories may target imported skills at base/skills/imported/<source>/<name>/."""
+    yaml = VALID_FRONTMATTER.replace(
+        "demo-skill/happy-path", "imported-skill/happy-path"
+    ).replace(
+        "skill: demo-skill", "skill: imported-skill"
+    ).replace(
+        "first_skill_loaded: demo-skill", "first_skill_loaded: imported-skill"
+    )
+    # Build the imported-skill layout instead of first-party.
+    imported_dir = (
+        tmp_path / "base" / "skills" / "imported" / "demo-source" / "imported-skill"
+    )
+    imported_dir.mkdir(parents=True)
+    (imported_dir / "SKILL.md").write_text(
+        "---\nname: imported-skill\ndescription: imported demo\nversion: 0.1.0\n"
+        "owner: test\nlast_reviewed: 2026-05-28\n---\n\n# Imported Skill\n",
+        encoding="utf-8",
+    )
+    traj_dir = tmp_path / "base" / "trajectories" / "imported-skill"
+    traj_dir.mkdir(parents=True)
+    (traj_dir / "happy-path.yaml").write_text(yaml, encoding="utf-8")
+
+    result = _run_check(tmp_path)
+    assert result.status == "ok", "\n".join(result.details)

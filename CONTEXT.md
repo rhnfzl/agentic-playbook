@@ -11,7 +11,7 @@ Canonical vocabulary for this repo. When code, docs, or PRs talk about a term, t
 - **Agent**: a subagent with its own context window, invoked by name. Per ADR-0009; lives in `base/agents/<name>.md` (markdown + YAML frontmatter, converted to TOML for Codex on install).
 - **Command**: a user-triggered slash action. Per ADR-0010; lives in `base/commands/<name>.md`. When the user types `/<name>`, the body becomes the prompt sent to the agent.
 - **Prompt**: a reusable runtime template that expands inline (Pi-style `/name` expansion). Per ADR-0010; lives in `base/prompts/<name>.md` with YAML frontmatter (distinguishes runtime templates from setup / onboarding docs that share the directory).
-- **Trajectory**: a cross-adapter behavior assertion for one (skill, scenario) pair. Per ADR-0043; lives in `base/trajectories/<skill>/<scenario>.yaml`. Declares input phrasings, DSL assertions over the tool-call trace, and an LLM-judge rubric. Consumed by the trajectory harness (`scripts/trajectory_harness.py`, lands in Phase 1), not by adapters.
+- **Trajectory**: a cross-adapter behavior assertion for one (skill, scenario) pair. Per ADR-0044; lives in `base/trajectories/<skill>/<scenario>.yaml`. Declares input phrasings, DSL assertions over the tool-call trace, and an LLM-judge rubric. Consumed by the trajectory harness (`scripts/trajectory_harness.py`, lands in Phase 1), not by adapters.
 - **Adapter**: a per-tool translator that materializes the canonical content types into the format a specific coding agent expects. Lives in `scripts/adapters/<tool>.py`. Trajectories are NOT materialized by adapters; they're read by the harness.
 - **Profile**: a per-role bundle that selects a subset of content types for a specific developer role. Lives in `profiles/<role>.toml`.
 - **Playbook**: the repo as a whole.
@@ -30,7 +30,7 @@ Canonical vocabulary for this repo. When code, docs, or PRs talk about a term, t
 - **Tier 2**: lighter adapter, surface varies. Currently: GitHub Copilot, Gemini CLI, Aider, Cline, Pi. (Pi materializes skills + rules + prompts to `~/.pi/agent/`; the others materialize skills + rules only via `AGENTS.md`.)
 - **Tier 3**: AGENTS.md only (generated). All other agents that read AGENTS.md natively. 20 named tools currently registered: Kiro, Goose, Junie, Zed, Amp, Augment, OpenCode, Aide, Droid, Jules, Qodo, Q-Developer, SWE-Agent, Devon, Claude-Flow, Kilo, Continue, Tabnine, Cline-CLI, Supermaven.
 
-## Eight-bucket diagram (ADR-0010 + ADR-0043)
+## Eight-bucket diagram (ADR-0010 + ADR-0044)
 
 The playbook ships eight content types. Seven of them get materialized by adapters into the tool's native surface (`Y` = materialize; `.` = skip). The eighth, **trajectories**, is consumed by the harness rather than materialized into any adapter, so the columns below cover only the materialized seven.
 
