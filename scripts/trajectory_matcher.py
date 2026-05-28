@@ -124,21 +124,32 @@ def _check_final_artifact_path(value: str, trace: TraceRecord) -> str | None:
 def _path_aware_glob_match(path: str, pattern: str) -> bool:
     """Path-aware glob: `*` does NOT cross path separators.
 
-    Patterns containing no `/` match ROOT-LEVEL files only (i.e. the
+    Patterns containing no separator match ROOT-LEVEL files only (the
     artifact path must itself be a basename with no separator). So
-    `*.md` matches `foo.md` but NOT `subdir/foo.md`. Authors wanting
-    nested matches use `**/*.md` or a specific path like `docs/*.md`.
+    `*.md` matches `foo.md` but NOT `subdir/foo.md` and NOT `./foo.md`.
+    Authors wanting nested matches use `**/*.md` or a specific path
+    like `docs/*.md`.
 
-    Patterns containing `/` match against the full path with stdlib
-    `fnmatch`. Note that stdlib `fnmatch`'s `*` matches `/` too, so
-    `**/*.md` and `*/*.md` both work for "one level deep markdown."
+    Patterns containing `/` match against the full normalized path
+    with stdlib `fnmatch`. Note that stdlib `fnmatch`'s `*` does match
+    `/`, so `**/*.md` and `*/*.md` both match markdown at ANY depth.
+
+    Normalization (codex review-round-4 fixes):
+      * Leading `./` stripped from the path so `./foo.md` matches `*.md`.
+      * Backslashes (Windows-style) normalized to `/` before checking
+        for separators, so `subdir\\foo.md` is NOT accepted by the
+        basename-style `*.md` pattern.
     """
+    # Normalize separators and strip a single leading `./`.
+    normalized_path = path.replace("\\", "/")
+    if normalized_path.startswith("./"):
+        normalized_path = normalized_path[2:]
+
     if "/" not in pattern:
-        # Pattern is basename-style; require artifact at root.
-        if "/" in path:
+        if "/" in normalized_path:
             return False
-        return fnmatch.fnmatch(path, pattern)
-    return fnmatch.fnmatch(path, pattern)
+        return fnmatch.fnmatch(normalized_path, pattern)
+    return fnmatch.fnmatch(normalized_path, pattern)
 
 
 def _check_max_total_tool_calls(value, trace: TraceRecord) -> str | None:

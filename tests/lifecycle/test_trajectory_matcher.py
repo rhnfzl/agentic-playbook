@@ -227,6 +227,38 @@ def test_final_artifact_path_recursive_glob_crosses_separator(tmp_path) -> None:
     assert result.passed
 
 
+def test_final_artifact_path_normalizes_leading_dot_slash(tmp_path) -> None:
+    """Codex review-round-4: `./foo.md` should match `*.md` (the leading
+    `./` is path-equivalent to `foo.md`). Previously the leading `./`
+    introduced a separator and the basename-style match rejected."""
+    from trajectory_matcher import evaluate_assertions
+
+    trace = _trace(
+        events=[
+            _event(0, "tool_call", "Write", arguments={"path": "./foo.md"}),
+        ],
+        artifacts={"./foo.md": "sha256:a"},
+    )
+    result = evaluate_assertions([{"final_artifact_path": "*.md"}], trace)
+    assert result.passed
+
+
+def test_final_artifact_path_rejects_windows_backslash_separator(tmp_path) -> None:
+    """Codex review-round-4: `subdir\\foo.md` (Windows-style separator)
+    should NOT match `*.md`. Without normalization the backslash isn't
+    a `/`, so the basename-style check would erroneously allow it."""
+    from trajectory_matcher import evaluate_assertions
+
+    trace = _trace(
+        events=[
+            _event(0, "tool_call", "Write", arguments={"path": "subdir\\foo.md"}),
+        ],
+        artifacts={"subdir\\foo.md": "sha256:a"},
+    )
+    result = evaluate_assertions([{"final_artifact_path": "*.md"}], trace)
+    assert not result.passed
+
+
 # --- max_total_tool_calls / min_total_tool_calls ---
 
 

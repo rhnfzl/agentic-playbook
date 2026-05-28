@@ -143,6 +143,14 @@ def install_for_adapter(
 # Adapters that register MCP servers inside shared JSON/TOML config files.
 # Used to compute managed_keys for the lockfile so a later narrower install
 # can remove the playbook-owned entries that fall out of the new profile.
+#
+# Intentionally separate from `adapters.trace_record.KNOWN_TRACE_ADAPTERS`:
+# that frozenset names which adapters have a trajectory trace shim
+# (Phase 1 has Claude Code only; the trace-record set names the FOUR
+# Tier-1 adapters as the planned set). This set names which adapters
+# emit MCP registration entries that the lockfile must reconcile. They
+# happen to overlap at v0.2 but are distinct concepts; do NOT consolidate
+# without an ADR amendment confirming both populations stay equal.
 _MCP_REGISTERING_ADAPTERS = {"claude-code", "codex", "cursor", "windsurf"}
 
 

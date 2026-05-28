@@ -348,6 +348,38 @@ def test_lint_fails_when_call_order_uses_block_style(tmp_path: Path) -> None:
     assert "inline" in joined or "block" in joined
 
 
+def test_lint_fails_when_call_order_is_empty_list(tmp_path: Path) -> None:
+    """Codex review-round-4: `call_order: []` would vacuously pass the
+    matcher. Reject at the linter so authors who meant to constrain
+    ordering do not get a silent green pass."""
+    yaml = VALID_FRONTMATTER.replace(
+        "  - first_skill_loaded: demo-skill",
+        "  - first_skill_loaded: demo-skill\n"
+        "  - call_order: []",
+    )
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    joined = "\n".join(result.details).lower()
+    assert "call_order" in joined
+    assert "empty" in joined
+
+
+def test_lint_fails_when_call_order_is_bare_key(tmp_path: Path) -> None:
+    """Bare `- call_order:` (no value) parses as empty string and must
+    trigger the block-style-not-supported branch."""
+    yaml = VALID_FRONTMATTER.replace(
+        "  - first_skill_loaded: demo-skill",
+        "  - first_skill_loaded: demo-skill\n"
+        "  - call_order:",
+    )
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    joined = "\n".join(result.details).lower()
+    assert "call_order" in joined
+
+
 def test_lint_resolves_imported_skill(tmp_path: Path) -> None:
     """Trajectories may target imported skills at base/skills/imported/<source>/<name>/."""
     yaml = VALID_FRONTMATTER.replace(

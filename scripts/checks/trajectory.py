@@ -222,6 +222,16 @@ def run(ctx: CheckContext) -> CheckResult:
                         f"`- call_order:` followed by indented dict items is "
                         f"not supported by the naive YAML reader."
                     )
+                elif not value:
+                    # Empty list vacuously passes the matcher; reject so an
+                    # author who meant to constrain ordering does not get a
+                    # silent green pass (codex review-round-4 finding).
+                    errors.append(
+                        f"{rel}: call_order is an empty list; remove the "
+                        f"assertion or add at least one {{tool: X, before: Y}} "
+                        f"entry. An empty list vacuously passes and provides no "
+                        f"ordering guarantee."
+                    )
                 else:
                     for entry in value:
                         if not isinstance(entry, dict):

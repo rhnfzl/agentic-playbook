@@ -249,6 +249,34 @@ def test_harness_rejects_skill_filter_with_no_matches(tmp_path: Path) -> None:
         run_harness(cfg)
 
 
+def test_harness_failure_details_route_to_stderr(tmp_path: Path, capsys) -> None:
+    """Codex review-round-4: when matrix.failed > 0, the Failures: detail
+    block must print to stderr (not stdout) so the stdout/stderr contract
+    holds. The matrix table itself stays on stdout."""
+    from trajectory_harness import HarnessConfig, print_summary, run_harness
+
+    _make_trajectory(
+        tmp_path,
+        assertions_block=(
+            "  - first_skill_loaded: demo\n"
+            "  - must_not_invoke_tool: Bash\n"
+        ),
+    )
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(include_bash=True),
+    )
+    matrix = run_harness(cfg)
+    print_summary(matrix)
+    captured = capsys.readouterr()
+    # Matrix header + table on stdout.
+    assert "Trajectory matrix" in captured.out
+    assert "FAIL" in captured.out
+    # Failure detail block on stderr.
+    assert "Failures:" in captured.err
+    assert "Bash" in captured.err
+
+
 def test_harness_strict_mode_warns_in_phase_1(tmp_path: Path) -> None:
     """Codex review finding: --strict is currently a no-op; surface a
     warning so CI that sets STRICT=1 expecting enforcement gets a clear

@@ -250,14 +250,19 @@ def print_summary(matrix: Matrix) -> None:
         print(f"  {skill:<24} {scenario:<18} {adapter:<14} {verdict}")
 
     if matrix.failed:
-        print()
-        print("Failures:")
+        # Codex review-round-4 fix: failure details route to stderr so the
+        # stdout/stderr contract holds. The matrix table itself stays on
+        # stdout (it's the normal output even when some cells fail; the
+        # exit code is the signal for CI). Failure diagnostics belong on
+        # stderr so `make trajectory-check 2>diag.log` captures them.
+        print(file=sys.stderr)
+        print("Failures:", file=sys.stderr)
         for (skill, scenario, adapter), (passed, total, failures) in sorted(by_key.items()):
             if passed == total:
                 continue
-            print(f"  {skill}/{scenario} on {adapter}:")
+            print(f"  {skill}/{scenario} on {adapter}:", file=sys.stderr)
             for f in failures[:5]:
-                print(f"    - {f}")
+                print(f"    - {f}", file=sys.stderr)
 
 
 def main() -> int:

@@ -42,7 +42,7 @@ Authors scaffold a new trajectory with `make new TRAJECTORY=<skill>:<scenario>`.
 
 Authoring cost outweighs signal, measured by quantitative thresholds. The metrics below are deliberately measurable in tooling we either have today or will have after Phase 1; "warnings the team stops reading" was a vibe-test in the draft and is now replaced.
 
-Phase 0 + Phase 1 (measurable today via `make trajectory-coverage-ratio`, see Consequences):
+Phase 0 + Phase 1 (measurable today via `make trajectory-coverage-ratio`; script lives at `scripts/trajectory_coverage.py`):
 
 - (trajectories committed / shipped skills) below 0.5 across two consecutive releases.
 - More than 50% of trajectories carry `adapter_scope: [claude-code]` only (silent opt-out from cross-adapter testing).
@@ -61,7 +61,7 @@ Unwind action if a reject criterion triggers: move trajectories under `evals/` a
 - New `make` targets: `make new TRAJECTORY=<skill>:<scenario>` today; `make record-trajectory`, `make verify-trajectory`, `make trajectory-check` land in Phase 1.
 - New decay-check class for trajectories (currently shares skill bands; revisit after Phase 1).
 - New `make check` gate (`trajectory`) enforces frontmatter and shape rules: required fields, TODO-placeholder rejection, non-empty `adapter_scope`, non-empty `assertions`, complete `llm_judge` (threshold + rubric + model), and threshold in `[0, 1]`.
-- Future work: `make trajectory-coverage-ratio` prints (trajectory count / shipped-skill count) as the release-gate metric named in the reject-if criteria.
+- `make trajectory-coverage-ratio` (added in the v0.2 fix round) prints (trajectory count / shipped-skill count) plus the claude-only share that the reject-if criteria reference. Output is human-readable by default; `JSON=1 make trajectory-coverage-ratio` for machine-readable output.
 - Authoring discipline grows: a skill change that breaks behavior is caught at trajectory time, not in production.
 
 ## Source
