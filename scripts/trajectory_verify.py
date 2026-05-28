@@ -33,6 +33,7 @@ sys.path.insert(0, str(REPO_ROOT_DEFAULT / "scripts"))
 
 from adapters._loader import PlaybookContent  # noqa: E402
 from adapters.claude_code_trace import parse_otel_jsonl  # noqa: E402
+from trajectory_judge import JudgeClient, evaluate_judge  # noqa: E402
 from trajectory_matcher import evaluate_assertions  # noqa: E402
 
 
@@ -42,6 +43,8 @@ def main(
     fixture: Path | None = None,
     repo_root: Path | None = None,
     phrasing: str | None = None,
+    judge_client: JudgeClient | None = None,
+    judge: bool = False,
 ) -> int:
     if skill is None or scenario is None:
         parser = argparse.ArgumentParser(
@@ -63,11 +66,18 @@ def main(
             "the first entry in the trajectory's phrasings list). Useful "
             "when a fixture was captured against a non-default phrasing.",
         )
+        parser.add_argument(
+            "--judge",
+            action="store_true",
+            help="After DSL passes, run the LLM judge against the trajectory's "
+            "rubric. Requires ANTHROPIC_API_KEY in the environment.",
+        )
         args = parser.parse_args()
         skill = args.skill
         scenario = args.scenario
         fixture = args.fixture
         phrasing = args.phrasing
+        judge = args.judge
 
     if repo_root is None:
         repo_root = REPO_ROOT_DEFAULT
@@ -109,10 +119,42 @@ def main(
     trace = parse_otel_jsonl(fixture, session_id="verify", prompt=prompt)
     result = evaluate_assertions(traj.assertions, trace)
 
-    if result.passed:
+    # Phase 2A: if --judge was requested and DSL passed, run the LLM judge
+    # and gate on the trajectory's threshold.
+    judge_failure_msg: str | None = None
+    if result.passed and judge:
+        client = judge_client
+        if client is None:
+            # Default real client; reads ANTHROPIC_API_KEY.
+            from adapters.anthropic_judge_client import (
+                HttpAnthropicJudgeClient,
+            )
+
+            try:
+                client = HttpAnthropicJudgeClient()
+            except ValueError as exc:
+                print(
+                    f"  error  cannot run judge: {exc}",
+                    file=sys.stderr,
+                )
+                return 1
+        judge_result = evaluate_judge(traj, trace, client)
+        threshold_raw = traj.llm_judge.get("threshold", 0.7)
+        try:
+            threshold = float(threshold_raw)
+        except (TypeError, ValueError):
+            threshold = 0.7
+        if judge_result.score < threshold:
+            judge_failure_msg = (
+                f"llm_judge: score {judge_result.score:.2f} below "
+                f"threshold {threshold} (reasoning: {judge_result.reasoning})"
+            )
+
+    if result.passed and judge_failure_msg is None:
+        suffix = " + judge" if judge else ""
         print(
             f"  ok  trajectory '{skill}/{scenario}' PASSED against fixture "
-            f"({fixture.name}): {len(traj.assertions)} assertion(s) satisfied."
+            f"({fixture.name}): {len(traj.assertions)} assertion(s) satisfied{suffix}."
         )
         return 0
 
@@ -121,6 +163,8 @@ def main(
         f"({fixture.name}):",
         file=sys.stderr,
     )
+    if judge_failure_msg is not None:
+        print(f"    - {judge_failure_msg}", file=sys.stderr)
     for failure in result.failures:
         print(f"    - {failure}", file=sys.stderr)
     return 1

@@ -125,6 +125,65 @@ def test_verify_fails_when_trajectory_does_not_exist(tmp_path: Path) -> None:
     assert "not found" in err.getvalue().lower()
 
 
+def test_verify_runs_judge_when_flag_set(tmp_path: Path) -> None:
+    """Phase 2A: --judge runs the LLM judge after DSL passes. Inject a
+    stub client so no live HTTP happens."""
+    import trajectory_verify
+    from trajectory_judge import JudgeResult
+
+    class _StubClient:
+        def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+            return JudgeResult(
+                score=0.9, reasoning="good", raw_response="",
+                model="claude-sonnet-4-6",
+            )
+
+    _seed(tmp_path)
+    fixture = _write_passing_fixture(tmp_path)
+    out = io.StringIO()
+    err = io.StringIO()
+    with redirect_stdout(out), redirect_stderr(err):
+        rc = trajectory_verify.main(
+            skill="demo",
+            scenario="happy-path",
+            fixture=fixture,
+            repo_root=tmp_path,
+            judge=True,
+            judge_client=_StubClient(),
+        )
+    assert rc == 0, out.getvalue() + err.getvalue()
+    assert "judge" in out.getvalue().lower()
+
+
+def test_verify_fails_when_judge_below_threshold(tmp_path: Path) -> None:
+    """A trajectory with threshold 0.7 must fail when the judge returns 0.4."""
+    import trajectory_verify
+    from trajectory_judge import JudgeResult
+
+    class _LowClient:
+        def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+            return JudgeResult(
+                score=0.4, reasoning="rubric not met", raw_response="",
+                model="claude-sonnet-4-6",
+            )
+
+    _seed(tmp_path)
+    fixture = _write_passing_fixture(tmp_path)
+    err = io.StringIO()
+    with redirect_stdout(io.StringIO()), redirect_stderr(err):
+        rc = trajectory_verify.main(
+            skill="demo",
+            scenario="happy-path",
+            fixture=fixture,
+            repo_root=tmp_path,
+            judge=True,
+            judge_client=_LowClient(),
+        )
+    assert rc == 1
+    assert "llm_judge" in err.getvalue()
+    assert "0.40" in err.getvalue() or "0.4" in err.getvalue()
+
+
 def test_verify_fails_against_failing_fixture(tmp_path: Path) -> None:
     """Fixture trace missing the Write call should produce a failing run."""
     import trajectory_verify
