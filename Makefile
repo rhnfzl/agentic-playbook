@@ -1,4 +1,4 @@
-.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit audit-security targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio trajectory-calibrate record-trajectory ai-bom
+.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit audit-security targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio trajectory-calibrate record-trajectory ai-bom telemetry-init telemetry-stop telemetry-report telemetry-collector-py
 
 PYTHON ?= python3
 
@@ -19,6 +19,11 @@ help:
 	@echo "  make audit-security                Run supply-chain gate: Snyk scanner + skill-evaluator + DDIPE + AI-BOM"
 	@echo "                                     STRICT_SECURITY=1 escalates skipped wrappers to errors"
 	@echo "  make ai-bom                        Regenerate docs/security/ai-bom.json without other checks"
+	@echo "  make telemetry-init                Bring up the OTLP collector (docker-compose, opt-in)"
+	@echo "  make telemetry-stop                Stop the OTLP collector"
+	@echo "  make telemetry-collector-py        Run the pure-Python OTLP collector (no docker)"
+	@echo "  make telemetry-report              Per-skill 30d trigger count + latency + tokens"
+	@echo "                                     Set TELEMETRY=off to disable every telemetry path"
 	@echo "  make sync-mattpocock               Pull mattpocock/skills updates into skills/imported/mattpocock/"
 	@echo "  make sync-distribution MANIFEST=/path/to/manifest.toml"
 	@echo "                                     Sync base/ to external destination per ADR-0042 (manifest-driven)"
@@ -73,6 +78,26 @@ audit-security:
 
 ai-bom:
 	@$(PYTHON) scripts/security/ai_bom.py
+
+telemetry-init:
+	@if [ "$$TELEMETRY" = "off" ] || [ "$$TELEMETRY_ENABLED" = "0" ] || [ "$$PLAYBOOK_TELEMETRY" = "off" ]; then \
+		echo "  .  telemetry disabled (TELEMETRY=off); refusing to start collector"; \
+		exit 0; \
+	fi
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "  x  docker not on PATH; use 'make telemetry-collector-py' instead"; \
+		exit 1; \
+	fi
+	@cd scripts/telemetry/otel_collector && docker compose up -d
+
+telemetry-stop:
+	@cd scripts/telemetry/otel_collector && docker compose down 2>/dev/null || true
+
+telemetry-collector-py:
+	@$(PYTHON) scripts/telemetry/pyotel_collector.py
+
+telemetry-report:
+	@$(PYTHON) scripts/skill_telemetry_report.py $(if $(DAYS),--days $(DAYS)) $(if $(JSON),--json)
 
 sync-mattpocock:
 	@bash scripts/sync_mattpocock.sh

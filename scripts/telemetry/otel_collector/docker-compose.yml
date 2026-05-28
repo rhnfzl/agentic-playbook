@@ -1,0 +1,25 @@
+version: "3.8"
+
+# OTLP/HTTP + OTLP/gRPC collector for the playbook telemetry layer.
+# Bring up with: `make telemetry-init`
+# Stop with:    `make telemetry-stop`
+#
+# The collector writes JSONL to the host at ~/.coding-agents-playbook/
+# telemetry/skills.jsonl. The bind mount uses ${HOME} so each user's
+# data stays local.
+#
+# Privacy: collector-config.yaml drops gen_ai.prompt and gen_ai.choice
+# bodies in the processor pipeline; only metadata reaches the file.
+
+services:
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: playbook-otelcol
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./collector-config.yaml:/etc/otelcol/config.yaml:ro
+      - ${HOME}/.coding-agents-playbook/telemetry:/var/log/playbook
+    ports:
+      - "127.0.0.1:4317:4317"   # OTLP/gRPC
+      - "127.0.0.1:4318:4318"   # OTLP/HTTP
+    restart: unless-stopped

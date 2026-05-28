@@ -2,8 +2,8 @@
 """
 Warn on content with stale last_reviewed dates; block at hard cutoff.
 
-Two content classes share the same decay bands today (ADR-0044 added
-trajectories):
+Two content classes share the same date-based decay bands today
+(ADR-0044 added trajectories):
 
   Skills (base/skills/<cat>/<name>/SKILL.md):
     - 60-day notice band
@@ -21,6 +21,13 @@ The first cut keeps trajectory bands identical to skills until the Phase
 1 harness produces actual drift data; tightening before then would
 generate noise the team is likely to stop reading. ADR-0044 lists this
 failure mode in its reject-if criteria.
+
+v0.14 (ADR-0048) added a usage-based layer. When the local telemetry
+JSONL is present AND `TELEMETRY` is not set to off, the check also flags
+skills that have not fired in 60+ days regardless of their
+`last_reviewed` date. This catches "I reviewed it last week but no one
+uses it" decay that the date-based bands miss. Disabled cleanly when
+`TELEMETRY=off`.
 """
 
 from __future__ import annotations
@@ -40,6 +47,8 @@ class _DecayBands(NamedTuple):
 
 SKILL_BANDS = _DecayBands(notice=60, warn=90, block=180)
 TRAJECTORY_BANDS = _DecayBands(notice=60, warn=90, block=180)
+
+USAGE_DECAY_DAYS = 60   # no triggers in this many days = decaying
 
 # Back-compat aliases for any consumer that imports these constants directly.
 NOTICE_DAYS = SKILL_BANDS.notice
@@ -98,6 +107,54 @@ def _check_files(
             info.append(f"{rel}: ok ({age}d)")
 
     return notices, warnings, errors, info
+
+
+def _usage_decay_findings(
+    skill_paths: list[Path],
+    repo_root: Path,
+    today: date,
+) -> list[str]:
+    """Telemetry-aware decay: flag skills with no triggers in 60d.
+
+    Silent no-op if `TELEMETRY=off`, telemetry deps unavailable, or
+    no JSONL recorded yet. Returns notice strings (advisory band,
+    not blocking) so the date-based decay stays the single source
+    of truth for build pass/fail.
+    """
+    try:
+        from telemetry import is_enabled, storage_path
+        from telemetry.ingest import aggregate, read_jsonl
+    except ImportError:
+        return []
+    if not is_enabled():
+        return []
+    if not storage_path().is_file():
+        return []
+    records = read_jsonl()
+    aggregates = aggregate(records)
+    fired_by_skill: dict[str, str] = {a.skill: a.last_fired_at for a in aggregates}
+
+    notices: list[str] = []
+    for skill_md in skill_paths:
+        skill_name = skill_md.parent.name
+        rel = skill_md.relative_to(repo_root)
+        last = fired_by_skill.get(skill_name)
+        if last is None:
+            notices.append(
+                f"{rel}: no telemetry events recorded (no usage signal)"
+            )
+            continue
+        try:
+            last_date = datetime.strptime(last[:10], "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        idle = (today - last_date).days
+        if idle >= USAGE_DECAY_DAYS:
+            notices.append(
+                f"{rel}: last fired {idle}d ago "
+                f"(>={USAGE_DECAY_DAYS}d, usage-decay band)"
+            )
+    return notices
 
 
 def _gather_skill_files(repo_root: Path) -> list[Path]:
@@ -166,6 +223,7 @@ def main(
         all_notices.extend(n)
         all_warnings.extend(w)
         all_errors.extend(e)
+    all_notices.extend(_usage_decay_findings(skill_paths, repo_root, today))
 
     if all_notices:
         print(f"\nDecay check: {len(all_notices)} notice(s)")
