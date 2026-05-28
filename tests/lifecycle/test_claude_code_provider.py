@@ -246,6 +246,149 @@ def test_provider_runs_in_isolated_cwd(tmp_path: Path) -> None:
     ), f"CWD does not look like a tempdir: {cwd_str}"
 
 
+def test_provider_passes_skip_permissions_flag(tmp_path: Path) -> None:
+    """Adversarial review-round-6 #4: headless mode must auto-approve
+    tool prompts or the subprocess hangs until timeout. The provider
+    passes --dangerously-skip-permissions explicitly so the choice is
+    visible in the source, not buried in env vars."""
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    captured: dict = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = list(args)
+        return _fake_completed()
+
+    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
+         patch("subprocess.run", side_effect=fake_run):
+        provider = ClaudeCodeProvider()
+        provider(_trajectory(), "x", "claude-code")
+
+    assert "--dangerously-skip-permissions" in captured["args"]
+
+
+def test_provider_env_is_minimal_allowlist(tmp_path: Path, monkeypatch) -> None:
+    """Adversarial review-round-6 #1: a full os.environ passthrough leaked
+    AWS_*, GITHUB_TOKEN, etc., into the spawned claude session. The
+    provider now uses an allowlist; verify AWS_ACCESS_KEY_ID is NOT
+    forwarded while ANTHROPIC_API_KEY IS."""
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "secret-should-not-leak")
+    monkeypatch.setenv("GITHUB_TOKEN", "secret-should-not-leak")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-leak-ok")
+
+    captured: dict = {}
+
+    def fake_run(args, **kwargs):
+        captured["env"] = kwargs.get("env", {})
+        return _fake_completed()
+
+    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
+         patch("subprocess.run", side_effect=fake_run):
+        provider = ClaudeCodeProvider()
+        provider(_trajectory(), "x", "claude-code")
+
+    env = captured["env"]
+    assert "AWS_ACCESS_KEY_ID" not in env
+    assert "GITHUB_TOKEN" not in env
+    assert env.get("ANTHROPIC_API_KEY") == "sk-ant-test-leak-ok"
+
+
+def test_provider_raises_on_nonzero_exit_code(tmp_path: Path) -> None:
+    """Adversarial review-round-6 #5: a crashed agent must surface as
+    infra_fail, NOT as a quality regression. Non-zero exit code raises
+    RuntimeError so the harness records the crash distinctly."""
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
+         patch(
+             "subprocess.run",
+             return_value=_fake_completed(
+                 returncode=2,
+                 stderr="Error: authentication failed",
+             ),
+         ):
+        provider = ClaudeCodeProvider()
+        import pytest as _pytest
+        with _pytest.raises(RuntimeError, match="code 2"):
+            provider(_trajectory(), "x", "claude-code")
+
+
+def test_provider_parses_spans_from_stdout_too(tmp_path: Path) -> None:
+    """Adversarial review-round-6 #3 (verdict-blocker): Node's
+    ConsoleSpanExporter writes to stdout by default, not stderr. The
+    provider now parses both channels. Spans on stdout must produce
+    events the same as spans on stderr."""
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    span_on_stdout = _otel_span_line(
+        "tool_call", "Write",
+        **{"tool.name": "Write"},
+    )
+
+    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
+         patch(
+             "subprocess.run",
+             return_value=_fake_completed(stdout=span_on_stdout, stderr=""),
+         ):
+        provider = ClaudeCodeProvider()
+        record = provider(_trajectory(), "x", "claude-code")
+
+    assert len(record.tool_calls()) == 1
+    assert record.tool_calls()[0].name == "Write"
+
+
+def test_provider_excludes_hidden_dirs_from_artifacts(tmp_path: Path) -> None:
+    """Adversarial review-round-6 #7: Claude Code creates `.claude/`
+    session state in the workdir. Without exclusion, those files
+    pollute TraceRecord.artifacts and `final_artifact_path` matches
+    the wrong file. Hidden parts (`.claude`, `.git`, `.cache`) are
+    excluded; visible files are kept."""
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    def fake_run(args, **kwargs):
+        cwd = Path(kwargs["cwd"])
+        # Visible agent output:
+        (cwd / "report.md").write_text("real output", encoding="utf-8")
+        # Hidden harness state:
+        (cwd / ".claude").mkdir()
+        (cwd / ".claude" / "session.json").write_text(
+            '{"...": "..."}', encoding="utf-8",
+        )
+        (cwd / ".cache").mkdir()
+        (cwd / ".cache" / "x.bin").write_text("blob", encoding="utf-8")
+        return _fake_completed()
+
+    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
+         patch("subprocess.run", side_effect=fake_run):
+        provider = ClaudeCodeProvider()
+        record = provider(_trajectory(), "x", "claude-code")
+
+    assert "report.md" in record.artifacts
+    assert not any(k.startswith(".") for k in record.artifacts)
+
+
+def test_provider_temp_dir_prefix_names_the_trajectory(tmp_path: Path) -> None:
+    """Adversarial review-round-6 #8: a tempdir prefix of
+    `trajectory-canary-` regardless of trajectory was misleading.
+    Per-trajectory prefix now identifies the source."""
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    captured: dict = {}
+
+    def fake_run(args, **kwargs):
+        captured["cwd"] = kwargs.get("cwd")
+        return _fake_completed()
+
+    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
+         patch("subprocess.run", side_effect=fake_run):
+        provider = ClaudeCodeProvider()
+        provider(_trajectory(), "x", "claude-code")
+
+    assert "traj-trajectory-canary-canary-" in captured["cwd"]
+
+
 def test_provider_captures_workdir_artifacts(tmp_path: Path) -> None:
     """Files written by the agent in its CWD become record.artifacts so
     `final_artifact_path` works for skills that write rather than Edit."""

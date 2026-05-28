@@ -1,9 +1,8 @@
 """Live Claude Code trace_provider (Phase 2B, ADR-0045 work).
 
 Spawns the `claude` CLI in headless `-p`/--print mode with OTel
-emission enabled (console exporter writes spans to stderr), parses the
-emitted spans into a TraceRecord via the Phase 1 shim, and returns it
-to the harness.
+emission enabled (console exporter), parses the emitted spans into a
+TraceRecord, and returns it to the harness.
 
 Contract: same as Phase 1's TraceProvider:
 
@@ -11,9 +10,16 @@ Contract: same as Phase 1's TraceProvider:
 
 CLI invocation:
 
-    claude -p "<phrasing>"
+    claude -p "<phrasing>" --dangerously-skip-permissions
 
-Environment overrides (set by the provider):
+The `--dangerously-skip-permissions` flag auto-approves tool calls so a
+headless run does not block on interactive prompts. It is explicit in
+the args (not hidden in env vars) so a reader of the source knows the
+harness is running in skip-permission mode.
+
+Environment overrides (set by the provider; baseline env is restricted
+to a minimal allowlist to avoid leaking parent secrets into the spawned
+session):
 
     CLAUDE_CODE_ENABLE_TELEMETRY=1
     OTEL_TRACES_EXPORTER=console
@@ -23,22 +29,28 @@ Environment overrides (set by the provider):
 
 The agent runs in an isolated temp working directory. Files written
 there become `TraceRecord.artifacts` so `final_artifact_path` works
-for skills that write rather than edit existing files.
+for skills that write rather than edit. Files under hidden
+directories (`.claude/`, `.git/`, `.cache/`) are excluded so harness
+state does not pollute the agent-output set.
+
+OTel spans land on BOTH stdout and stderr depending on the Claude
+Code build (Node ConsoleSpanExporter writes to stdout by default but
+some Claude Code builds re-route to stderr). The provider parses both
+channels and merges the events.
 
 Errors:
 
   * `claude` not on PATH       -> RuntimeError (harness -> infra_fail)
   * Non-claude-code adapter    -> ValueError    (harness -> infra_fail)
   * Subprocess timeout         -> TimeoutError  (harness -> infra_fail)
-
-The provider does NOT swallow these; the harness's try/except in
-run_harness produces `infra_fail` cells that an operator can
-distinguish from agent-quality regressions.
+  * Non-zero exit code         -> RuntimeError  (harness -> infra_fail)
+                                   -- distinguishes crashed-agent from
+                                   clean-exit-but-wrong-output
 
 Tests for the unit behavior live in
 `tests/lifecycle/test_claude_code_provider.py` (all paths mocked).
 The live-spawn smoke test is gated on PHASE2_LIVE in
-`tests/lifecycle/test_claude_code_provider_live.py` (Phase 2B Task 4).
+`tests/lifecycle/test_claude_code_provider_live.py`.
 """
 
 from __future__ import annotations
@@ -55,6 +67,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from adapters.claude_code_trace import _attr_value  # noqa: E402  reuse: prevents drift
 from adapters.trace_record import TraceEvent, TraceRecord  # noqa: E402
 
 
@@ -62,15 +75,49 @@ _ALLOWED_ADAPTERS = {"claude-code"}  # Phase 2B only.
 
 _DEFAULT_TIMEOUT_S = 300.0  # 5 minutes per cell; harness can override.
 
+# Minimal env passed to the spawned `claude`. Allowlist documented per
+# adversarial review-round-6 finding: a full `dict(os.environ)` was
+# leaking AWS_*, GITHUB_TOKEN, etc., into the spawned session. We
+# allowlist only the vars Claude Code documents as inputs plus the
+# bare minimum a POSIX process needs to run.
+_ALLOWED_ENV_KEYS: frozenset[str] = frozenset({
+    # Anthropic / Claude Code
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
+    "CLAUDE_CODE_ENABLE_TELEMETRY",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    # OTel
+    "OTEL_TRACES_EXPORTER",
+    "OTEL_LOG_USER_PROMPTS",
+    "OTEL_LOG_TOOL_DETAILS",
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    # POSIX minimum
+    "PATH",
+    "HOME",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    # Node (Claude Code is Node)
+    "NODE_OPTIONS",
+    "NVM_DIR",
+})
+
 
 class ClaudeCodeProvider:
     """Live Claude Code trace_provider for the trajectory harness.
 
     Construction args:
-      claude_bin     -- override the binary path (default: shutil.which("claude"))
-      timeout        -- subprocess timeout in seconds (default: 300).
-      keep_workdirs  -- True keeps the per-spawn temp dir for inspection.
-                        Default False cleans up after the run.
+      claude_bin       -- override the binary path; default: shutil.which("claude")
+      timeout          -- subprocess timeout in seconds (default: 300).
+      keep_workdirs    -- True keeps the per-spawn temp dir for inspection.
+                          Default False cleans up after the run.
+      extra_env        -- additional env-var keys to forward from the
+                          parent process into the spawned session, on
+                          top of `_ALLOWED_ENV_KEYS`. Use sparingly.
 
     Callable: provider(trajectory, phrasing, adapter) -> TraceRecord.
     """
@@ -80,10 +127,12 @@ class ClaudeCodeProvider:
         claude_bin: str | None = None,
         timeout: float = _DEFAULT_TIMEOUT_S,
         keep_workdirs: bool = False,
+        extra_env: frozenset[str] | None = None,
     ) -> None:
         self._claude_bin = claude_bin
         self._timeout = timeout
         self._keep_workdirs = keep_workdirs
+        self._extra_env = extra_env or frozenset()
 
     def __call__(
         self,
@@ -106,11 +155,20 @@ class ClaudeCodeProvider:
                 "claude_bin=... to ClaudeCodeProvider explicitly."
             )
 
-        workdir = Path(tempfile.mkdtemp(prefix="trajectory-canary-"))
+        # Per-trajectory tempdir prefix so a debugging session can
+        # identify the source from the directory name. Previously every
+        # spawn used `trajectory-canary-` regardless of which trajectory
+        # was running (adversarial review-round-6 finding).
+        prefix = f"traj-{trajectory.skill}-{trajectory.scenario}-"
+        workdir = Path(tempfile.mkdtemp(prefix=prefix))
         started_at = datetime.now(timezone.utc)
         try:
             env = self._build_env()
-            args = [claude_bin, "-p", phrasing]
+            args = [
+                claude_bin,
+                "-p", phrasing,
+                "--dangerously-skip-permissions",
+            ]
             try:
                 result = subprocess.run(
                     args,
@@ -126,8 +184,25 @@ class ClaudeCodeProvider:
                     f"({exc.cmd!r})"
                 ) from exc
 
+            # Non-zero exit means the agent crashed mid-task or the CLI
+            # rejected the invocation. Distinguish from "agent finished
+            # but produced the wrong artifact" by raising; the harness
+            # records this as infra_fail (adversarial review-round-6 #5).
+            if result.returncode != 0:
+                stderr_tail = (result.stderr or "")[-500:]
+                raise RuntimeError(
+                    f"`claude` exited with code {result.returncode}; "
+                    f"stderr tail: {stderr_tail!r}"
+                )
+
             ended_at = datetime.now(timezone.utc)
-            events = _parse_otel_lines(result.stderr)
+            # Parse spans from BOTH stdout and stderr; Node Console
+            # ExportSpanExporter writes to stdout in some builds and
+            # stderr in others. Merging both is defensive and zero-cost.
+            events = _parse_otel_lines(result.stdout) + _parse_otel_lines(
+                result.stderr,
+                start_seq=len(_parse_otel_lines(result.stdout)),
+            )
             artifacts = _scan_workdir_artifacts(workdir)
 
             return TraceRecord(
@@ -147,24 +222,26 @@ class ClaudeCodeProvider:
                 shutil.rmtree(workdir, ignore_errors=True)
 
     def _build_env(self) -> dict[str, str]:
-        env = dict(os.environ)
+        """Return a minimal env: allowlisted parent vars + provider overrides.
+
+        Replaces a `dict(os.environ)` that leaked AWS_*, GITHUB_TOKEN,
+        and other parent secrets into the spawned `claude` session
+        (adversarial review-round-6 #1).
+        """
+        allowed = _ALLOWED_ENV_KEYS | self._extra_env
+        env = {k: v for k, v in os.environ.items() if k in allowed}
         env["CLAUDE_CODE_ENABLE_TELEMETRY"] = "1"
         env["OTEL_TRACES_EXPORTER"] = "console"
-        # Do not leak prompt text into the OTel pipeline.
         env["OTEL_LOG_USER_PROMPTS"] = "0"
-        # Need tool name + arguments for the matcher's must_invoke_tool /
-        # final_artifact_path primitives.
         env["OTEL_LOG_TOOL_DETAILS"] = "1"
         return env
 
 
-def _parse_otel_lines(text: str) -> list[TraceEvent]:
-    """Pull OTel JSON spans out of mixed-stderr text and convert to events.
+def _parse_otel_lines(text: str, start_seq: int = 0) -> list[TraceEvent]:
+    """Pull OTel JSON spans out of mixed text and convert to events.
 
-    Real Claude Code stderr interleaves spans with startup noise
+    Real Claude Code output interleaves spans with startup noise
     (`Loading skills from...`, etc.). Filter non-JSON lines silently.
-    Lines that parse to a JSON object get fed to the Phase 1 OTel
-    parsing helpers via in-memory conversion.
     """
     events: list[TraceEvent] = []
     for line in text.splitlines():
@@ -177,18 +254,19 @@ def _parse_otel_lines(text: str) -> list[TraceEvent]:
             continue
         if not isinstance(span, dict):
             continue
-        event = _span_to_event(span, seq=len(events))
+        event = _span_to_event(span, seq=start_seq + len(events))
         if event is not None:
             events.append(event)
     return events
 
 
 def _span_to_event(span: dict, seq: int) -> TraceEvent | None:
-    """Best-effort: convert one OTel span dict into a TraceEvent.
+    """Convert one OTel span dict into a TraceEvent.
 
-    Mirrors `claude_code_trace._span_to_event` (Phase 1) but is local
-    to this module to avoid importing across the adapter boundary.
-    Operation name -> kind, name attribute -> name, etc.
+    Uses `claude_code_trace._attr_value` (imported above) so the
+    string/int/double/bool branch list cannot drift from the Phase 1
+    shim. Adversarial review-round-6 caught a local copy that silently
+    dropped doubleValue and boolValue attributes.
     """
     attrs = _attrs_to_dict(span.get("attributes", []))
     op = attrs.get("gen_ai.operation.name")
@@ -227,6 +305,9 @@ def _span_to_event(span: dict, seq: int) -> TraceEvent | None:
 
 
 def _attrs_to_dict(attrs):  # type: ignore[no-untyped-def]
+    """Flatten OTel attribute list to a dict, reusing the Phase 1
+    `_attr_value` so doubleValue / boolValue / intValue / stringValue
+    all unwrap consistently."""
     out: dict = {}
     for entry in attrs or []:
         if not isinstance(entry, dict):
@@ -234,14 +315,9 @@ def _attrs_to_dict(attrs):  # type: ignore[no-untyped-def]
         key = entry.get("key")
         if key is None:
             continue
-        value = entry.get("value", {})
-        if "stringValue" in value:
-            out[key] = value["stringValue"]
-        elif "intValue" in value:
-            try:
-                out[key] = int(value["intValue"])
-            except (TypeError, ValueError):
-                pass
+        value = _attr_value(entry)
+        if value is not None:
+            out[key] = value
     return out
 
 
@@ -264,17 +340,23 @@ def _sum_tokens(events: list[TraceEvent], key: str) -> int:
 
 
 def _scan_workdir_artifacts(workdir: Path) -> dict[str, str]:
-    """sha256 every file the agent left in its working directory.
+    """sha256 every NON-HIDDEN file the agent left in its working directory.
 
-    Recursive; sorted; relative paths so trajectories' final_artifact_path
-    globs match against `out.md` (root) or `subdir/foo.md` consistently
-    regardless of where the temp dir lives.
+    Hidden paths (`.claude/`, `.git/`, `.cache/`) are excluded because
+    they're harness state, not agent-produced content. Without this
+    exclusion, Claude Code's session-log JSON would land in
+    TraceRecord.artifacts and the `final_artifact_path: "*.md"`
+    assertion would resolve against the wrong "final" file
+    (adversarial review-round-6 #7).
     """
     artifacts: dict[str, str] = {}
     if not workdir.is_dir():
         return artifacts
     for path in sorted(workdir.rglob("*")):
         if not path.is_file():
+            continue
+        rel_parts = path.relative_to(workdir).parts
+        if any(part.startswith(".") for part in rel_parts):
             continue
         try:
             data = path.read_bytes()
