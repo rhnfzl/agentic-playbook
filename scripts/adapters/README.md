@@ -29,7 +29,7 @@ class Adapter(Protocol):
 
 ## Tier breakdown (by adapter constant, not by feature surface)
 
-Tier source-of-truth is the `tier = N` constant declared inside each adapter module. Do not classify adapters by "what surface they materialize" — the constants ARE the contract.
+Tier source-of-truth is the `tier = N` constant declared inside each adapter module. Do not classify adapters by "what surface they materialize" (the constants ARE the contract).
 
 | Tier | Module | `tier =` line |
 |---|---|---|
