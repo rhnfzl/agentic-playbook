@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import NamedTuple
 
@@ -60,6 +61,34 @@ def _read_text(path: Path) -> str:
         return ""
 
 
+def _tracked_paths(repo_root: Path, subpath: str) -> set[Path] | None:
+    """Return the set of git-tracked files under <repo_root>/<subpath>.
+
+    Returns None if `git` is unavailable, repo_root is not a git repo,
+    or the call fails. Callers should fall back to glob when None.
+
+    The purpose is reproducibility: an untracked file in docs/adr/
+    should not change the committed atlas. CI rebuilds from a clean
+    checkout and would otherwise produce a diff against the committed
+    pages.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo_root), "ls-files", subpath],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
+        return None
+    if proc.returncode != 0:
+        return None
+    paths: set[Path] = set()
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if line:
+            paths.add((repo_root / line).resolve())
+    return paths
+
+
 def _frontmatter(text: str) -> dict:
     if not text.startswith("---"):
         return {}
@@ -75,13 +104,28 @@ def _frontmatter(text: str) -> dict:
     return out
 
 
-def _adr_nodes(repo_root: Path) -> list[Node]:
+def _adr_nodes(repo_root: Path) -> tuple[list[Node], dict[str, str]]:
+    """Return ADR nodes + a {adr_id: body} cache.
+
+    The cache is the single read of each ADR file; downstream edge
+    functions (`_adr_to_skill_edges`, `_adr_to_adr_supersedes`) reuse
+    it instead of re-reading from disk.
+
+    When git is available we only consider tracked files, so an
+    untracked ADR draft does not change the committed atlas. Falls
+    back to a glob when git is unavailable (test scenarios on tmp
+    directories).
+    """
     adr_dir = repo_root / "docs" / "adr"
     if not adr_dir.is_dir():
-        return []
+        return [], {}
+    tracked = _tracked_paths(repo_root, "docs/adr")
     nodes: list[Node] = []
+    bodies: dict[str, str] = {}
     for adr_file in sorted(adr_dir.glob("*.md")):
         if adr_file.name == "README.md":
+            continue
+        if tracked is not None and adr_file.resolve() not in tracked:
             continue
         m = _ADR_FILE_RE.match(adr_file.name)
         if not m:
@@ -93,14 +137,16 @@ def _adr_nodes(repo_root: Path) -> list[Node]:
             if line.startswith("#"):
                 title = line.lstrip("# ").rstrip().lstrip(f"{number}. ")
                 break
-        nodes.append(Node(
+        node = Node(
             id=f"adr-{number}",
             kind="adr",
             label=f"ADR-{number}: {title}",
             href=f"adr/{number}.html",
             meta={"number": number, "source_path": str(adr_file.relative_to(repo_root))},
-        ))
-    return nodes
+        )
+        nodes.append(node)
+        bodies[node.id] = text
+    return nodes, bodies
 
 
 def _skill_nodes(repo_root: Path) -> list[Node]:
@@ -163,10 +209,13 @@ def _trajectory_nodes(repo_root: Path) -> list[Node]:
 
 
 def _adr_to_skill_edges(adr_nodes: list[Node], skill_nodes: list[Node],
-                        repo_root: Path) -> list[Edge]:
+                        adr_bodies: dict[str, str]) -> list[Edge]:
     """Heuristic: if an ADR body contains a skill's frontmatter name as
     a whole word, add a mentions edge. Avoids false positives by
-    requiring word boundaries and a minimum length."""
+    requiring word + hyphen boundaries and a minimum length.
+
+    Reads ADR bodies from the shared cache populated by `_adr_nodes`;
+    avoids a second pass over disk."""
     skill_names: dict[str, str] = {}
     for n in skill_nodes:
         nm = n.meta.get("skill_name") or n.label.split("/")[-1]
@@ -175,7 +224,7 @@ def _adr_to_skill_edges(adr_nodes: list[Node], skill_nodes: list[Node],
 
     edges: list[Edge] = []
     for adr in adr_nodes:
-        text = _read_text(repo_root / adr.meta["source_path"])
+        text = adr_bodies.get(adr.id, "")
         for name, sid in skill_names.items():
             # Hyphen is NOT a word character in Python's `re`, so `\b`
             # fires at hyphen boundaries. That means a search for
@@ -209,11 +258,13 @@ def _trajectory_to_skill_edges(trajectory_nodes: list[Node],
     return edges
 
 
-def _adr_to_adr_supersedes(adr_nodes: list[Node], repo_root: Path) -> list[Edge]:
+def _adr_to_adr_supersedes(adr_nodes: list[Node],
+                           adr_bodies: dict[str, str]) -> list[Edge]:
+    """Reuses the body cache populated by `_adr_nodes`."""
     by_number: dict[str, str] = {n.meta["number"]: n.id for n in adr_nodes}
     edges: list[Edge] = []
     for adr in adr_nodes:
-        text = _read_text(repo_root / adr.meta["source_path"])
+        text = adr_bodies.get(adr.id, "")
         for m in _ADR_SUPERSEDES_RE.finditer(text):
             raw = m.group(1).zfill(4)
             target_id = by_number.get(raw)
@@ -223,13 +274,13 @@ def _adr_to_adr_supersedes(adr_nodes: list[Node], repo_root: Path) -> list[Edge]
 
 
 def build_graph(repo_root: Path) -> Graph:
-    adrs = _adr_nodes(repo_root)
+    adrs, adr_bodies = _adr_nodes(repo_root)
     skills = _skill_nodes(repo_root)
     trajectories = _trajectory_nodes(repo_root)
     edges = (
-        _adr_to_skill_edges(adrs, skills, repo_root)
+        _adr_to_skill_edges(adrs, skills, adr_bodies)
         + _trajectory_to_skill_edges(trajectories, skills)
-        + _adr_to_adr_supersedes(adrs, repo_root)
+        + _adr_to_adr_supersedes(adrs, adr_bodies)
     )
     return Graph(nodes=adrs + skills + trajectories, edges=edges)
 

@@ -26,7 +26,17 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import (
+# Direct invocation (`python3 scripts/telemetry/pyotel_collector.py` per
+# the documented no-docker path) has no package context, so the relative
+# import would raise ImportError before argparse runs. Bootstrap the
+# scripts/ directory onto sys.path and use an absolute import; the
+# module is still importable as `telemetry.pyotel_collector` from inside
+# the package, so this does not break `python -m` use.
+_SCRIPTS = Path(__file__).resolve().parent.parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+from telemetry import (  # noqa: E402
     DEFAULT_TELEMETRY_DIR,
     JSONL_FILENAME,
     TelemetryRecord,

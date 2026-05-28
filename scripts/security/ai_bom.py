@@ -105,6 +105,27 @@ def build_bom(repo_root: Path) -> dict:
     }
 
 
+def _existing_bom(output: Path) -> dict | None:
+    if not output.is_file():
+        return None
+    try:
+        return json.loads(output.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _components_unchanged(new_bom: dict, existing: dict | None) -> bool:
+    """Compare component lists ignoring generated_at; if equal, the
+    BOM hasn't changed semantically and we should preserve the prior
+    timestamp so `make check` does not dirty a clean tree."""
+    if existing is None:
+        return False
+    return (
+        new_bom.get("repo") == existing.get("repo")
+        and new_bom.get("components") == existing.get("components")
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -125,6 +146,11 @@ def main(argv: list[str] | None = None) -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
 
     bom = build_bom(repo_root)
+    existing = _existing_bom(output)
+    if _components_unchanged(bom, existing) and isinstance(existing, dict):
+        # Preserve generated_at so `make check` is idempotent on a
+        # tree where no skills or MCP bundles have changed.
+        bom["generated_at"] = existing.get("generated_at", bom["generated_at"])
     output.write_text(json.dumps(bom, indent=2) + "\n", encoding="utf-8")
     print(f"  ok  AI-BOM written to {output.relative_to(repo_root)} "
           f"({len(bom['components'])} component(s))")

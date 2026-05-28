@@ -77,3 +77,37 @@ def test_bom_writes_iso_timestamp_with_tz(tmp_path: Path, monkeypatch) -> None:
 def test_empty_repo_emits_empty_components(tmp_path: Path) -> None:
     bom = ai_bom.build_bom(tmp_path)
     assert bom["components"] == []
+
+
+def test_bom_is_idempotent_when_components_unchanged(tmp_path: Path) -> None:
+    """Two consecutive runs on the same tree must produce the same
+    file. Without idempotency `make check` would dirty a clean tree
+    on every CI run (the BOM is a make-check target via
+    skill-security)."""
+    _seed_skill(
+        tmp_path / "base" / "skills" / "imported" / "src" / "demo",
+        name="demo", version="0.1.0",
+    )
+    out = tmp_path / "ai-bom.json"
+    ai_bom.main(["--repo-root", str(tmp_path), "--output", str(out)])
+    first = out.read_text(encoding="utf-8")
+    ai_bom.main(["--repo-root", str(tmp_path), "--output", str(out)])
+    second = out.read_text(encoding="utf-8")
+    assert first == second, "second run must preserve generated_at"
+
+
+def test_bom_writes_fresh_content_when_components_change(tmp_path: Path) -> None:
+    """Sanity check the inverse of idempotency: when the component
+    list changes the BOM must reflect the new components and the
+    file content must differ."""
+    out = tmp_path / "ai-bom.json"
+    ai_bom.main(["--repo-root", str(tmp_path), "--output", str(out)])
+    first = json.loads(out.read_text(encoding="utf-8"))
+    _seed_skill(
+        tmp_path / "base" / "skills" / "imported" / "src" / "added-later",
+        name="added-later", version="0.1.0",
+    )
+    ai_bom.main(["--repo-root", str(tmp_path), "--output", str(out)])
+    second = json.loads(out.read_text(encoding="utf-8"))
+    assert first["components"] != second["components"]
+    assert "added-later" in {c.get("name") for c in second["components"]}

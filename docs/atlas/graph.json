@@ -253,12 +253,6 @@
       "href": "adr/0042.html"
     },
     {
-      "id": "adr-0043",
-      "kind": "adr",
-      "label": "ADR-0043: Marketplace distribution for selective skill install",
-      "href": "adr/0043.html"
-    },
-    {
       "id": "adr-0044",
       "kind": "adr",
       "label": "ADR-0044: trajectories/ as 8th content type",
@@ -1229,11 +1223,6 @@
     {
       "source": "adr-0041",
       "target": "skill-base-meta-human-html",
-      "kind": "mentions"
-    },
-    {
-      "source": "adr-0043",
-      "target": "skill-base-productivity-handoff",
       "kind": "mentions"
     },
     {

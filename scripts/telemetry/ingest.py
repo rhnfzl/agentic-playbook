@@ -102,12 +102,41 @@ def _otlp_value(value: object) -> object:
     return None
 
 
+def _records_from_row(row: dict) -> list[TelemetryRecord]:
+    """One JSONL row may carry one TelemetryRecord, one raw OTLP span,
+    OR a full OTLP envelope (resourceSpans -> scopeSpans -> spans)
+    which the otelcol file exporter writes by default. Yield every
+    record the row contains."""
+    if "resourceSpans" in row:
+        out: list[TelemetryRecord] = []
+        for resource_span in row.get("resourceSpans", []) or []:
+            if not isinstance(resource_span, dict):
+                continue
+            for scope_span in resource_span.get("scopeSpans", []) or []:
+                if not isinstance(scope_span, dict):
+                    continue
+                for span in scope_span.get("spans", []) or []:
+                    if not isinstance(span, dict):
+                        continue
+                    rec = _coerce_record(span)
+                    if rec is not None:
+                        out.append(rec)
+        return out
+    rec = _coerce_record(row)
+    return [rec] if rec is not None else []
+
+
 def read_jsonl(path: Path | None = None) -> list[TelemetryRecord]:
     """Read the JSONL file and return TelemetryRecord rows.
 
     Missing file is empty (no events recorded yet). Malformed lines
     are skipped silently; the collector is the source of truth, and
     a malformed line is the collector's bug, not the consumer's.
+
+    Tolerates three row shapes: canonical TelemetryRecord (pure-Python
+    collector), raw OTLP span (older otelcol versions), and OTLP
+    envelope (`resourceSpans` -> `scopeSpans` -> `spans`) which the
+    current otelcol file exporter writes by default.
     """
     p = path if path is not None else storage_path()
     if not p.is_file():
@@ -124,9 +153,7 @@ def read_jsonl(path: Path | None = None) -> list[TelemetryRecord]:
                 continue
             if not isinstance(row, dict):
                 continue
-            rec = _coerce_record(row)
-            if rec is not None:
-                out.append(rec)
+            out.extend(_records_from_row(row))
     return out
 
 
