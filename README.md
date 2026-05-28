@@ -14,7 +14,7 @@
 
 > **agentic-playbook is a tool-agnostic, shareable repository of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and 20+ more coding agents through a single `make install`.**
 
-It is also a deliberately-built teaching project. The 49 Architecture Decision Records under `docs/adr/` explain why each design choice exists; the research under `docs/research/` shows the evidence. Clone it, study the ADRs, copy the patterns, and build your own playbook with whatever conventions fit your team.
+It is also a deliberately-built teaching project. The 48 Architecture Decision Records under `docs/adr/` explain why each design choice exists; the research under `docs/research/` shows the evidence. Clone it, study the ADRs, copy the patterns, and build your own playbook with whatever conventions fit your team.
 
 ## Who this is for
 
@@ -52,7 +52,7 @@ The installer detects which agents are present on your machine, pre-selects them
 
 Most playbooks are utilitarian: they exist to be consumed, not learned from. This one is deliberately built as a teaching project.
 
-- `docs/adr/` explains **why** each decision was made. 49 ADRs covering content shape, install model, governance, lifecycle, hooks contract, MCP boundary, profile semantics, version policy, content tiering, sync infrastructure, supply-chain security gate, telemetry privacy, atlas knowledge graph.
+- `docs/adr/` explains **why** each decision was made. 48 ADRs covering content shape, install model, governance, lifecycle, hooks contract, MCP boundary, profile semantics, version policy, content tiering, sync infrastructure, supply-chain security gate, telemetry privacy, atlas knowledge graph.
 - `docs/atlas/` is an auto-generated, browseable knowledge graph of every ADR, skill, and trajectory in the repo, plus the cross-references between them. Run `make atlas` to rebuild; open `docs/atlas/index.html` in a browser to explore.
 - `docs/research/` shows the **evidence** behind those decisions.
 - `base/prompts/` contains pre-built scaffolding prompts you can paste into your coding agent to bootstrap a version of this playbook for your own team or project.
@@ -251,7 +251,7 @@ Tier 1 (full adapter, hook-capable): Claude Code, Cursor IDE + CLI, Codex CLI, W
 
 ### How is agentic-playbook different from anthropics/skills or awesome-agent-skills?
 
-`anthropics/skills` is a curated bundle of skills from Anthropic. `awesome-agent-skills` (heilcheng, VoltAgent) is a curated index of external skill repositories. agentic-playbook is a **distribution-and-governance system**: it ships seven other content types (rules, hooks, MCP server configs, subagents, slash commands, prompt templates, behavior trajectories) alongside skills, with a multi-adapter installer, a 17-gate `make check` quality pipeline, a supply-chain security gate (`make audit`), opt-in OTel telemetry per skill (`make telemetry-report`), and an auto-generated knowledge graph (`make atlas`). It is a teaching project as much as a content library: 49 Architecture Decision Records explain why each choice was made.
+`anthropics/skills` is a curated bundle of skills from Anthropic. `awesome-agent-skills` (heilcheng, VoltAgent) is a curated index of external skill repositories. agentic-playbook is a **distribution-and-governance system**: it ships seven other content types (rules, hooks, MCP server configs, subagents, slash commands, prompt templates, behavior trajectories) alongside skills, with a multi-adapter installer, a 17-gate `make check` quality pipeline, a supply-chain security gate (`make audit`), opt-in OTel telemetry per skill (`make telemetry-report`), and an auto-generated knowledge graph (`make atlas`). It is a teaching project as much as a content library: 48 Architecture Decision Records explain why each choice was made.
 
 ### Is it safe to clone and install on my machine?
 

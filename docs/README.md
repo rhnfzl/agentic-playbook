@@ -6,7 +6,7 @@ This is the documentation hub for agentic-playbook. The repo separates **rationa
 
 | Subdirectory | What lives here | When to consult |
 |---|---|---|
-| [`adr/`](adr/README.md) | 49 Architecture Decision Records. Why each design choice was made, what the alternatives were, what the consequences are. | When you want to understand "why does the installer use X instead of Y." |
+| [`adr/`](adr/README.md) | 48 Architecture Decision Records. Why each design choice was made, what the alternatives were, what the consequences are. | When you want to understand "why does the installer use X instead of Y." |
 | [`research/`](research/README.md) | Dated research briefs that informed the ADRs. Inspirations map, failure-modes catalog, upcoming-adapters tracking. | When you want the evidence base behind a design decision, or when you're proposing a new adapter / pattern. |
 | [`atlas/`](atlas/README.md) | Auto-generated knowledge graph (HTML) that links ADRs, skills, trajectories, and their cross-references. Per ADR-0049. | When you want to browse the corpus visually rather than file-by-file. Open `atlas/index.html` in a browser. |
 | [`security/`](security/README.md) | AI Bill of Materials (`ai-bom.json`) and the supply-chain gate's output. Per ADR-0047. | When you want to know what external skills are imported, what their pinned source is, and when they were last vetted. |

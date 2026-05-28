@@ -26,7 +26,7 @@ Do not hand-edit anything under `docs/atlas/`; `make atlas` will overwrite. The 
 
 ## Why this exists
 
-The playbook's value proposition is "the rationale IS the value." 49 ADRs is a lot of pages to navigate file-by-file. Atlas is the affordance that makes browsing 49 + 140 + 8 = ~200 interlinked artifacts feasible.
+The playbook's value proposition is "the rationale IS the value." 48 ADRs plus 109 skills plus 1 trajectory is a lot to navigate file-by-file. Atlas is the affordance that makes browsing the 158-node corpus feasible.
 
 ADR-0049 documents the design choices: why auto-generated (because the corpus moves faster than hand-curated indexes survive), why static HTML (because GitHub Pages or any other static host can serve it), why a graph (because the value is in the cross-references, not the per-file content).
 

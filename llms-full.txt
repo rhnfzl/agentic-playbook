@@ -1,6 +1,6 @@
 # agentic-playbook (full summary)
 
-> A tool-agnostic, shareable repository of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ AI coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install`. Also a teaching project: 49 Architecture Decision Records explain why each design choice exists.
+> A tool-agnostic, shareable repository of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ AI coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install`. Also a teaching project: 48 Architecture Decision Records explain why each design choice exists.
 
 This is the long-form `llms-full.txt` companion to `llms.txt`. It is a curated **summary** of the playbook's design (not a raw concatenation of source files). Treat it as a single-fetch primer for an AI agent that wants the playbook's shape; fetch the linked source files for verbatim content.
 
@@ -40,7 +40,7 @@ One `git clone` followed by one `make install` gives you:
 
 ## How is this different from other agent skill libraries
 
-`anthropics/skills` is a curated bundle of skills from Anthropic. `awesome-agent-skills` (heilcheng, VoltAgent) is a curated index of external skill repositories. agentic-playbook is a **distribution-and-governance system**: it ships seven other content types (rules, hooks, MCP server configs, subagents, slash commands, prompt templates, behavior trajectories) alongside skills, with a multi-adapter installer, a 17-gate `make check` quality pipeline, a supply-chain security gate (`make audit`), opt-in OTel telemetry per skill (`make telemetry-report`), and an auto-generated knowledge graph (`make atlas`). It is a teaching project as much as a content library: 49 Architecture Decision Records explain why each choice was made.
+`anthropics/skills` is a curated bundle of skills from Anthropic. `awesome-agent-skills` (heilcheng, VoltAgent) is a curated index of external skill repositories. agentic-playbook is a **distribution-and-governance system**: it ships seven other content types (rules, hooks, MCP server configs, subagents, slash commands, prompt templates, behavior trajectories) alongside skills, with a multi-adapter installer, a 17-gate `make check` quality pipeline, a supply-chain security gate (`make audit`), opt-in OTel telemetry per skill (`make telemetry-report`), and an auto-generated knowledge graph (`make atlas`). It is a teaching project as much as a content library: 48 Architecture Decision Records explain why each choice was made.
 
 ## Supported coding agents
 
@@ -70,7 +70,7 @@ The opt-in OpenTelemetry collector records metadata only: skill name, adapter, m
 
 ## Auto-generated knowledge graph (ADR-0049)
 
-`make atlas` walks the 49 ADRs + 140 skills + 8 trajectories + the AI BOM and emits a static HTML site at `docs/atlas/` with per-node pages and cross-links. The graph view is in `graph.json`. Privacy: telemetry signals (trigger count, p95 latency) are baked into the atlas pages only when `TELEMETRY=on` is set explicitly at build time.
+`make atlas` walks the 48 ADRs + 109 skills + 1 trajectory + the AI BOM and emits a static HTML site at `docs/atlas/` with per-node pages and cross-links. The graph view is in `graph.json`. Privacy: telemetry signals (trigger count, p95 latency) are baked into the atlas pages only when `TELEMETRY=on` is set explicitly at build time.
 
 ## Quality gates that fire on `make check`
 

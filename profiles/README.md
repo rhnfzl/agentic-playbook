@@ -10,7 +10,7 @@ Per the profile-separation principle, each profile is single-role. A teammate wh
 
 | Profile | Audience | Default content selection |
 |---|---|---|
-| `backend-developer.toml` | AI Backend / MCP engineers | All engineering skills + backend-relevant rules + Sonar + VCS-host hooks + Jira/Slack/error-tracking MCP |
+| `backend-developer.toml` | AI Backend / MCP engineers | All engineering skills + backend-relevant rules + code-quality + VCS-host hooks + Jira/Slack/error-tracking MCP |
 | `frontend-developer.toml` | Frontend engineers | UI + presentation skills + VCS-host hooks + Slack MCP |
 | `qa.toml` | QA engineers | Test-discipline skills + bug-triage + code-review + Jira MCP |
 | `tech-lead.toml` | Tech leads | Everything in backend + meeting-brief + handoff + stakeholder-slack-brief + presentation + decay tooling |

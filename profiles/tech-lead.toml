@@ -1,43 +1,46 @@
-# Profile: Tech Lead
+# Profile: Tech Lead (portable, public-safe subset)
 name = "tech-lead"
-description = "Tech lead with broad coverage. Includes all skills, all rules, all hooks, all MCP configs. Use for the playbook owner / primary maintainer."
-requires_overlays = ["team"]
+description = "Tech lead profile with broad coverage. Public-safe subset of the upstream tech-lead bundle: all engineering, productivity, meta, and observability skills that ship in this mirror, plus always-on rules. Workplace-specific extensions (specific CI gates, internal request-chain rules, ticket-tracker bindings) are designed in the upstream and intentionally not shipped here."
+owner = "rehan"
+last_reviewed = "2026-05-28"
 
 [skills]
 include = [
-  "engineering/code-review",
   "engineering/ci-failure-triage",
-  "engineering/sonar-pr-gate",
+  "engineering/code-review-graph-first",
+  "engineering/diagnose",
+  "engineering/improve-codebase-architecture",
   "engineering/post-iter-review",
-  "engineering/match-ticket-grounding",
-  "engineering/mcp-first-boundary-check",
-  "engineering/chat-transcript-debug",
-  "engineering/agentic-scenario-triage",
+  "engineering/prototype",
+  "engineering/tdd",
+  "engineering/to-issues",
+  "engineering/to-prd",
+  "engineering/triage",
   "productivity/grill-me",
   "productivity/handoff",
-  "productivity/stakeholder-slack-brief",
-  "productivity/slack-inbound-reply",
-  "observability/k8s-state-sweep",
-  "observability/vpn-connectivity-check",
+  "productivity/ask-colleague",
+  "productivity/ask-team",
+  "observability/ha-alert-triage",
+  "observability/market-audit-deployed-stack",
+  "meta/agents-md-curator",
+  "meta/audit-docs",
+  "meta/playbook-promote",
+  "meta/playbook-retrospective",
+  "meta/skill-cleaner",
   "meta/write-a-skill",
+  "meta/zoom-out",
 ]
 
 [rules]
 include = [
-  "label-policy",
-  "mcp-first-boundary",
   "no-em-dashes",
   "no-ticket-ids-in-code",
-  "VCS-not-github",
   "writing-style",
-  "jira-priority-scheme",
-  "full-request-chain",
   "never-push-to-develop",
-  "direct-acc-first",
 ]
 
 [hooks]
-include = ["sonar-advisory", "lint-guard", "never-push-to-develop", "human-html-autoindex"]
+include = ["lint-guard", "never-push-to-develop", "human-html-autoindex", "agent-memory-session-brief"]
 
 [mcp]
-include = ["code-review-graph", "atlassian", "slack", "error-tracking", "tavily", "VCS", "code-quality"]
+include = ["code-review-graph", "slack", "tavily"]

@@ -78,7 +78,7 @@ class Adapter(Protocol):
 
 Tier 1 (full surface, hook-capable): `claude_code.py`, `codex.py`, `cursor.py`, `windsurf.py`, `cline.py`, `copilot.py`.
 Tier 2 (rules-only): `aider.py`, `gemini_cli.py`, `pi.py`.
-Tier 3 (AGENTS.md-only, declarative): 16 entries in `tier3.toml` produce `TierThreeAdapter` instances via `tier3.py`. Per ADR-0030.
+Tier 3 (AGENTS.md-only, declarative): 20 entries in `tier3.toml` produce `TierThreeAdapter` instances via `tier3.py`. Per ADR-0030.
 
 Shared helpers live in:
 - `adapters/_reader.py`: `load_skills`, `load_rules`, `load_hooks`, `load_mcp_configs`, `load_agents`, `load_commands`, `load_prompts`.

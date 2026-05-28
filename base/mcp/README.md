@@ -4,13 +4,13 @@ This directory holds shareable Model Context Protocol (MCP) server configuration
 
 ## What MCP is
 
-MCP (Model Context Protocol) is the open standard that lets AI agents call external tools and data sources (Atlassian, Slack, error-tracking, custom HTTP services, databases) without each tool being baked into the agent. One server config works across Claude Code, Cursor, Codex CLI, Windsurf, and any other MCP-compliant client. See modelcontextprotocol.io for the spec.
+MCP (Model Context Protocol) is the open standard that lets AI agents call external tools and data sources (Slack, web search, custom HTTP services, databases, issue trackers, etc.) without each tool being baked into the agent. One server config works across Claude Code, Cursor, Codex CLI, Windsurf, and any other MCP-compliant client. See modelcontextprotocol.io for the spec.
 
 ## Two MCP shapes coexist
 
 The directory holds two distinct entry shapes; both are discovered by `_loader.load_mcp_configs`:
 
-1. **Flat config** at `mcp/<name>.json` for hosted, npx, or uvx MCPs you do not host source for (Atlassian, Tavily, error-tracking, etc.). One JSON file = one server.
+1. **Flat config** at `mcp/<name>.json` for hosted, npx, or uvx MCPs you do not host source for (Tavily, Slack, etc.). One JSON file = one server.
 2. **Bundle dir** at `mcp/<name>/` containing `server.json` + `*.py` source + `README.md` for locally-hosted Python MCPs whose source you want shipped with the playbook (`agent-memory-bridge`). The installer:
    - Symlinks the `*.py` files into `~/.config/agent-shared/mcp_servers/<name>/` via `_loader.materialize_mcp_sources`.
    - Reads `server.json`, expands its `{{AGENT_SHARED_MCP_DIR}}` placeholder to the symlink target, then writes the resolved config into each enabled agent's MCP registry.

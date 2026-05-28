@@ -43,8 +43,8 @@ Walk in this order:
 
   Step 2 -- Inventory the playbook's project-applicable content.
     a) Walk base/rules/. List every rule with a one-line description.
-    b) Walk base/hooks/. List hooks that make sense at the project level (lint-guard,
-       never-push-to-develop, sonar-advisory) vs hooks that are user-level only.
+    b) Walk base/hooks/. List hooks that make sense at the project level (e.g.
+       lint-guard, never-push-to-develop) vs hooks that are user-level only.
     c) Walk base/mcp/. Identify any MCP server configs that would help THIS project
        (e.g. error-tracking MCP for a project with an error tracker wired up; Atlassian
        MCP for a project with Jira issues referenced in commits).

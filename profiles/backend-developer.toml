@@ -1,43 +1,31 @@
-# Profile: Backend Developer (team AI Backend + MCP)
+# Profile: Backend Developer (portable, public-safe subset)
 name = "backend-developer"
-description = "Backend developer working on team AI Backend or MCP projects. Includes all engineering + observability skills, full rule set, and all MCP integrations."
-requires_overlays = ["team"]
+description = "Backend developer profile. Public-safe subset of the upstream backend-developer bundle: the engineering, productivity, and meta skills that ship in this mirror, plus the always-on writing-style and no-em-dashes rules. Workplace-specific extensions (specific CI gates, ticket-tracker bindings, internal request-chain rules, internal-host policies, VCS-host bindings) are designed in the upstream and intentionally not shipped here."
+owner = "rehan"
+last_reviewed = "2026-05-28"
 
 [skills]
 include = [
-  "engineering/code-review",
   "engineering/ci-failure-triage",
-  "engineering/sonar-pr-gate",
   "engineering/post-iter-review",
-  "engineering/match-ticket-grounding",
-  "engineering/mcp-first-boundary-check",
-  "engineering/chat-transcript-debug",
-  "engineering/agentic-scenario-triage",
+  "engineering/improve-codebase-architecture",
+  "engineering/tdd",
+  "engineering/triage",
   "productivity/grill-me",
   "productivity/handoff",
-  "productivity/stakeholder-slack-brief",
-  "productivity/slack-inbound-reply",
-  "observability/k8s-state-sweep",
-  "observability/vpn-connectivity-check",
   "meta/write-a-skill",
 ]
 
 [rules]
 include = [
-  "label-policy",
-  "mcp-first-boundary",
   "no-em-dashes",
   "no-ticket-ids-in-code",
-  "VCS-not-github",
   "writing-style",
-  "jira-priority-scheme",
-  "full-request-chain",
   "never-push-to-develop",
-  "direct-acc-first",
 ]
 
 [hooks]
-include = ["sonar-advisory", "lint-guard", "never-push-to-develop", "human-html-autoindex"]
+include = ["lint-guard", "never-push-to-develop", "human-html-autoindex"]
 
 [mcp]
-include = ["code-review-graph", "atlassian", "slack", "error-tracking", "tavily", "VCS", "code-quality"]
+include = ["code-review-graph", "slack", "tavily"]

@@ -38,6 +38,11 @@ docs/human-html/
 # Brainstorming spec drafts (kept local until promoted to an ADR or merged feature)
 docs/superpowers/
 
+# Operator-local learnings + checklists about how upstream content
+# incorporation is handled. Keeps the meta-knowledge out of the public
+# mirror without losing it locally.
+docs/learnings/
+
 # Plugin / marketplace artifacts that the upstream sync may emit into the
 # portfolio destination. These are operator-owned outputs, not public
 # content; the portfolio repo keeps them untracked so an upstream
