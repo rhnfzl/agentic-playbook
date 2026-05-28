@@ -84,6 +84,34 @@ def test_banned_prefixes_includes_canonical_body_keys() -> None:
         assert key in BANNED_PREFIXES
 
 
+def test_indexed_otel_variants_are_dropped() -> None:
+    """Real-world OTel SDKs emit keys like gen_ai.input.messages.0.content
+    and gen_ai.completion.text. The collector must strip them too, not
+    only the exact prefix names. Without this guarantee the docker path
+    would let prompt bodies through (ADR-0048 reject-if criterion)."""
+    env = _envelope([
+        {"key": "skill.name", "value": {"stringValue": "to-prd"}},
+        {"key": "gen_ai.input.messages.0.content",
+         "value": {"stringValue": "LEAKY USER PROMPT 0"}},
+        {"key": "gen_ai.input.messages.1.content",
+         "value": {"stringValue": "LEAKY USER PROMPT 1"}},
+        {"key": "gen_ai.output.messages.0.content",
+         "value": {"stringValue": "LEAKY RESPONSE 0"}},
+        {"key": "gen_ai.completion.text",
+         "value": {"stringValue": "LEAKY COMPLETION"}},
+        {"key": "gen_ai.choice.0.message.content",
+         "value": {"stringValue": "LEAKY CHOICE"}},
+        {"key": "gen_ai.prompt.0",
+         "value": {"stringValue": "LEAKY PROMPT"}},
+    ])
+    records = extract_records(env)
+    assert len(records) == 1
+    blob = repr(records[0])
+    for needle in ("LEAKY USER PROMPT", "LEAKY RESPONSE",
+                   "LEAKY COMPLETION", "LEAKY CHOICE", "LEAKY PROMPT"):
+        assert needle not in blob
+
+
 def test_append_records_writes_jsonl(tmp_path: Path) -> None:
     from telemetry import TelemetryRecord
     out = tmp_path / "skills.jsonl"

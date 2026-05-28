@@ -82,15 +82,19 @@ ai-bom:
 	@$(PYTHON) scripts/security/ai_bom.py
 
 telemetry-init:
-	@if [ "$$TELEMETRY" = "off" ] || [ "$$TELEMETRY_ENABLED" = "0" ] || [ "$$PLAYBOOK_TELEMETRY" = "off" ]; then \
-		echo "  .  telemetry disabled (TELEMETRY=off); refusing to start collector"; \
-		exit 0; \
-	fi
-	@if ! command -v docker >/dev/null 2>&1; then \
-		echo "  x  docker not on PATH; use 'make telemetry-collector-py' instead"; \
-		exit 1; \
-	fi
-	@cd scripts/telemetry/otel_collector && docker compose up -d
+	@$(PYTHON) -c "import sys; sys.path.insert(0, 'scripts'); from telemetry import is_enabled; sys.exit(0 if is_enabled() else 99)"; \
+		rc=$$?; \
+		if [ $$rc -eq 99 ]; then \
+			echo "  .  telemetry disabled; refusing to start collector"; \
+			exit 0; \
+		elif [ $$rc -ne 0 ]; then \
+			exit $$rc; \
+		fi; \
+		if ! command -v docker >/dev/null 2>&1; then \
+			echo "  x  docker not on PATH; use 'make telemetry-collector-py' instead"; \
+			exit 1; \
+		fi; \
+		cd scripts/telemetry/otel_collector && docker compose up -d
 
 telemetry-stop:
 	@cd scripts/telemetry/otel_collector && docker compose down 2>/dev/null || true

@@ -181,16 +181,23 @@ def aggregate(records: Iterable[TelemetryRecord]) -> list[SkillAggregate]:
 
 
 def filter_recent(records: Iterable[TelemetryRecord], days: int) -> list[TelemetryRecord]:
-    """Keep records fired within the last `days` calendar days."""
+    """Keep records fired within the last `days` calendar days.
+
+    Naive ISO timestamps (no `+00:00`) are coerced to UTC so the
+    comparison against `datetime.now(timezone.utc)` does not shift
+    by the local-time offset. Malformed strings drop the record.
+    """
     if days <= 0:
         return list(records)
     cutoff = datetime.now(timezone.utc).timestamp() - (days * 86400)
     out: list[TelemetryRecord] = []
     for rec in records:
         try:
-            ts = datetime.fromisoformat(rec.fired_at).timestamp()
+            parsed = datetime.fromisoformat(rec.fired_at)
         except ValueError:
             continue
-        if ts >= cutoff:
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        if parsed.timestamp() >= cutoff:
             out.append(rec)
     return out

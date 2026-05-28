@@ -13,19 +13,23 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
-  # Privacy guard: strip any attribute that could carry prompt or
-  # response bodies before the exporter sees the span.
+  # Privacy guard: strip any attribute whose key starts with one of
+  # the body prefixes. Uses regex (not exact-key match) so indexed
+  # variants like gen_ai.input.messages.0.content and
+  # gen_ai.completion.text are also dropped. The pattern matches the
+  # BANNED_PREFIXES list in scripts/telemetry/pyotel_collector.py so
+  # both collector paths enforce the same privacy contract.
   attributes/strip_bodies:
     actions:
-      - key: gen_ai.prompt
+      - pattern: ^gen_ai\.prompt($|\.)
         action: delete
-      - key: gen_ai.choice
+      - pattern: ^gen_ai\.choice($|\.)
         action: delete
-      - key: gen_ai.input.messages
+      - pattern: ^gen_ai\.input\.message($|s($|\.))
         action: delete
-      - key: gen_ai.output.messages
+      - pattern: ^gen_ai\.output\.message($|s($|\.))
         action: delete
-      - key: gen_ai.completion
+      - pattern: ^gen_ai\.completion($|\.)
         action: delete
   batch:
     timeout: 5s

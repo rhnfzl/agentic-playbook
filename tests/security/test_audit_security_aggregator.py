@@ -69,3 +69,24 @@ def test_aggregator_strict_mode_blocks_on_skipped_wrapper(
         with patch("security.agent_skill_evaluator_wrapper.run", return_value=ok):
             rc = audit_security.run_security_audit(tmp_path)
     assert rc == 1
+
+
+def test_aggregator_blocks_on_wrapper_error_status(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """ADR-0047: a wrapper exiting unexpectedly (error status) is a gate
+    failure even in non-strict mode. We do not know what the wrapper
+    would have flagged, so we cannot let the build through."""
+    monkeypatch.delenv("STRICT_SECURITY", raising=False)
+    _make_imported_skill(tmp_path, "```python\nprint('ok')\n```\n")
+    ok = WrapperResult(tool="t1", status="ok", findings=[])
+    error = WrapperResult(
+        tool="t2", status="error", findings=[], note="subprocess crashed",
+    )
+    buf = io.StringIO()
+    with patch("security.mcp_scan_wrapper.run", return_value=error):
+        with patch("security.agent_skill_evaluator_wrapper.run", return_value=ok):
+            with redirect_stdout(buf):
+                rc = audit_security.run_security_audit(tmp_path)
+    assert rc == 1
+    assert "errored unexpectedly" in buf.getvalue()

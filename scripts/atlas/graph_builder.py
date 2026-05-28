@@ -177,7 +177,16 @@ def _adr_to_skill_edges(adr_nodes: list[Node], skill_nodes: list[Node],
     for adr in adr_nodes:
         text = _read_text(repo_root / adr.meta["source_path"])
         for name, sid in skill_names.items():
-            if re.search(rf"\b{re.escape(name)}\b", text):
+            # Hyphen is NOT a word character in Python's `re`, so `\b`
+            # fires at hyphen boundaries. That means a search for
+            # `to-prd` could match inside `push-to-prd-v2` at the hyphen.
+            # We assert non-word AND non-hyphen on both sides so the
+            # match is a true standalone reference, not a substring of
+            # a longer compound name.
+            if re.search(
+                rf"(?<![\w-]){re.escape(name)}(?![\w-])",
+                text,
+            ):
                 edges.append(Edge(source=adr.id, target=sid, kind="mentions"))
     return edges
 

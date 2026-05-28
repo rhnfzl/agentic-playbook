@@ -110,3 +110,17 @@ def test_aggregate_returns_skillaggregate_type() -> None:
     records = [TelemetryRecord("a", "cc", "m", "2026-05-28T10:00:00+00:00", 100, 1, 2)]
     aggs = aggregate(records)
     assert isinstance(aggs[0], SkillAggregate)
+
+
+def test_filter_recent_handles_naive_iso_timestamp() -> None:
+    """Some collectors write timezone-naive timestamps. Without UTC
+    coercion the comparison against `datetime.now(timezone.utc)`
+    would shift by the local-time offset and could drop a freshly-
+    fired record on systems where the offset is positive."""
+    from datetime import datetime, timedelta, timezone
+    naive_recent = (
+        datetime.now(timezone.utc) - timedelta(days=5)
+    ).replace(tzinfo=None).isoformat(timespec="seconds")
+    records = [TelemetryRecord("a", "cc", "m", naive_recent, 0, 0, 0)]
+    kept = filter_recent(records, days=30)
+    assert len(kept) == 1, "naive ISO recent record should be kept"

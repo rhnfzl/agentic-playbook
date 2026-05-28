@@ -973,16 +973,6 @@
     },
     {
       "source": "adr-0004",
-      "target": "skill-base-imported-triage",
-      "kind": "mentions"
-    },
-    {
-      "source": "adr-0004",
-      "target": "skill-base-productivity-grill-me",
-      "kind": "mentions"
-    },
-    {
-      "source": "adr-0008",
       "target": "skill-base-productivity-grill-me",
       "kind": "mentions"
     },
@@ -1004,11 +994,6 @@
     {
       "source": "adr-0013",
       "target": "skill-base-meta-human-html",
-      "kind": "mentions"
-    },
-    {
-      "source": "adr-0015",
-      "target": "skill-base-imported-image-to-code-skill",
       "kind": "mentions"
     },
     {
@@ -1239,11 +1224,6 @@
     {
       "source": "adr-0040",
       "target": "skill-base-meta-human-html",
-      "kind": "mentions"
-    },
-    {
-      "source": "adr-0041",
-      "target": "skill-base-productivity-handoff",
       "kind": "mentions"
     },
     {

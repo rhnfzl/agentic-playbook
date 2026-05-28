@@ -117,3 +117,38 @@ def test_empty_repo_produces_empty_graph(tmp_path: Path) -> None:
     graph = graph_builder.build_graph(tmp_path)
     assert graph.nodes == []
     assert graph.edges == []
+
+
+def test_hyphenated_skill_name_not_matched_inside_compound(
+    tmp_path: Path,
+) -> None:
+    """Python's `\\b` does not fire as expected at hyphen boundaries,
+    so a naive `\\bto-prd\\b` would match inside `push-to-prd-v2`.
+    The graph builder must use a hyphen-aware boundary."""
+    _seed_skill(tmp_path, "base", "engineering", "to-prd")
+    # ADR body mentions a longer compound that contains "to-prd"
+    # as a substring but is NOT a reference to the skill.
+    _seed_adr(
+        tmp_path, "0001", "Compound",
+        body="The push-to-prd-v2 pipeline was deprecated last quarter.",
+    )
+    graph = graph_builder.build_graph(tmp_path)
+    mentions = [e for e in graph.edges if e.kind == "mentions"]
+    assert mentions == [], (
+        "compound name push-to-prd-v2 should not produce a to-prd mention"
+    )
+
+
+def test_hyphenated_skill_name_still_matches_real_reference(
+    tmp_path: Path,
+) -> None:
+    """Sanity check that the hyphen-aware boundary still fires for
+    genuine references, not just compound exclusions."""
+    _seed_skill(tmp_path, "base", "engineering", "to-prd")
+    _seed_adr(
+        tmp_path, "0001", "Real",
+        body="The to-prd skill is the canonical example here.",
+    )
+    graph = graph_builder.build_graph(tmp_path)
+    mentions = [e for e in graph.edges if e.kind == "mentions"]
+    assert len(mentions) == 1

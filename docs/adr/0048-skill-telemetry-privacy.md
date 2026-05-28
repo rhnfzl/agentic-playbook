@@ -62,8 +62,12 @@ response content (`gen_ai.choice`, `gen_ai.output.messages`,
 `gen_ai.completion`) are dropped at the collector before write.
 
 The pure-Python collector enforces this via the `BANNED_PREFIXES`
-constant. The docker collector enforces it via the
-`attributes/strip_bodies` processor in `collector-config.yaml`.
+constant (Python `startswith`). The docker collector enforces it
+via the `attributes/strip_bodies` processor with regex `pattern`
+actions (NOT exact-key actions), so indexed variants like
+`gen_ai.input.messages.0.content` and `gen_ai.completion.text`
+are also stripped. The two implementations match the same
+semantic prefix list.
 
 Storage is local-first under `~/.coding-agents-playbook/telemetry/`.
 No upstream submission. No remote endpoints. No analytics SDKs.

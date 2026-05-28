@@ -100,12 +100,20 @@ def run_security_audit(repo_root: Path) -> int:
 
     strict = is_strict()
     skipped_count = sum(1 for r in results if r.status == "skipped")
+    error_results = [r for r in results if r.status == "error"]
     blocking_findings = [
         f for f in all_findings
         if SEVERITY_ORDER.get(f.severity, 99) <= SEVERITY_ORDER["medium"]
     ]
 
     if blocking_findings:
+        return 1
+    if error_results:
+        # ADR-0047: a wrapper exiting unexpectedly is a gate failure, not
+        # a soft-skip. We do not know what the wrapper would have flagged,
+        # so we cannot let the build through.
+        print(f"  {len(error_results)} wrapper(s) errored unexpectedly; "
+              "ADR-0047 treats this as a blocking failure")
         return 1
     if strict and skipped_count > 0:
         print(f"  STRICT_SECURITY=1: {skipped_count} wrapper(s) skipped, treating as failure")

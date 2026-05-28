@@ -79,6 +79,10 @@ when present:
 
 - `docs/security/ai-bom.json` (ADR-0047): per-source vetted-as-of
   marker. Rendered as `vetted: YYYY-MM-DD` or `vetted: unvetted`.
+  Only applied to skills under `base/skills/imported/` since BOM
+  entries are keyed by `imported/<source>/...` paths; first-party
+  skills under `base/skills/<category>/` have no vetted-as-of
+  concept and render without the security badge.
 - Telemetry aggregates via `scripts/telemetry.ingest` (ADR-0048):
   trigger count and last-fired timestamp. Omitted when
   `TELEMETRY=off` or the JSONL is missing.
