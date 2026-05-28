@@ -123,12 +123,48 @@ def _iter_trajectories(
         yield traj
 
 
+_KNOWN_ADAPTERS_FOR_VALIDATION = {"claude-code", "codex", "cursor", "windsurf"}
+
+
 def run_harness(cfg: HarnessConfig) -> Matrix:
-    """Execute the matrix and return the aggregated result."""
+    """Execute the matrix and return the aggregated result.
+
+    Raises ValueError if filters narrow the run to zero cells. A typo
+    like ADAPTER=claud-code (note the missing `e`) would otherwise exit
+    green with zero cells, which is misleading CI output (codex review
+    finding).
+    """
     content = PlaybookContent.load(cfg.repo_root)
     matrix = Matrix()
 
-    for traj in _iter_trajectories(content, cfg.skill_filter):
+    if cfg.strict:
+        # Phase 1 has no live adapters and therefore no `adapter_unavailable`
+        # to escalate to a hard failure. Make the no-op visible so a CI
+        # configuration that sets STRICT=1 expecting enforcement gets a
+        # clear advisory rather than a silent green pass.
+        import warnings as _warnings
+        _warnings.warn(
+            "strict mode is a Phase 2 feature; no live adapters to flag "
+            "as unavailable. STRICT=1 has no effect in Phase 1.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    if cfg.adapter_filter and cfg.adapter_filter not in _KNOWN_ADAPTERS_FOR_VALIDATION:
+        raise ValueError(
+            f"adapter filter '{cfg.adapter_filter}' is not in the known "
+            f"adapter set {sorted(_KNOWN_ADAPTERS_FOR_VALIDATION)}; check "
+            f"for a typo or add the adapter to the registry."
+        )
+
+    candidate_trajectories = list(_iter_trajectories(content, cfg.skill_filter))
+    if cfg.skill_filter and not candidate_trajectories:
+        raise ValueError(
+            f"skill filter '{cfg.skill_filter}' matched no trajectories; "
+            f"available skills: {sorted({t.skill for t in content.trajectories})}"
+        )
+
+    for traj in candidate_trajectories:
         adapters = traj.adapter_scope
         if cfg.adapter_filter:
             adapters = [a for a in adapters if a == cfg.adapter_filter]

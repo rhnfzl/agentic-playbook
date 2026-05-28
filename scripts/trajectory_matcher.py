@@ -72,18 +72,50 @@ def _check_must_not_invoke_tool(value: str, trace: TraceRecord) -> str | None:
 
 
 def _check_final_artifact_path(value: str, trace: TraceRecord) -> str | None:
+    """Assert that the LAST file-producing tool call's path matches the glob.
+
+    The name is "final" deliberately: the trace may write `draft.md` early
+    and finish with `out.txt`; the trajectory author who declared
+    `final_artifact_path: "*.md"` expects the FINAL artifact to be markdown,
+    not just any artifact in the run. We find the last Write/Edit/NotebookEdit
+    tool call by scanning trace.events in reverse and check its path.
+
+    The glob uses fnmatch semantics: `*` does NOT cross path separators by
+    default (Python fnmatch uses translate-with-special-handling per the
+    stdlib). Authors who want recursive matching write `**/*.md`.
+    """
     if not trace.artifacts:
         return (
             f"final_artifact_path: no artifacts were produced "
-            f"(expected one matching '{value}')"
+            f"(expected last artifact path to match '{value}')"
         )
-    for path in trace.artifacts:
-        if fnmatch.fnmatch(path, value):
-            return None
-    return (
-        f"final_artifact_path: no artifact matches '{value}'. "
-        f"Got: {sorted(trace.artifacts)}"
-    )
+    # Find the last file-producing tool call by reverse-scanning events.
+    file_producing_tools = {"Write", "Edit", "NotebookEdit"}
+    last_path: str | None = None
+    for event in reversed(trace.events):
+        if event.kind != "tool_call" or event.name not in file_producing_tools:
+            continue
+        if not isinstance(event.arguments, dict):
+            continue
+        candidate = (
+            event.arguments.get("path")
+            or event.arguments.get("file_path")
+            or event.arguments.get("notebook_path")
+        )
+        if isinstance(candidate, str):
+            last_path = candidate
+            break
+    if last_path is None:
+        return (
+            f"final_artifact_path: artifacts exist ({sorted(trace.artifacts)}) "
+            f"but no Write/Edit/NotebookEdit tool call recorded a path"
+        )
+    if not fnmatch.fnmatch(last_path, value):
+        return (
+            f"final_artifact_path: last artifact '{last_path}' does not "
+            f"match '{value}'. Earlier artifacts: {sorted(trace.artifacts)}"
+        )
+    return None
 
 
 def _check_max_total_tool_calls(value, trace: TraceRecord) -> str | None:

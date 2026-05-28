@@ -133,7 +133,7 @@ def test_final_artifact_path_passes_when_glob_matches() -> None:
     from trajectory_matcher import evaluate_assertions
 
     trace = _trace(
-        events=[_event(0, "tool_call", "Write")],
+        events=[_event(0, "tool_call", "Write", arguments={"path": "spec.md"})],
         artifacts={"spec.md": "sha256:abc"},
     )
     result = evaluate_assertions([{"final_artifact_path": "*.md"}], trace)
@@ -144,7 +144,7 @@ def test_final_artifact_path_fails_when_glob_misses() -> None:
     from trajectory_matcher import evaluate_assertions
 
     trace = _trace(
-        events=[_event(0, "tool_call", "Write")],
+        events=[_event(0, "tool_call", "Write", arguments={"path": "out.txt"})],
         artifacts={"out.txt": "sha256:abc"},
     )
     result = evaluate_assertions([{"final_artifact_path": "*.md"}], trace)
@@ -157,6 +157,38 @@ def test_final_artifact_path_fails_when_no_artifacts() -> None:
     trace = _trace(events=[_event(0, "tool_call", "Write")], artifacts={})
     result = evaluate_assertions([{"final_artifact_path": "*.md"}], trace)
     assert not result.passed
+
+
+def test_final_artifact_path_uses_LAST_write_not_any(tmp_path) -> None:
+    """Codex review finding: 'final' must mean LAST. A trace that writes
+    draft.md then out.txt must fail `final_artifact_path: "*.md"`."""
+    from trajectory_matcher import evaluate_assertions
+
+    trace = _trace(
+        events=[
+            _event(0, "tool_call", "Write", arguments={"path": "draft.md"}),
+            _event(1, "tool_call", "Write", arguments={"path": "out.txt"}),
+        ],
+        artifacts={"draft.md": "sha256:a", "out.txt": "sha256:b"},
+    )
+    result = evaluate_assertions([{"final_artifact_path": "*.md"}], trace)
+    assert not result.passed
+    assert any("out.txt" in f for f in result.failures)
+
+
+def test_final_artifact_path_passes_when_LAST_write_matches(tmp_path) -> None:
+    """Opposite case: out.txt then draft.md -> last is .md -> pass."""
+    from trajectory_matcher import evaluate_assertions
+
+    trace = _trace(
+        events=[
+            _event(0, "tool_call", "Write", arguments={"path": "out.txt"}),
+            _event(1, "tool_call", "Write", arguments={"path": "draft.md"}),
+        ],
+        artifacts={"out.txt": "sha256:a", "draft.md": "sha256:b"},
+    )
+    result = evaluate_assertions([{"final_artifact_path": "*.md"}], trace)
+    assert result.passed
 
 
 # --- max_total_tool_calls / min_total_tool_calls ---

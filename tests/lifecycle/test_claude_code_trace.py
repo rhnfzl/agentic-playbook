@@ -176,3 +176,103 @@ def test_shim_handles_malformed_jsonl_gracefully(tmp_path: Path) -> None:
     )
     record = parse_otel_jsonl(out, session_id="s1", prompt="x")
     assert len(record.tool_calls()) == 1
+
+
+def test_shim_records_artifact_for_edit_tool(tmp_path: Path) -> None:
+    """Edit tool calls populate record.artifacts with an `edit:` sentinel.
+    Phase 1 review finding: Write-only artifact tracking made
+    `final_artifact_path` silently fail on any skill that modifies files."""
+    from adapters.claude_code_trace import parse_otel_jsonl
+
+    out = _write_otel_jsonl(
+        tmp_path,
+        [_span("Edit", attributes={
+            "gen_ai.operation.name": "tool_call",
+            "tool.name": "Edit",
+            "tool.arguments": '{"file_path": "src/foo.py"}',
+        })],
+    )
+    record = parse_otel_jsonl(out, session_id="s1", prompt="x")
+    assert "src/foo.py" in record.artifacts
+    assert record.artifacts["src/foo.py"].startswith("edit:")
+
+
+def test_shim_records_artifact_for_notebookedit_tool(tmp_path: Path) -> None:
+    from adapters.claude_code_trace import parse_otel_jsonl
+
+    out = _write_otel_jsonl(
+        tmp_path,
+        [_span("NotebookEdit", attributes={
+            "gen_ai.operation.name": "tool_call",
+            "tool.name": "NotebookEdit",
+            "tool.arguments": '{"notebook_path": "analysis.ipynb"}',
+        })],
+    )
+    record = parse_otel_jsonl(out, session_id="s1", prompt="x")
+    assert "analysis.ipynb" in record.artifacts
+
+
+def test_shim_flattens_nested_otlp_envelope(tmp_path: Path) -> None:
+    """Nested OTLP-over-HTTP/JSON envelopes (resourceSpans/scopeSpans/spans)
+    are flattened transparently. The shim accepts both this format and
+    the flat console-exporter format, per the capture-contract docstring."""
+    from adapters.claude_code_trace import parse_otel_jsonl
+
+    nested_envelope = {
+        "resourceSpans": [
+            {
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            _span("skill_load", attributes={
+                                "gen_ai.operation.name": "skill_load",
+                                "skill.name": "demo",
+                            }),
+                            _span("Write", attributes={
+                                "gen_ai.operation.name": "tool_call",
+                                "tool.name": "Write",
+                            }),
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+    out = tmp_path / "envelope.jsonl"
+    out.write_text(json.dumps(nested_envelope), encoding="utf-8")
+
+    record = parse_otel_jsonl(out, session_id="s1", prompt="x")
+    assert len(record.tool_calls()) == 1
+    assert record.tool_calls()[0].name == "Write"
+    assert len(record.skill_loads()) == 1
+
+
+def test_shim_handles_mixed_flat_and_nested_envelope_lines(tmp_path: Path) -> None:
+    """A JSONL may have lines in either format. Both must be ingested."""
+    from adapters.claude_code_trace import parse_otel_jsonl
+
+    flat_line = _span("Write", attributes={
+        "gen_ai.operation.name": "tool_call",
+        "tool.name": "Write",
+        "tool.arguments": '{"path": "a.md", "content": "a"}',
+    })
+    nested_line = {
+        "resourceSpans": [
+            {"scopeSpans": [{"spans": [
+                _span("Edit", attributes={
+                    "gen_ai.operation.name": "tool_call",
+                    "tool.name": "Edit",
+                    "tool.arguments": '{"file_path": "b.py"}',
+                })
+            ]}]}
+        ]
+    }
+    out = tmp_path / "mixed.jsonl"
+    out.write_text(
+        json.dumps(flat_line) + "\n" + json.dumps(nested_line),
+        encoding="utf-8",
+    )
+    record = parse_otel_jsonl(out, session_id="s1", prompt="x")
+    names = [e.name for e in record.tool_calls()]
+    assert "Write" in names
+    assert "Edit" in names

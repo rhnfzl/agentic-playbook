@@ -41,6 +41,7 @@ def main(
     scenario: str | None = None,
     fixture: Path | None = None,
     repo_root: Path | None = None,
+    phrasing: str | None = None,
 ) -> int:
     if skill is None or scenario is None:
         parser = argparse.ArgumentParser(
@@ -55,10 +56,18 @@ def main(
             help="Path to a JSONL trace fixture; bypasses live Claude Code "
             "(Phase 2 will make this optional once live spawning lands).",
         )
+        parser.add_argument(
+            "--phrasing",
+            default=None,
+            help="Override the prompt used to label the trace (default: "
+            "the first entry in the trajectory's phrasings list). Useful "
+            "when a fixture was captured against a non-default phrasing.",
+        )
         args = parser.parse_args()
         skill = args.skill
         scenario = args.scenario
         fixture = args.fixture
+        phrasing = args.phrasing
 
     if repo_root is None:
         repo_root = REPO_ROOT_DEFAULT
@@ -87,9 +96,14 @@ def main(
         print(f"  error  fixture file not found: {fixture}")
         return 1
 
-    # Use the first phrasing as the prompt (verify is single-shot, not the
-    # full matrix).
-    prompt = traj.input_phrasings[0] if traj.input_phrasings else ""
+    # Use the first phrasing as the prompt unless the author overrode
+    # via --phrasing. Verify is single-shot, not the full matrix.
+    if phrasing is not None:
+        prompt = phrasing
+    elif traj.input_phrasings:
+        prompt = traj.input_phrasings[0]
+    else:
+        prompt = ""
     trace = parse_otel_jsonl(fixture, session_id="verify", prompt=prompt)
     result = evaluate_assertions(traj.assertions, trace)
 

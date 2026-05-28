@@ -1,16 +1,38 @@
 """Claude Code OTel trace shim (Phase 1, ADR-0045).
 
-Claude Code emits OTel `gen_ai.*` spans natively when
-`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is set. An OTel collector writes
-those spans to a JSONL file (one span per line); this shim reads that
-file and normalizes the spans into a TraceRecord.
+Capture contract:
+
+  This shim accepts EITHER of two on-disk formats per the OpenTelemetry
+  spec, and flattens transparently:
+
+  Format A (Node ConsoleSpanExporter output): one flat span object per
+  line, no envelope. Produced by:
+
+      OTEL_TRACES_EXPORTER=console claude code <session>
+        > trace.jsonl 2>&1
+
+  Format B (OTLP-over-HTTP/JSON envelope): nested
+  `resourceSpans -> scopeSpans -> spans` per the OpenTelemetry proto.
+  Produced when an `otelcol` HTTP receiver is configured with
+  `OTEL_TRACES_EXPORTER=otlp` and a file_exporter sink. Each line is
+  one envelope; the shim flattens the nested span list before parsing.
+
+  Both formats survive the same downstream pipeline because the
+  TraceEvent contract is identical for either source.
 
 Span attribute mapping (subset of code.claude.com/docs/en/monitoring-usage):
 
   gen_ai.operation.name=chat              -> kind=model_response;
                                              accumulates token usage.
   gen_ai.operation.name=tool_call         -> kind=tool_call; tool.name and
-                                             tool.arguments captured.
+                                             tool.arguments captured. Write,
+                                             Edit, NotebookEdit produce
+                                             artifact entries (Write hashes
+                                             the content; Edit/NotebookEdit
+                                             record the file path with an
+                                             `edit:` sentinel since the
+                                             post-edit hash is not in the
+                                             tool input).
   gen_ai.operation.name=skill_load        -> kind=skill_load; skill.name captured.
   gen_ai.request.model                    -> TraceRecord.model.
   gen_ai.usage.input_tokens               -> summed into total_input_tokens.
@@ -65,6 +87,31 @@ def _sha256_of(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _flatten_envelope(parsed: dict) -> list[dict]:
+    """Return the list of span dicts inside `parsed`.
+
+    Accepts both the flat shape (parsed IS a span) and the nested OTLP
+    envelope shape (resourceSpans -> scopeSpans -> spans). Returns an
+    empty list when neither shape is recognized; the caller skips and
+    the surrounding loop continues to the next line.
+    """
+    # Flat span: has the marker attributes the parser needs.
+    if "startTimeUnixNano" in parsed or "attributes" in parsed:
+        return [parsed]
+    # Nested OTLP envelope.
+    spans: list[dict] = []
+    for resource_span in parsed.get("resourceSpans", []) or []:
+        if not isinstance(resource_span, dict):
+            continue
+        for scope_span in resource_span.get("scopeSpans", []) or []:
+            if not isinstance(scope_span, dict):
+                continue
+            for span in scope_span.get("spans", []) or []:
+                if isinstance(span, dict):
+                    spans.append(span)
+    return spans
+
+
 def parse_otel_jsonl(
     path: Path,
     *,
@@ -73,10 +120,11 @@ def parse_otel_jsonl(
 ) -> TraceRecord:
     """Read a Claude Code OTLP JSONL log and produce a TraceRecord.
 
-    Malformed lines are skipped (not raised) so a single broken span
-    does not poison the whole trace. The harness's report distinguishes
-    `infra_fail` (parse-error rate above threshold) from
-    `assertion_fail` so silent corruption is still visible.
+    Accepts flat-per-line spans (console exporter) or nested OTLP
+    envelopes (`resourceSpans -> scopeSpans -> spans`). Malformed lines
+    are skipped (not raised) so a single broken span does not poison
+    the whole trace. The harness report distinguishes infra failures
+    from assertion failures so silent corruption stays visible.
     """
     raw_spans: list[dict] = []
     if path.is_file():
@@ -84,9 +132,12 @@ def parse_otel_jsonl(
             if not line.strip():
                 continue
             try:
-                raw_spans.append(json.loads(line))
+                parsed = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            if not isinstance(parsed, dict):
+                continue
+            raw_spans.extend(_flatten_envelope(parsed))
 
     raw_spans.sort(key=lambda s: int(s.get("startTimeUnixNano", "0") or 0))
 
@@ -140,16 +191,27 @@ def parse_otel_jsonl(
                     arguments_dict = json.loads(arguments_str)
                 except json.JSONDecodeError:
                     arguments_dict = {"raw": arguments_str}
-            # Record any file write as an artifact.
-            if (
-                isinstance(tool_name, str)
-                and tool_name == "Write"
-                and isinstance(arguments_dict, dict)
-            ):
-                path_val = arguments_dict.get("path")
-                content_val = arguments_dict.get("content", "")
-                if isinstance(path_val, str) and isinstance(content_val, str):
-                    artifacts[path_val] = _sha256_of(content_val)
+            # Record file-producing tools as artifacts. Write hashes content
+            # because it is present in the tool input. Edit and NotebookEdit
+            # use an `edit:` sentinel because the post-edit file content is
+            # not in the tool input; the path glob in `final_artifact_path`
+            # still matches, so trajectories that assert "*.py was touched"
+            # work for both create and modify operations.
+            if isinstance(tool_name, str) and isinstance(arguments_dict, dict):
+                path_val = (
+                    arguments_dict.get("path")
+                    or arguments_dict.get("file_path")
+                    or arguments_dict.get("notebook_path")
+                )
+                if isinstance(path_val, str):
+                    if tool_name == "Write":
+                        content_val = arguments_dict.get("content", "")
+                        if isinstance(content_val, str):
+                            artifacts[path_val] = _sha256_of(content_val)
+                    elif tool_name in {"Edit", "NotebookEdit"}:
+                        # Sentinel; the file existed before this tool ran and
+                        # the post-edit hash is not in the tool input.
+                        artifacts.setdefault(path_val, f"edit:{tool_name}")
             events.append(TraceEvent(
                 seq=seq,
                 kind="tool_call",

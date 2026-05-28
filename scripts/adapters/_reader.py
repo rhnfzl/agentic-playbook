@@ -282,6 +282,55 @@ def _parse_inline_list(raw: str) -> list[str]:
     return [s.strip('"').strip("'")]
 
 
+def _split_top_level_commas(s: str) -> list[str]:
+    """Split `s` on commas that are NOT inside braces or brackets. Used to
+    tokenize a YAML flow-style sequence like `{a: 1, b: 2}, {c: 3, d: 4}`
+    into the two map literals without breaking the inner `a: 1, b: 2`."""
+    out: list[str] = []
+    depth = 0
+    start = 0
+    for i, ch in enumerate(s):
+        if ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            out.append(s[start:i])
+            start = i + 1
+    out.append(s[start:])
+    return [tok.strip() for tok in out if tok.strip()]
+
+
+def _parse_inline_dict(s: str) -> dict[str, str]:
+    """Parse `{k: v, k2: v2}` into a dict. Tolerant of quoted scalars."""
+    body = s.strip()
+    if body.startswith("{") and body.endswith("}"):
+        body = body[1:-1]
+    result: dict[str, str] = {}
+    for token in _split_top_level_commas(body):
+        if ":" not in token:
+            continue
+        k, v = token.split(":", 1)
+        result[k.strip()] = v.strip().strip('"').strip("'")
+    return result
+
+
+def _parse_inline_list_of_dicts(raw: str) -> list[dict[str, str]]:
+    """Parse `[{a: 1, b: 2}, {c: 3}]` into a list of dicts. Returns []
+    if the shape is not recognized; the linter is the gate."""
+    s = raw.strip()
+    if not (s.startswith("[") and s.endswith("]")):
+        return []
+    inner = s[1:-1].strip()
+    if not inner:
+        return []
+    out: list[dict[str, str]] = []
+    for token in _split_top_level_commas(inner):
+        if token.startswith("{") and token.endswith("}"):
+            out.append(_parse_inline_dict(token))
+    return out
+
+
 def _parse_trajectory_body(body: str) -> tuple[list[str], list[dict], dict]:
     """Parse trajectory YAML body into (phrasings, assertions, llm_judge).
 
@@ -380,15 +429,26 @@ def _parse_trajectory_body(body: str) -> tuple[list[str], list[dict], dict]:
                 in_phrasings = False
 
         elif section == "assertions":
-            # Each list item is `  - key: value` (single-pair dict).
+            # Each list item is `  - key: value` (single-pair dict). Values
+            # may be:
+            #   - bare scalars (e.g. `must_invoke_tool: Write`),
+            #   - inline lists of scalars (e.g. `no_skill_load_after: [a, b]`),
+            #   - inline lists of dicts (e.g. `call_order:
+            #     [{tool: X, before: Y}, {tool: A, before: B}]`).
+            # The naive YAML parser does NOT cover block-scalar nested forms;
+            # the linter rejects those with a clear message rather than
+            # silently dropping them.
             if line.lstrip().startswith("- "):
                 payload = line.split("- ", 1)[1]
                 if ":" in payload:
                     k, v = payload.split(":", 1)
                     key = k.strip()
-                    value: str | list[str] = v.strip().strip('"').strip("'")
-                    if isinstance(value, str) and value.startswith("[") and value.endswith("]"):
-                        value = _parse_inline_list(value)
+                    raw_value = v.strip()
+                    value: object = raw_value.strip('"').strip("'")
+                    if raw_value.startswith("[{") and raw_value.endswith("]"):
+                        value = _parse_inline_list_of_dicts(raw_value)
+                    elif raw_value.startswith("[") and raw_value.endswith("]"):
+                        value = _parse_inline_list(raw_value)
                     assertions.append({key: value})
 
         elif section == "llm_judge":

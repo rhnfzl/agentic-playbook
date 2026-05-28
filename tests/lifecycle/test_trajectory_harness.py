@@ -216,3 +216,53 @@ def test_harness_stdout_summary(tmp_path: Path, capsys) -> None:
     assert "demo" in captured.out
     assert "claude-code" in captured.out
     assert "PASS" in captured.out
+
+
+def test_harness_rejects_unknown_adapter_filter(tmp_path: Path) -> None:
+    """Codex review finding: ADAPTER=claud-code typo previously returned
+    zero cells (matrix.failed == 0 => exit 0). Now it raises."""
+    import pytest as _pytest
+    from trajectory_harness import HarnessConfig, run_harness
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        adapter_filter="claud-code",
+    )
+    with _pytest.raises(ValueError, match="claud-code"):
+        run_harness(cfg)
+
+
+def test_harness_rejects_skill_filter_with_no_matches(tmp_path: Path) -> None:
+    """Skill filter typo must error instead of silently passing."""
+    import pytest as _pytest
+    from trajectory_harness import HarnessConfig, run_harness
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        skill_filter="no-such-skill",
+    )
+    with _pytest.raises(ValueError, match="no-such-skill"):
+        run_harness(cfg)
+
+
+def test_harness_strict_mode_warns_in_phase_1(tmp_path: Path) -> None:
+    """Codex review finding: --strict is currently a no-op; surface a
+    warning so CI that sets STRICT=1 expecting enforcement gets a clear
+    advisory rather than silent green pass."""
+    import warnings as _warnings
+    from trajectory_harness import HarnessConfig, run_harness
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        strict=True,
+    )
+    with _warnings.catch_warnings(record=True) as caught:
+        _warnings.simplefilter("always")
+        run_harness(cfg)
+    assert any("strict" in str(w.message).lower() for w in caught)

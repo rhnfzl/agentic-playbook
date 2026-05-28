@@ -165,3 +165,89 @@ def test_load_trajectories_skips_files_without_frontmatter(tmp_path: Path) -> No
     # can attribute the failure to a specific path.
     assert len(result) == 1
     assert result[0].frontmatter == {}
+
+
+def test_load_trajectories_parses_call_order_assertion(tmp_path: Path) -> None:
+    """Codex review finding: `call_order: [{tool: X, before: Y}]` must load
+    correctly from YAML, not get shredded by comma-splitting inside the dict."""
+    from adapters._protocol import resolve_content_paths
+    from adapters._reader import load_trajectories
+
+    body = """input:
+  phrasings:
+    - "x"
+
+assertions:
+  - first_skill_loaded: demo-skill
+  - call_order: [{tool: AskUserQuestion, before: Write}, {tool: Read, before: Write}]
+
+llm_judge:
+  threshold: 0.7
+  rubric: "x"
+  model: claude-sonnet-4-6
+"""
+    (tmp_path / "base" / "trajectories" / "demo-skill").mkdir(parents=True)
+    (tmp_path / "base" / "trajectories" / "demo-skill" / "happy-path.yaml").write_text(
+        _make_trajectory_yaml(body=body),
+        encoding="utf-8",
+    )
+    result = load_trajectories(resolve_content_paths(None, tmp_path))
+    assert len(result) == 1
+    traj = result[0]
+    # Find the call_order assertion (must be a list of dicts, not garbled strings).
+    call_order_assertions = [a for a in traj.assertions if "call_order" in a]
+    assert len(call_order_assertions) == 1
+    value = call_order_assertions[0]["call_order"]
+    assert isinstance(value, list)
+    assert len(value) == 2
+    assert value[0] == {"tool": "AskUserQuestion", "before": "Write"}
+    assert value[1] == {"tool": "Read", "before": "Write"}
+
+
+def test_loaded_call_order_passes_matcher_end_to_end(tmp_path: Path) -> None:
+    """The full pipeline: YAML -> reader -> matcher. Verifies the codex
+    finding that call_order was DOA from YAML is fixed."""
+    from adapters._protocol import resolve_content_paths
+    from adapters._reader import load_trajectories
+    from adapters.trace_record import TraceEvent, TraceRecord
+    from datetime import datetime, timezone
+    from trajectory_matcher import evaluate_assertions
+
+    body = """input:
+  phrasings:
+    - "x"
+
+assertions:
+  - call_order: [{tool: AskUserQuestion, before: Write}]
+
+llm_judge:
+  threshold: 0.7
+  rubric: "x"
+  model: claude-sonnet-4-6
+"""
+    (tmp_path / "base" / "trajectories" / "demo-skill").mkdir(parents=True)
+    (tmp_path / "base" / "trajectories" / "demo-skill" / "happy-path.yaml").write_text(
+        _make_trajectory_yaml(body=body),
+        encoding="utf-8",
+    )
+    traj = load_trajectories(resolve_content_paths(None, tmp_path))[0]
+
+    trace = TraceRecord(
+        adapter="claude-code",
+        model="x",
+        session_id="s",
+        prompt="x",
+        events=[
+            TraceEvent(seq=0, kind="tool_call", name="AskUserQuestion",
+                       arguments=None, duration_ms=None, raw_attrs={}),
+            TraceEvent(seq=1, kind="tool_call", name="Write",
+                       arguments={"path": "out.md"}, duration_ms=None, raw_attrs={}),
+        ],
+        artifacts={"out.md": "sha256:x"},
+        total_input_tokens=0,
+        total_output_tokens=0,
+        started_at=datetime(2026, 5, 28, tzinfo=timezone.utc),
+        ended_at=datetime(2026, 5, 28, tzinfo=timezone.utc),
+    )
+    result = evaluate_assertions(traj.assertions, trace)
+    assert result.passed, "\n".join(result.failures)
