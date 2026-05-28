@@ -1,17 +1,20 @@
 # 0046. Trajectory DSL surface + hybrid DSL/LLM-judge match semantics
 
 ## Status
-Proposed (2026-05-28) — Phase 1 ships only the DSL half; the LLM-judge
-half lands with the Phase 2 live trace_provider work.
+Accepted (2026-05-28). Phase 1 shipped the DSL half. Phase 2 added the
+LLM-judge half via `scripts/trajectory_judge.py` and the live
+`anthropic_judge_client.HttpAnthropicJudgeClient`, plus the
+`JudgeClient` Protocol seam for fakes in tests. The hybrid contract is
+now fully implemented end to end.
 
 ## Context
 
 ADR-0044 introduced the trajectory content type and named ADR-0046 as the
 home for two coupled decisions:
 
-1. The shape of the trajectory DSL — which assertion primitives the
+1. The shape of the trajectory DSL, i.e. which assertion primitives the
    matcher understands and how they compose.
-2. The hybrid match contract — DSL assertions evaluate first (cheap,
+2. The hybrid match contract: DSL assertions evaluate first (cheap,
    deterministic); if they pass, the LLM-judge runs against the
    `llm_judge.rubric` and threshold (slower, costs money).
 

@@ -164,7 +164,7 @@ def _call_provider_with_retry(
     TraceRecord on success or the FINAL exception after exhausting
     retries.
 
-    Retries on TimeoutError and RuntimeError only — those are the
+    Retries on TimeoutError and RuntimeError only, since those are the
     classes the ClaudeCodeProvider raises for transient failures
     (timeout, non-zero exit from a crashed `claude`). Other exceptions
     (ValueError on bad adapter, KeyboardInterrupt) propagate
