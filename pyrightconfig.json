@@ -19,6 +19,9 @@
   "extraPaths": [
     "scripts",
     "scripts/adapters",
+    "scripts/security",
+    "scripts/telemetry",
+    "scripts/atlas",
     "base/mcp/anchored-fs",
     "base/mcp/anchored-fs/bundle",
     "base/mcp/anchored-fs/.venv/lib/python3.11/site-packages"

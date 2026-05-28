@@ -1,0 +1,146 @@
+# 0047. Supply-chain security gate for vendored skills
+
+## Status
+Accepted (2026-05-28). First cut ships three independent wrappers
+plus an AI Bill of Materials emitter. Skipped wrappers degrade to
+notices by default; `STRICT_SECURITY=1` escalates skips to errors.
+
+## Context
+
+The playbook imports skills from external sources (mattpocock, obra,
+curated upstreams) via `make sync-mattpocock` and the curated-skills
+flow. The existing `audit_external_skill.py` scans vendored content
+for pattern-based risks (hidden Unicode, secret-file paths,
+network-exfil commands, persistence writes, unpinned downloads). It
+has caught real issues since v0.3.
+
+Two pressures motivated a second layer:
+
+1. **Snyk ToxicSkills (Feb 2026)** audited 3,984 public skills and
+   found 36.8% have security flaws, 13.4% critical. The playbook
+   does not ship public skills, but every vendored upstream is
+   subject to the same threat surface.
+
+2. **No record of "what's imported and when it was vetted"**. The
+   sync scripts pull updates without an audit timestamp; reviewers
+   have no machine-readable record to diff against a CVE feed.
+
+The new gate is additive: the existing pattern audit stays in
+`make check` as the always-on baseline. The new aggregator runs
+external scanners (Snyk's `snyk-agent-scan`, `agent-skill-evaluator`)
+plus a Document-Driven Implicit Payload Execution (DDIPE) detector
+and emits an AI-BOM file Atlas can render.
+
+## Decision
+
+### Three wrappers, one aggregator, one BOM
+
+`scripts/security/` houses three wrappers and the BOM emitter:
+
+- `mcp_scan_wrapper.py` shells out to `uvx snyk-agent-scan@latest`
+  (falls back to legacy `mcp-scan` name). Targets MCP server
+  configs, not raw skill dirs.
+- `agent_skill_evaluator_wrapper.py` imports the PyPI package if
+  available, falls back to `uvx`. Targets raw SKILL.md files.
+- `ddipe_detector.py` is pure Python: scans fenced code blocks in
+  SKILL.md bodies for risky tokens (`curl|sh`, `rm -rf`,
+  `eval(atob(...))`, `>/dev/tcp/`, etc.). Prose is not scanned (the
+  pattern audit already covers narrative risks).
+- `ai_bom.py` walks `base/skills/imported/` and `base/mcp/`, emits
+  `docs/security/ai-bom.json` with source, version, vetted-as-of
+  marker, and pinned SHA (where known).
+
+`scripts/audit_security.py` is the standalone CLI; it produces a
+unified report and exit code. `scripts/checks/skill_security.py`
+wraps the same logic for `make check` via the existing legacy-capture
+helper.
+
+### Soft-by-default, strict opt-in
+
+Fresh contributor clones must run `make check` without first
+installing PyPI tools. Each wrapper returns:
+
+- `ok` when it ran and produced no findings,
+- `findings` when it ran and produced findings (aggregator decides
+  blocking severity),
+- `skipped` when the tool is not installed or not configured,
+- `error` when invocation failed unexpectedly (network, JSON parse).
+
+The aggregator blocks the build only on `findings` at severity
+`medium` or higher. Skips are not blocking. `STRICT_SECURITY=1`
+escalates skips to blocking so release branches can gate on full
+coverage.
+
+### Severity thresholds
+
+Findings carry one of: `critical | high | medium | low | info`.
+The aggregator blocks on anything at `medium` or higher; lower
+severities print as notices. Severity is normalized per wrapper
+from the upstream tool's native vocabulary.
+
+### Vetted-as-of marker
+
+Each imported source directory may carry a `.vetted-as-of` file
+containing an ISO date. The BOM surfaces this verbatim; Atlas
+renders it as a per-skill badge. Sources without a marker render
+"unvetted." Marker authorship is a reviewer responsibility; this
+ADR does not legislate the review workflow.
+
+### Why these three tools
+
+- **snyk-agent-scan**: the Snyk-published scanner for MCP server
+  configs. Most useful when the playbook ships installed-config
+  examples; currently inert because we ship bundles. Wired now so
+  the slot is filled when configs land.
+- **agent-skill-evaluator**: PyPI package framed as "npm audit for
+  SKILL.md." Covers frontmatter shape, link health, and a small
+  set of risky-instruction heuristics.
+- **DDIPE**: novel to this playbook. Targets the threat that an
+  agent reads a "reference implementation" fenced block and
+  reproduces it verbatim in the user's terminal. Pure Python so it
+  ships with no external dependency.
+
+The pattern audit (`audit_external_skill.py`) was deliberately not
+merged into this gate. It runs already as a separate
+`make check` step (`external-skill-audit`) and keeps the
+single-responsibility shape. Aggregating it here would conflate the
+"pattern signatures we own" with the "external scanners we wrap."
+
+## Consequences
+
+### Positive
+
+- First explicit trust model for vendored content. Each imported
+  source has a vetted-as-of record; CVE feeds can diff against the
+  BOM.
+- Soft-fail keeps onboarding fast. New contributors are not blocked
+  by uvx or PyPI installs to run `make check`.
+- DDIPE detector closes the specific "agent copies the payload"
+  threat that pattern audit and frontmatter checks do not catch.
+
+### Negative
+
+- Three external dependencies add maintenance surface. `mcp-scan ->
+  snyk-agent-scan` rename happened mid-development; we already
+  handle it. Future renames will need wrapper updates.
+- `snyk-agent-scan` is inert until we ship installed-config
+  examples. The wrapper exists so the slot is filled, but it
+  produces no findings against today's repo.
+- AI-BOM is hand-rolled JSON rather than CycloneDX. A CycloneDX
+  export can land as a derived view; this ADR does not require it.
+
+### Reject if
+
+- `make audit-security` materially slows `make check` (target:
+  under 30s on a clean tree)
+- A wrapper's "skipped" state masks a real finding that the same
+  tool would have caught
+- The vetted-as-of marker becomes a rubber-stamp ritual rather
+  than a review record
+
+## References
+
+- Snyk ToxicSkills audit: https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub
+- CVE-2025-6514 (mcp-remote OS command injection)
+- OWASP Agentic Skills Top 10 (April 2026)
+- `docs/research/2026-05-28-tavily-enhancement-backlog.md` Idea 2

@@ -1,4 +1,4 @@
-.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio trajectory-calibrate record-trajectory
+.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit audit-security targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio trajectory-calibrate record-trajectory ai-bom
 
 PYTHON ?= python3
 
@@ -16,6 +16,9 @@ help:
 	@echo "  make update                        Re-materialize playbook content into current adapters"
 	@echo "  make remove                        Remove materialized playbook content per adapter"
 	@echo "  make audit                         Run external-skill security audit (block-by-default)"
+	@echo "  make audit-security                Run supply-chain gate: Snyk scanner + skill-evaluator + DDIPE + AI-BOM"
+	@echo "                                     STRICT_SECURITY=1 escalates skipped wrappers to errors"
+	@echo "  make ai-bom                        Regenerate docs/security/ai-bom.json without other checks"
 	@echo "  make sync-mattpocock               Pull mattpocock/skills updates into skills/imported/mattpocock/"
 	@echo "  make sync-distribution MANIFEST=/path/to/manifest.toml"
 	@echo "                                     Sync base/ to external destination per ADR-0042 (manifest-driven)"
@@ -64,6 +67,12 @@ remove:
 
 audit:
 	@$(PYTHON) scripts/audit_external_skill.py
+
+audit-security:
+	@$(PYTHON) scripts/audit_security.py
+
+ai-bom:
+	@$(PYTHON) scripts/security/ai_bom.py
 
 sync-mattpocock:
 	@bash scripts/sync_mattpocock.sh

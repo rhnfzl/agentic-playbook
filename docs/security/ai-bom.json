@@ -1,0 +1,516 @@
+{
+  "generated_at": "2026-05-28T13:20:01+00:00",
+  "repo": "agentic-playbook",
+  "components": [
+    {
+      "kind": "imported_skill",
+      "source": "impeccable",
+      "path": "base/skills/imported/impeccable",
+      "name": "impeccable",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "layers",
+      "path": "base/skills/imported/layers/layers-conceptual-model",
+      "name": "layers-conceptual-model",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "layers",
+      "path": "base/skills/imported/layers/layers-domain",
+      "name": "layers-domain",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "layers",
+      "path": "base/skills/imported/layers/layers-interaction-flow",
+      "name": "layers-interaction-flow",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "layers",
+      "path": "base/skills/imported/layers/layers-intro",
+      "name": "layers-intro",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "layers",
+      "path": "base/skills/imported/layers/layers-observed-behaviour",
+      "name": "layers-observed-behaviour",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "layers",
+      "path": "base/skills/imported/layers/layers-orient",
+      "name": "layers-orient",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "layers",
+      "path": "base/skills/imported/layers/layers-product-strategy",
+      "name": "layers-product-strategy",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "layers",
+      "path": "base/skills/imported/layers/layers-surface",
+      "name": "layers-surface",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "layers",
+      "path": "base/skills/imported/layers/layers-user-needs",
+      "name": "layers-user-needs",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/engineering/diagnose",
+      "name": "diagnose",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/engineering/grill-with-docs",
+      "name": "grill-with-docs",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/engineering/improve-codebase-architecture",
+      "name": "improve-codebase-architecture",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/engineering/prototype",
+      "name": "prototype",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/engineering/setup-matt-pocock-skills",
+      "name": "setup-matt-pocock-skills",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/engineering/tdd",
+      "name": "tdd",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/engineering/to-issues",
+      "name": "to-issues",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/engineering/to-prd",
+      "name": "to-prd",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/engineering/triage",
+      "name": "triage",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/engineering/zoom-out",
+      "name": "zoom-out",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/misc/git-guardrails-claude-code",
+      "name": "git-guardrails-claude-code",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/misc/migrate-to-shoehorn",
+      "name": "migrate-to-shoehorn",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/misc/scaffold-exercises",
+      "name": "scaffold-exercises",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/misc/setup-pre-commit",
+      "name": "setup-pre-commit",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/productivity/caveman",
+      "name": "caveman",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/productivity/grill-me",
+      "name": "grill-me",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/productivity/handoff",
+      "name": "handoff",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "mattpocock",
+      "path": "base/skills/imported/mattpocock/productivity/write-a-skill",
+      "name": "write-a-skill",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/brainstorm-okrs",
+      "name": "brainstorm-okrs",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/create-prd",
+      "name": "create-prd",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/define-problem-statement",
+      "name": "define-problem-statement",
+      "version": "2.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/job-stories",
+      "name": "job-stories",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/opportunity-solution-tree",
+      "name": "opportunity-solution-tree",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/outcome-roadmap",
+      "name": "outcome-roadmap",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/pre-mortem",
+      "name": "pre-mortem",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/prioritize-features",
+      "name": "prioritize-features",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/release-notes",
+      "name": "release-notes",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/retro",
+      "name": "retro",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/sprint-plan",
+      "name": "sprint-plan",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/stakeholder-map",
+      "name": "stakeholder-map",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/summarize-meeting",
+      "name": "summarize-meeting",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/user-stories",
+      "name": "user-stories",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "pm-curated",
+      "path": "base/skills/imported/pm-curated/utility-pm-critic",
+      "name": "utility-pm-critic",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "research-curated",
+      "path": "base/skills/imported/research-curated/competitor-analysis",
+      "name": "competitor-analysis",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "research-curated",
+      "path": "base/skills/imported/research-curated/discover-interview-synthesis",
+      "name": "discover-interview-synthesis",
+      "version": "2.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "research-curated",
+      "path": "base/skills/imported/research-curated/interview-script",
+      "name": "interview-script",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "research-curated",
+      "path": "base/skills/imported/research-curated/market-sizing",
+      "name": "market-sizing",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "research-curated",
+      "path": "base/skills/imported/research-curated/sentiment-analysis",
+      "name": "sentiment-analysis",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "research-curated",
+      "path": "base/skills/imported/research-curated/summarize-interview",
+      "name": "summarize-interview",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "research-curated",
+      "path": "base/skills/imported/research-curated/user-personas",
+      "name": "user-personas",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/brandkit",
+      "name": "brandkit",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/brutalist-skill",
+      "name": "industrial-brutalist-ui",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/gpt-tasteskill",
+      "name": "gpt-taste",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/image-to-code-skill",
+      "name": "image-to-code",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/imagegen-frontend-mobile",
+      "name": "imagegen-frontend-mobile",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/imagegen-frontend-web",
+      "name": "imagegen-frontend-web",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/minimalist-skill",
+      "name": "minimalist-ui",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/output-skill",
+      "name": "full-output-enforcement",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/redesign-skill",
+      "name": "redesign-existing-projects",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/soft-skill",
+      "name": "high-end-visual-design",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/stitch-skill",
+      "name": "stitch-design-taste",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "imported_skill",
+      "source": "taste-skill",
+      "path": "base/skills/imported/taste-skill/taste-skill",
+      "name": "design-taste-frontend",
+      "version": "1.0.0",
+      "vetted_as_of": null
+    },
+    {
+      "kind": "mcp_bundle",
+      "name": "agent-memory-bridge",
+      "path": "base/mcp/agent-memory-bridge",
+      "version": null,
+      "vetted_as_of": null
+    },
+    {
+      "kind": "mcp_bundle",
+      "name": "anchored-fs",
+      "path": "base/mcp/anchored-fs",
+      "version": null,
+      "vetted_as_of": null
+    }
+  ]
+}
