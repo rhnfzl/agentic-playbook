@@ -62,6 +62,23 @@ class HarnessConfig:
     the LLM judge after the DSL matcher passes; both must clear for the
     cell to pass. When None (Phase 1 default), only the DSL runs.
 
+    Phase 2C-α adds defensive infrastructure:
+
+    * `max_provider_calls` caps the live trace_provider invocations per
+      run. None = unlimited (preserves Phase 2B behavior). Once the
+      budget is exhausted, remaining cells are recorded as skipped with
+      `failures=['budget_exhausted: ...']`.
+    * `max_judge_calls` caps the LLM judge invocations. Independent
+      from the provider budget so a small judge budget can run a full
+      DSL pass without LLM-judge spending.
+    * `dry_run=True` counts cells without invoking the provider or
+      judge. Useful for budgeting before wiring nightly cron.
+    * `max_retries` is the number of retries on provider exceptions
+      (TimeoutError, RuntimeError). Default 0 keeps the Phase 2B
+      behavior of recording the first failure as infra_fail. Sleep
+      between retries is `retry_backoff_s * (2 ** attempt)` (zero in
+      tests).
+
     `skill_filter` narrows the run to one skill (or None for all).
     `adapter_filter` narrows to one adapter (or None for all).
     `strict` flips adapter_unavailable into a hard failure.
@@ -73,6 +90,11 @@ class HarnessConfig:
     skill_filter: str | None = None
     adapter_filter: str | None = None
     strict: bool = False
+    max_provider_calls: int | None = None
+    max_judge_calls: int | None = None
+    dry_run: bool = False
+    max_retries: int = 0
+    retry_backoff_s: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -127,6 +149,47 @@ def _iter_trajectories(
         if skill_filter and traj.skill != skill_filter:
             continue
         yield traj
+
+
+def _call_provider_with_retry(
+    provider: TraceProvider,
+    trajectory: Trajectory,
+    phrasing: str,
+    adapter: str,
+    *,
+    max_retries: int,
+    backoff_s: float,
+) -> "TraceRecord | Exception":
+    """Wrap the provider call in a retry loop. Returns either the
+    TraceRecord on success or the FINAL exception after exhausting
+    retries.
+
+    Retries on TimeoutError and RuntimeError only — those are the
+    classes the ClaudeCodeProvider raises for transient failures
+    (timeout, non-zero exit from a crashed `claude`). Other exceptions
+    (ValueError on bad adapter, KeyboardInterrupt) propagate
+    immediately because retrying them won't help.
+
+    Backoff is exponential: `backoff_s * (2 ** attempt)` where attempt
+    is 0-indexed. Tests set backoff_s=0 so they don't slow the suite.
+    """
+    import time as _time
+
+    attempt = 0
+    last_exc: Exception | None = None
+    while attempt <= max_retries:
+        try:
+            return provider(trajectory, phrasing, adapter)
+        except (TimeoutError, RuntimeError) as exc:
+            last_exc = exc
+            if attempt < max_retries and backoff_s > 0:
+                _time.sleep(backoff_s * (2 ** attempt))
+            attempt += 1
+        except Exception as exc:
+            # Non-retriable: ValueError (bad adapter), etc.
+            return exc
+    assert last_exc is not None
+    return last_exc
 
 
 # Adapter registry lives in adapters/trace_record.py; reuse the frozenset
@@ -190,6 +253,9 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
                 f"trajectories use these adapters: {adapter_options}"
             )
 
+    provider_calls = 0
+    judge_calls = 0
+
     for traj in candidate_trajectories:
         adapters = traj.adapter_scope
         if cfg.adapter_filter:
@@ -197,9 +263,52 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
 
         for adapter in adapters:
             for phrasing in traj.input_phrasings:
-                try:
-                    trace = cfg.trace_provider(traj, phrasing, adapter)
-                except Exception as exc:
+                # Dry-run: never invoke the provider or judge; record
+                # every cell as a planned-skip so the matrix shows the
+                # full intended workload.
+                if cfg.dry_run:
+                    matrix.cells.append(
+                        MatrixCell(
+                            skill=traj.skill,
+                            scenario=traj.scenario,
+                            phrasing=phrasing,
+                            adapter=adapter,
+                            passed=False,
+                            failures=["dry_run: cell counted, not executed"],
+                        )
+                    )
+                    continue
+
+                # Cost ceiling on provider calls. Cells past the cap are
+                # recorded as budget-exhausted so the matrix shows what
+                # was skipped (rather than silently shrinking).
+                if (
+                    cfg.max_provider_calls is not None
+                    and provider_calls >= cfg.max_provider_calls
+                ):
+                    matrix.cells.append(
+                        MatrixCell(
+                            skill=traj.skill,
+                            scenario=traj.scenario,
+                            phrasing=phrasing,
+                            adapter=adapter,
+                            passed=False,
+                            failures=[
+                                f"budget_exhausted: max_provider_calls="
+                                f"{cfg.max_provider_calls} reached"
+                            ],
+                        )
+                    )
+                    continue
+
+                provider_calls += 1
+                trace_or_exc = _call_provider_with_retry(
+                    cfg.trace_provider, traj, phrasing, adapter,
+                    max_retries=cfg.max_retries,
+                    backoff_s=cfg.retry_backoff_s,
+                )
+                if isinstance(trace_or_exc, Exception):
+                    exc = trace_or_exc
                     matrix.cells.append(
                         MatrixCell(
                             skill=traj.skill,
@@ -214,6 +323,7 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
                         )
                     )
                     continue
+                trace = trace_or_exc
 
                 result = evaluate_assertions(traj.assertions, trace)
                 failures = list(result.failures)
@@ -223,24 +333,36 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
                 # run the LLM judge and gate on the trajectory threshold.
                 # DSL failures short-circuit the judge to save cost.
                 if passed and cfg.judge_client is not None:
-                    judge_result = evaluate_judge(traj, trace, cfg.judge_client)
-                    threshold = get_threshold(traj)
-                    if judge_result.score < threshold:
-                        passed = False
-                        # Distinguish infra failures from quality failures
-                        # so operators reading the matrix can route a 429
-                        # to "retry overnight" and a quality miss to
-                        # "regression to investigate."
-                        prefix = (
-                            "judge_infra_fail"
-                            if judge_result.is_infra_error
-                            else "llm_judge"
-                        )
+                    if (
+                        cfg.max_judge_calls is not None
+                        and judge_calls >= cfg.max_judge_calls
+                    ):
                         failures.append(
-                            f"{prefix}: score {judge_result.score:.2f} "
-                            f"below threshold {threshold} "
-                            f"(reasoning: {judge_result.reasoning})"
+                            f"judge_budget_exhausted: max_judge_calls="
+                            f"{cfg.max_judge_calls}; treating cell as DSL-only pass"
                         )
+                    else:
+                        judge_calls += 1
+                        judge_result = evaluate_judge(
+                            traj, trace, cfg.judge_client,
+                        )
+                        threshold = get_threshold(traj)
+                        if judge_result.score < threshold:
+                            passed = False
+                            # Distinguish infra failures from quality
+                            # failures so operators reading the matrix
+                            # can route a 429 to "retry overnight" and a
+                            # quality miss to "regression to investigate."
+                            prefix = (
+                                "judge_infra_fail"
+                                if judge_result.is_infra_error
+                                else "llm_judge"
+                            )
+                            failures.append(
+                                f"{prefix}: score {judge_result.score:.2f} "
+                                f"below threshold {threshold} "
+                                f"(reasoning: {judge_result.reasoning})"
+                            )
 
                 matrix.cells.append(
                     MatrixCell(
@@ -322,6 +444,33 @@ def main() -> int:
         default=300.0,
         help="Per-cell timeout in seconds for the Claude Code spawn.",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Count cells but do not invoke the provider or judge. Useful "
+        "for budgeting before wiring nightly cron (Phase 2C-alpha).",
+    )
+    parser.add_argument(
+        "--max-spawns",
+        type=int,
+        default=None,
+        help="Cap the number of live trace_provider invocations. Cells "
+        "past the cap are recorded as budget_exhausted.",
+    )
+    parser.add_argument(
+        "--max-judge-calls",
+        type=int,
+        default=None,
+        help="Cap the number of LLM-judge invocations. Independent of "
+        "--max-spawns so a small judge budget can run a full DSL pass.",
+    )
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=0,
+        help="Retry provider exceptions (TimeoutError, RuntimeError) this "
+        "many times before recording infra_fail. Default 0.",
+    )
     args = parser.parse_args()
 
     # Phase 2B: live Claude Code provider is the default. The harness's
@@ -349,6 +498,10 @@ def main() -> int:
         skill_filter=args.skill,
         adapter_filter=args.adapter,
         strict=args.strict,
+        max_provider_calls=args.max_spawns,
+        max_judge_calls=args.max_judge_calls,
+        dry_run=args.dry_run,
+        max_retries=args.max_retries,
     )
     try:
         matrix = run_harness(cfg)
