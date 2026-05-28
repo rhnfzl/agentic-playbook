@@ -1,4 +1,4 @@
-.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor
+.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor trajectory-check verify-trajectory
 
 PYTHON ?= python3
 
@@ -110,6 +110,19 @@ new:
 		echo "   or: make new TRAJECTORY=<skill>:<scenario>"; \
 		exit 1; \
 	fi
+
+trajectory-check:
+	@$(PYTHON) scripts/trajectory_harness.py \
+		$(if $(SKILL),--skill "$(SKILL)") \
+		$(if $(ADAPTER),--adapter "$(ADAPTER)") \
+		$(if $(STRICT),--strict)
+
+verify-trajectory:
+	@if [ -z "$(SKILL)" ] || [ -z "$(SCENARIO)" ]; then \
+		echo "Usage: make verify-trajectory SKILL=<name> SCENARIO=<name>"; exit 1; \
+	fi
+	@$(PYTHON) scripts/trajectory_verify.py --skill "$(SKILL)" --scenario "$(SCENARIO)" \
+		$(if $(FIXTURE),--fixture "$(FIXTURE)")
 
 doctor:
 	@$(PYTHON) scripts/install.py --diagnose
