@@ -26,12 +26,20 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import NamedTuple
 
+# Allow atlas to share the canonical frontmatter parser with decay,
+# ai_bom, and any other consumer.
+_SCRIPTS_PARENT = Path(__file__).resolve().parent.parent
+if str(_SCRIPTS_PARENT) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_PARENT))
+
+from skill_identity import parse_frontmatter as _parse_frontmatter  # noqa: E402
+
 
 _ADR_FILE_RE = re.compile(r"^(\d{4})-(.+)\.md$")
-_FRONTMATTER_FIELD_RE = re.compile(r"^([a-z_]+):\s*(.+?)\s*$", re.MULTILINE)
 _ADR_SUPERSEDES_RE = re.compile(r"[Ss]upersed(?:e|es)\s+(?:ADR-)?(\d{2,4})")
 
 
@@ -90,18 +98,14 @@ def _tracked_paths(repo_root: Path, subpath: str) -> set[Path] | None:
 
 
 def _frontmatter(text: str) -> dict:
-    if not text.startswith("---"):
-        return {}
-    end = text.find("\n---", 3)
-    if end == -1:
-        return {}
-    head = text[3:end]
-    out: dict = {}
-    for line in head.splitlines():
-        m = _FRONTMATTER_FIELD_RE.match(line)
-        if m:
-            out[m.group(1)] = m.group(2).strip().strip('"').strip("'")
-    return out
+    """Thin wrapper around the canonical parse_frontmatter helper.
+
+    Atlas keeps the local symbol so call sites do not change, but
+    the implementation now delegates to the shared parser so future
+    quirk fixes apply across atlas + ai_bom + decay at once.
+    """
+    fm, _ = _parse_frontmatter(text)
+    return fm
 
 
 def _adr_nodes(repo_root: Path) -> tuple[list[Node], dict[str, str]]:

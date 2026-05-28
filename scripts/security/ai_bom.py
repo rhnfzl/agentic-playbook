@@ -21,6 +21,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Reuse the canonical frontmatter parser shared with atlas + decay
+# instead of maintaining a third copy that drifts on every quirk fix.
+_SCRIPTS_PARENT = Path(__file__).resolve().parent.parent
+if str(_SCRIPTS_PARENT) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_PARENT))
+
+from skill_identity import frontmatter_field  # noqa: E402
+
 
 def _read_text_safely(path: Path) -> str:
     try:
@@ -38,19 +46,7 @@ def _vetted_as_of(skill_dir: Path) -> str | None:
 
 
 def _skill_frontmatter_field(skill_md: Path, key: str) -> str | None:
-    text = _read_text_safely(skill_md)
-    if not text.startswith("---"):
-        return None
-    end = text.find("\n---", 3)
-    if end == -1:
-        return None
-    head = text[3:end]
-    needle = f"{key}:"
-    for line in head.splitlines():
-        line = line.strip()
-        if line.startswith(needle):
-            return line[len(needle):].strip().strip('"').strip("'")
-    return None
+    return frontmatter_field(_read_text_safely(skill_md), key)
 
 
 def _imported_skill_sources(repo_root: Path) -> list[dict]:

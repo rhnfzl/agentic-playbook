@@ -124,6 +124,7 @@ def _usage_decay_findings(
     try:
         from telemetry import is_enabled, storage_path
         from telemetry.ingest import aggregate, read_jsonl
+        from skill_identity import skill_identity
     except ImportError:
         return []
     if not is_enabled():
@@ -136,7 +137,11 @@ def _usage_decay_findings(
 
     notices: list[str] = []
     for skill_md in skill_paths:
-        skill_name = skill_md.parent.name
+        # Canonical join key: frontmatter `name`, falling back to
+        # directory basename. Until this PR the loop used the dirname
+        # only, which was structurally wrong as soon as a skill rename
+        # diverged from its directory slug.
+        skill_name = skill_identity(skill_md)
         rel = skill_md.relative_to(repo_root)
         last = fired_by_skill.get(skill_name)
         if last is None:

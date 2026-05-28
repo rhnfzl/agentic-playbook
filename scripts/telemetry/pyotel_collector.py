@@ -22,7 +22,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -43,102 +42,25 @@ from telemetry import (  # noqa: E402
     is_enabled,
     storage_path,
 )
-
-
-# Attribute keys we extract from `gen_ai.*` conventions. Anything outside
-# this allowlist is dropped before write.
-ALLOWED_KEYS = frozenset({
-    "gen_ai.system",
-    "gen_ai.request.model",
-    "gen_ai.response.model",
-    "gen_ai.usage.input_tokens",
-    "gen_ai.usage.output_tokens",
-    "gen_ai.usage.prompt_tokens",   # legacy alias
-    "gen_ai.usage.completion_tokens",  # legacy alias
-    "gen_ai.agent.id",
-    "gen_ai.agent.name",
-    "gen_ai.query.source",
-    "skill.name",
-    "skill.id",
-    "playbook.adapter",
-})
-
-# Banned keys we ACTIVELY strip even if the upstream sends them. This is
-# the privacy guarantee: prompt and response bodies must not reach disk.
-BANNED_PREFIXES = (
-    "gen_ai.prompt",
-    "gen_ai.choice",
-    "gen_ai.input.message",
-    "gen_ai.output.message",
-    "gen_ai.completion",
+from telemetry._otlp_record import (  # noqa: E402
+    ALLOWED_KEYS,
+    BANNED_PREFIXES,
+    span_to_record as _span_to_record,
 )
 
 
-def _attr_value(attr: dict) -> object:
-    value = attr.get("value", {}) if isinstance(attr, dict) else {}
-    if not isinstance(value, dict):
-        return None
-    for k in ("stringValue", "intValue", "doubleValue", "boolValue"):
-        if k in value:
-            return value[k]
-    return None
-
-
-def _redact(attrs: list[dict] | None) -> dict:
-    """Return a redacted attribute dict: only ALLOWED_KEYS, never BANNED."""
-    out: dict = {}
-    for attr in attrs or []:
-        if not isinstance(attr, dict):
-            continue
-        key = attr.get("key", "")
-        if not isinstance(key, str) or not key:
-            continue
-        if any(key.startswith(p) for p in BANNED_PREFIXES):
-            continue
-        if key not in ALLOWED_KEYS:
-            continue
-        out[key] = _attr_value(attr)
-    return out
-
-
-def _span_to_record(span: dict) -> TelemetryRecord | None:
-    """Build a TelemetryRecord from an OTLP span if it is a skill span."""
-    attrs = _redact(span.get("attributes", []))
-    skill = attrs.get("skill.name") or attrs.get("skill.id")
-    if not isinstance(skill, str):
-        return None
-    start_ns = int(span.get("startTimeUnixNano", 0) or 0)
-    end_ns = int(span.get("endTimeUnixNano", 0) or 0)
-    latency_ms = (end_ns - start_ns) / 1_000_000 if end_ns > start_ns else 0.0
-    fired_at = datetime.fromtimestamp(
-        start_ns / 1_000_000_000 if start_ns > 0 else 0,
-        tz=timezone.utc,
-    ).isoformat(timespec="seconds")
-    input_tokens = int(
-        attrs.get("gen_ai.usage.input_tokens")
-        or attrs.get("gen_ai.usage.prompt_tokens")
-        or 0
-    )
-    output_tokens = int(
-        attrs.get("gen_ai.usage.output_tokens")
-        or attrs.get("gen_ai.usage.completion_tokens")
-        or 0
-    )
-    model = str(
-        attrs.get("gen_ai.response.model")
-        or attrs.get("gen_ai.request.model")
-        or "unknown"
-    )
-    adapter = str(attrs.get("playbook.adapter") or attrs.get("gen_ai.system") or "unknown")
-    return TelemetryRecord(
-        skill=skill,
-        adapter=adapter,
-        model=model,
-        fired_at=fired_at,
-        latency_ms=latency_ms,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-    )
+# Re-export the privacy-relevant constants for tests that import
+# them from this module. Canonical definitions live in
+# telemetry/_otlp_record.py so both collectors and ingest share one
+# privacy contract.
+__all__ = (
+    "ALLOWED_KEYS",
+    "BANNED_PREFIXES",
+    "append_records",
+    "extract_records",
+    "main",
+    "serve",
+)
 
 
 def extract_records(envelope: dict) -> list[TelemetryRecord]:
