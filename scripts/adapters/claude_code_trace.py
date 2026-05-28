@@ -112,6 +112,118 @@ def _flatten_envelope(parsed: dict) -> list[dict]:
     return spans
 
 
+def spans_from_text(text: str) -> list[dict]:
+    """Read OTel span JSON from mixed text, flatten envelopes, sort by time.
+
+    The single span ingest path used by both the fixture replay
+    (`parse_otel_jsonl`) and the live trace provider
+    (`claude_code_provider.ClaudeCodeProvider`). Before unification both
+    callers had separate parsers that drifted: the provider concatenated
+    stdout-then-stderr spans (pipe-order seq, not time-order), did not
+    flatten OTLP envelopes, and dropped unknown operations.
+
+    Real Claude Code output interleaves spans with startup noise
+    (`Loading skills from ...`). Non-JSON lines and malformed JSON are
+    skipped (not raised) so a single broken line does not poison the
+    whole trace. Spans are sorted by `startTimeUnixNano` so the
+    provider's merged stdout+stderr matches the time order the fixture
+    replay sees.
+    """
+    raw: list[dict] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line[0] != "{":
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(parsed, dict):
+            continue
+        raw.extend(_flatten_envelope(parsed))
+    raw.sort(key=lambda s: int(s.get("startTimeUnixNano", "0") or 0))
+    return raw
+
+
+def _span_to_event(span: dict, seq: int) -> TraceEvent | None:
+    """Convert one sorted OTel span dict to a TraceEvent.
+
+    Single source of truth for the span->event mapping. The live
+    provider and `parse_otel_jsonl` both call this so the two paths
+    cannot diverge on which operation names are recognized or which
+    attribute branches unwrap.
+
+    Returns None only for spans whose `attributes` block is missing
+    entirely (i.e. not a real span). Unknown `gen_ai.operation.name`
+    values are preserved as `kind=model_response` with raw_attrs so the
+    matcher does not crash but a human can still inspect them.
+    """
+    if "attributes" not in span and "startTimeUnixNano" not in span:
+        return None
+    attrs = _attrs_to_dict(span.get("attributes", []))
+    op = attrs.get("gen_ai.operation.name")
+
+    start = int(span.get("startTimeUnixNano", "0") or 0)
+    end = int(span.get("endTimeUnixNano", "0") or 0)
+    duration_ms = max(0, (end - start) // 1_000_000) if end and start else None
+
+    if op == "chat":
+        model_attr = attrs.get("gen_ai.request.model")
+        return TraceEvent(
+            seq=seq, kind="model_response",
+            name=str(model_attr or "chat"),
+            arguments=None, duration_ms=duration_ms, raw_attrs=attrs,
+        )
+    if op == "tool_call":
+        tool_name = attrs.get("tool.name") or span.get("name", "unknown")
+        arguments_str = attrs.get("tool.arguments")
+        arguments_dict: dict | None = None
+        if isinstance(arguments_str, str):
+            try:
+                arguments_dict = json.loads(arguments_str)
+            except json.JSONDecodeError:
+                arguments_dict = {"raw": arguments_str}
+        return TraceEvent(
+            seq=seq, kind="tool_call",
+            name=str(tool_name),
+            arguments=arguments_dict, duration_ms=duration_ms, raw_attrs=attrs,
+        )
+    if op == "skill_load":
+        skill_name = attrs.get("skill.name") or span.get("name", "unknown")
+        return TraceEvent(
+            seq=seq, kind="skill_load",
+            name=str(skill_name),
+            arguments=None, duration_ms=duration_ms, raw_attrs=attrs,
+        )
+    # Unknown op: preserve as model_response with raw_attrs so the matcher
+    # does not crash but a human can inspect (fixture-replay legacy
+    # behavior; the provider previously dropped these silently, which is
+    # the divergence the unified parser closes).
+    return TraceEvent(
+        seq=seq, kind="model_response",
+        name=str(span.get("name", "unknown")),
+        arguments=None, duration_ms=duration_ms, raw_attrs=attrs,
+    )
+
+
+def events_from_text(text: str) -> list[TraceEvent]:
+    """Live-provider entry point: stdout+stderr text -> sequenced TraceEvents.
+
+    Combines `spans_from_text` (parse + sort) and `_span_to_event`
+    (convert) so the provider does not have its own span pipeline. Token
+    totals and the model field come from a separate walk in the
+    provider because the workdir-artifact path and judge wiring need
+    those independently.
+    """
+    spans = spans_from_text(text)
+    events: list[TraceEvent] = []
+    for span in spans:
+        event = _span_to_event(span, seq=len(events))
+        if event is not None:
+            events.append(event)
+    return events
+
+
 def parse_otel_jsonl(
     path: Path,
     *,
@@ -125,21 +237,13 @@ def parse_otel_jsonl(
     are skipped (not raised) so a single broken span does not poison
     the whole trace. The harness report distinguishes infra failures
     from assertion failures so silent corruption stays visible.
-    """
-    raw_spans: list[dict] = []
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                parsed = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(parsed, dict):
-                continue
-            raw_spans.extend(_flatten_envelope(parsed))
 
-    raw_spans.sort(key=lambda s: int(s.get("startTimeUnixNano", "0") or 0))
+    Uses the same `spans_from_text` + `_span_to_event` pair the live
+    provider uses, so a fixture replay and a live run produce the same
+    shape of events for the same input spans.
+    """
+    text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    raw_spans = spans_from_text(text)
 
     events: list[TraceEvent] = []
     artifacts: dict[str, str] = {}
@@ -149,18 +253,16 @@ def parse_otel_jsonl(
     started_at_nano: int | None = None
     ended_at_nano: int | None = None
 
-    for seq, span in enumerate(raw_spans):
-        attrs = _attrs_to_dict(span.get("attributes", []))
-        op = attrs.get("gen_ai.operation.name")
-
+    for span in raw_spans:
         start = int(span.get("startTimeUnixNano", "0") or 0)
         end = int(span.get("endTimeUnixNano", "0") or 0)
-        duration_ms = max(0, (end - start) // 1_000_000) if end and start else None
         if started_at_nano is None or start < started_at_nano:
             started_at_nano = start
         if ended_at_nano is None or end > ended_at_nano:
             ended_at_nano = end
 
+        attrs = _attrs_to_dict(span.get("attributes", []))
+        op = attrs.get("gen_ai.operation.name")
         if op == "chat":
             in_tokens = attrs.get("gen_ai.usage.input_tokens") or 0
             out_tokens = attrs.get("gen_ai.usage.output_tokens") or 0
@@ -172,78 +274,34 @@ def parse_otel_jsonl(
             model_attr = attrs.get("gen_ai.request.model")
             if isinstance(model_attr, str) and model_attr:
                 model = model_attr
-            events.append(TraceEvent(
-                seq=seq,
-                kind="model_response",
-                name=str(model_attr or "chat"),
-                arguments=None,
-                duration_ms=duration_ms,
-                raw_attrs=attrs,
-            ))
-            continue
 
-        if op == "tool_call":
-            tool_name = attrs.get("tool.name") or span.get("name", "unknown")
-            arguments_str = attrs.get("tool.arguments")
-            arguments_dict: dict | None = None
-            if isinstance(arguments_str, str):
-                try:
-                    arguments_dict = json.loads(arguments_str)
-                except json.JSONDecodeError:
-                    arguments_dict = {"raw": arguments_str}
-            # Record file-producing tools as artifacts. Write hashes content
-            # because it is present in the tool input. Edit and NotebookEdit
-            # use an `edit:` sentinel because the post-edit file content is
-            # not in the tool input; the path glob in `final_artifact_path`
-            # still matches, so trajectories that assert "*.py was touched"
-            # work for both create and modify operations.
-            if isinstance(tool_name, str) and isinstance(arguments_dict, dict):
-                path_val = (
-                    arguments_dict.get("path")
-                    or arguments_dict.get("file_path")
-                    or arguments_dict.get("notebook_path")
-                )
-                if isinstance(path_val, str):
-                    if tool_name == "Write":
-                        content_val = arguments_dict.get("content", "")
-                        if isinstance(content_val, str):
-                            artifacts[path_val] = _sha256_of(content_val)
-                    elif tool_name in {"Edit", "NotebookEdit"}:
-                        # Sentinel; the file existed before this tool ran and
-                        # the post-edit hash is not in the tool input.
-                        artifacts.setdefault(path_val, f"edit:{tool_name}")
-            events.append(TraceEvent(
-                seq=seq,
-                kind="tool_call",
-                name=str(tool_name),
-                arguments=arguments_dict,
-                duration_ms=duration_ms,
-                raw_attrs=attrs,
-            ))
+        event = _span_to_event(span, seq=len(events))
+        if event is None:
             continue
+        events.append(event)
 
-        if op == "skill_load":
-            skill_name = attrs.get("skill.name") or span.get("name", "unknown")
-            events.append(TraceEvent(
-                seq=seq,
-                kind="skill_load",
-                name=str(skill_name),
-                arguments=None,
-                duration_ms=duration_ms,
-                raw_attrs=attrs,
-            ))
-            continue
-
-        # Unknown operation: preserve as model_response with raw_attrs so the
-        # matcher does not crash but a human can inspect.
-        events.append(TraceEvent(
-            seq=seq,
-            kind="model_response",
-            name=str(span.get("name", "unknown")),
-            arguments=None,
-            duration_ms=duration_ms,
-            raw_attrs=attrs,
-        ))
+        # Record file-producing tools as artifacts. Write hashes content
+        # because it is present in the tool input. Edit and NotebookEdit
+        # use an `edit:` sentinel because the post-edit file content is
+        # not in the tool input. The path glob in `final_artifact_path`
+        # still matches, so trajectories that assert "*.py was touched"
+        # work for both create and modify operations. The live provider
+        # path uses workdir scan instead so artifact hashes reflect the
+        # post-spawn filesystem state.
+        if event.kind == "tool_call" and isinstance(event.arguments, dict):
+            tool_name = event.name
+            path_val = (
+                event.arguments.get("path")
+                or event.arguments.get("file_path")
+                or event.arguments.get("notebook_path")
+            )
+            if isinstance(path_val, str):
+                if tool_name == "Write":
+                    content_val = event.arguments.get("content", "")
+                    if isinstance(content_val, str):
+                        artifacts[path_val] = _sha256_of(content_val)
+                elif tool_name in {"Edit", "NotebookEdit"}:
+                    artifacts.setdefault(path_val, f"edit:{tool_name}")
 
     started_at = (
         datetime.fromtimestamp(started_at_nano / 1e9, tz=timezone.utc)

@@ -1,28 +1,37 @@
 #!/usr/bin/env python3
-"""Trajectory harness CLI (Phase 1, ADR-0046).
+"""Trajectory harness CLI (Phase 2C, ADR-0044 + ADR-0046).
 
 Loads trajectories from the playbook's content, runs each phrasing
-against the trace-provider for every adapter in the trajectory's
+against the trace_provider for every adapter in the trajectory's
 adapter_scope, and produces a pass/fail matrix.
 
-Phase 1 contract:
+Shipped behavior (was "Phase 1 contract" before the Phase 2 fold):
 
-  * The harness DOES NOT spawn live agents in this phase. It receives a
-    `trace_provider` callable that returns a TraceRecord for each
-    (trajectory, phrasing, adapter) tuple. Tests inject a synthetic
-    provider; Phase 2 swaps in `run_claude_code_session`.
-  * The DSL matcher (scripts/trajectory_matcher.py) evaluates the
-    assertions in each trajectory. The LLM judge is Phase 2.
-  * Output: a Matrix dataclass that the CLI prints as a table. The
-    Matrix shape stays frozen so Phase 2's only job is to plug a real
-    trace_provider in.
+  * Default `trace_provider` is the live `ClaudeCodeProvider` (Phase
+    2B). Tests inject a synthetic provider via `HarnessConfig`.
+  * The DSL matcher (`scripts/trajectory_matcher.py`) evaluates the
+    deterministic assertions per ADR-0046 step 1.
+  * When `judge_client` is wired (Phase 2A; `--judge` flag), the LLM
+    judge evaluates the rubric after DSL passes. The hybrid contract
+    requires BOTH to clear for the cell to pass.
+  * Cost-ceiling and retry hooks (Phase 2C-alpha) bound the spend:
+    `max_provider_calls` counts every spawn (initial + retries) so a
+    `--max-spawns=N` ceiling is honored even when `--max-retries>0`;
+    `max_judge_calls` caps LLM-judge invocations independently; a
+    judge required by the trajectory but unavailable due to budget
+    exhaustion fails the cell (review-fold #3, ADR-0046).
+  * `--strict` refuses to start a run if any trajectory has an
+    `llm_judge` block but the harness was launched without
+    `--judge`/`judge_client`. Surfaces a class of silent
+    DSL-only-pass before any spawn happens.
 
 CLI:
 
   python3 scripts/trajectory_harness.py [--skill <name>] [--adapter <name>]
 
-  make trajectory-check                 # all trajectories x all adapters
-  make trajectory-check SKILL=to-prd    # narrow to one skill
+  make trajectory-check                # all trajectories x all adapters
+  make trajectory-check SKILL=to-prd   # narrow to one skill
+  make trajectory-check JUDGE=1        # enable the hybrid match
 """
 
 from __future__ import annotations
@@ -49,39 +58,39 @@ TraceProvider = Callable[[Trajectory, str, str], TraceRecord]
 class HarnessConfig:
     """All inputs the harness needs to run.
 
-    `trace_provider` is the seam between Phase 1 (fixture-driven, in-test)
-    and Phase 2 (live Claude Code session). The contract is:
+    `trace_provider` is the seam between fixture-driven test runs and
+    live Claude Code sessions. Contract:
 
       provider(trajectory, phrasing, adapter) -> TraceRecord
 
     The provider is responsible for spawning the adapter, capturing the
-    trace, and returning a TraceRecord. Errors raised by the provider
-    propagate so the harness can mark the cell as infra_fail.
+    trace, and returning a TraceRecord. Exceptions raised by the
+    provider propagate so the harness can mark the cell as infra_fail.
 
-    `judge_client` is the Phase 2A addition. When set, the harness runs
-    the LLM judge after the DSL matcher passes; both must clear for the
-    cell to pass. When None (Phase 1 default), only the DSL runs.
+    `judge_client` is the Phase 2A LLM-judge seam. When set, the
+    harness runs the rubric after the DSL matcher passes; both must
+    clear for the cell to pass. None means DSL-only.
 
-    Phase 2C-α adds defensive infrastructure:
+    Cost / retry budget (Phase 2C-alpha; review-fold #3):
 
-    * `max_provider_calls` caps the live trace_provider invocations per
-      run. None = unlimited (preserves Phase 2B behavior). Once the
-      budget is exhausted, remaining cells are recorded as skipped with
-      `failures=['budget_exhausted: ...']`.
-    * `max_judge_calls` caps the LLM judge invocations. Independent
-      from the provider budget so a small judge budget can run a full
-      DSL pass without LLM-judge spending.
-    * `dry_run=True` counts cells without invoking the provider or
-      judge. Useful for budgeting before wiring nightly cron.
-    * `max_retries` is the number of retries on provider exceptions
-      (TimeoutError, RuntimeError). Default 0 keeps the Phase 2B
-      behavior of recording the first failure as infra_fail. Sleep
-      between retries is `retry_backoff_s * (2 ** attempt)` (zero in
-      tests).
+    * `max_provider_calls` caps the TOTAL number of trace_provider
+      invocations, including retries (review-fold P2 finding: previous
+      behavior counted only the initial call, so `--max-spawns=3
+      --max-retries=2` could spawn up to 9 subprocesses despite the
+      advertised ceiling). None means unlimited.
+    * `max_judge_calls` caps the LLM-judge invocations independently
+      from the provider budget. None means unlimited. When the judge
+      budget is exhausted and a trajectory has llm_judge configured,
+      the cell fails (review-fold #3, ADR-0046).
+    * `dry_run=True` counts cells without invoking provider or judge.
+    * `max_retries` retries provider exceptions (TimeoutError,
+      RuntimeError). Default 0. Backoff: `retry_backoff_s * (2 ** k)`.
 
-    `skill_filter` narrows the run to one skill (or None for all).
-    `adapter_filter` narrows to one adapter (or None for all).
-    `strict` flips adapter_unavailable into a hard failure.
+    `skill_filter` / `adapter_filter` narrow the run to one slug each.
+    `strict` refuses to start a run if any candidate trajectory has an
+    `llm_judge` block but `judge_client` is None (review-fold: removes
+    the silent DSL-only-pass case where the judge half was intended
+    but never wired).
     """
 
     repo_root: Path
@@ -95,6 +104,21 @@ class HarnessConfig:
     dry_run: bool = False
     max_retries: int = 0
     retry_backoff_s: float = 1.0
+
+
+@dataclass
+class _HarnessCounters:
+    """Mutable spawn / judge counters threaded through the cell loop.
+
+    Lives outside HarnessConfig because the config is frozen (its
+    contents define a run; counters are run-state). The counters are
+    incremented via `_consume_provider_budget` and `_consume_judge_budget`
+    so all increments happen in one place and the retry loop cannot
+    skip a count by accident.
+    """
+
+    provider_calls: int = 0
+    judge_calls: int = 0
 
 
 @dataclass(frozen=True)
@@ -159,6 +183,7 @@ def _call_provider_with_retry(
     *,
     max_retries: int,
     backoff_s: float,
+    consume_budget: Callable[[], bool] | None = None,
 ) -> "TraceRecord | Exception":
     """Wrap the provider call in a retry loop. Returns either the
     TraceRecord on success or the FINAL exception after exhausting
@@ -172,12 +197,27 @@ def _call_provider_with_retry(
 
     Backoff is exponential: `backoff_s * (2 ** attempt)` where attempt
     is 0-indexed. Tests set backoff_s=0 so they don't slow the suite.
+
+    `consume_budget` is the per-attempt budget gate. It is called
+    BEFORE each subprocess spawn (initial attempt + every retry); if it
+    returns False the loop stops with either the last seen exception
+    or a synthetic budget-exhausted RuntimeError. Folds the cost
+    ceiling into the retry path so a `--max-spawns=3 --max-retries=2`
+    user spawns at most 3 subprocesses total (review-fold P2: previous
+    behavior counted only the initial attempt).
     """
     import time as _time
 
     attempt = 0
     last_exc: Exception | None = None
     while attempt <= max_retries:
+        if consume_budget is not None and not consume_budget():
+            if last_exc is not None:
+                return last_exc
+            return RuntimeError(
+                "budget_exhausted: max_provider_calls reached before "
+                "the first attempt could start"
+            )
         try:
             return provider(trajectory, phrasing, adapter)
         except (TimeoutError, RuntimeError) as exc:
@@ -192,6 +232,139 @@ def _call_provider_with_retry(
     return last_exc
 
 
+def _make_provider_budget_consumer(
+    cfg: HarnessConfig, counters: _HarnessCounters,
+) -> Callable[[], bool]:
+    """Return a per-attempt budget hook for `_call_provider_with_retry`.
+
+    Each call checks whether `provider_calls < max_provider_calls`. If
+    headroom exists the counter increments and the function returns
+    True (caller may spawn). If no headroom remains the counter does
+    NOT increment and the function returns False (caller aborts). A
+    `None` cap acts as unlimited.
+    """
+    def _consume() -> bool:
+        if (
+            cfg.max_provider_calls is not None
+            and counters.provider_calls >= cfg.max_provider_calls
+        ):
+            return False
+        counters.provider_calls += 1
+        return True
+
+    return _consume
+
+
+def _consume_judge_budget(
+    cfg: HarnessConfig, counters: _HarnessCounters,
+) -> bool:
+    """Check + consume one slot in the judge budget. Mirrors the
+    provider variant but as a one-shot call (no retry on judge)."""
+    if (
+        cfg.max_judge_calls is not None
+        and counters.judge_calls >= cfg.max_judge_calls
+    ):
+        return False
+    counters.judge_calls += 1
+    return True
+
+
+def _evaluate_cell(
+    cfg: HarnessConfig,
+    trajectory: Trajectory,
+    phrasing: str,
+    adapter: str,
+    counters: _HarnessCounters,
+) -> MatrixCell:
+    """Run one (trajectory, phrasing, adapter) cell and return its result.
+
+    Extracted from `run_harness` so the cell-level decision tree
+    (dry-run, budget, retry, DSL, judge, judge-budget) sits in one
+    testable block (review-fold thermo-nuclear #2: prior version was a
+    170-line nested loop where each concern added another `if` at the
+    same indentation).
+    """
+    def _cell(passed: bool, failures: list[str]) -> MatrixCell:
+        return MatrixCell(
+            skill=trajectory.skill,
+            scenario=trajectory.scenario,
+            phrasing=phrasing,
+            adapter=adapter,
+            passed=passed,
+            failures=failures,
+        )
+
+    if cfg.dry_run:
+        return _cell(False, ["dry_run: cell counted, not executed"])
+
+    if (
+        cfg.max_provider_calls is not None
+        and counters.provider_calls >= cfg.max_provider_calls
+    ):
+        # Refuse to start a cell whose first attempt cannot afford a
+        # spawn. The retry loop also rechecks per attempt; this guard
+        # is the "no first attempt at all" case so its message names
+        # the cell-start condition, not the mid-retry condition.
+        return _cell(False, [
+            f"budget_exhausted: max_provider_calls="
+            f"{cfg.max_provider_calls} reached"
+        ])
+
+    trace_or_exc = _call_provider_with_retry(
+        cfg.trace_provider, trajectory, phrasing, adapter,
+        max_retries=cfg.max_retries,
+        backoff_s=cfg.retry_backoff_s,
+        consume_budget=_make_provider_budget_consumer(cfg, counters),
+    )
+    if isinstance(trace_or_exc, Exception):
+        exc = trace_or_exc
+        return _cell(False, [
+            f"infra_fail: trace_provider raised "
+            f"{type(exc).__name__}: {exc}"
+        ])
+
+    trace = trace_or_exc
+    result = evaluate_assertions(trajectory.assertions, trace)
+    failures = list(result.failures)
+    passed = result.passed
+
+    # Hybrid match (ADR-0046): when DSL passes AND a judge is wired AND
+    # the trajectory has an llm_judge block, the cell passes only if
+    # the judge score clears the threshold. Judge-budget exhaustion is
+    # a CELL FAILURE (review-fold P2): the contract is "DSL pass AND
+    # judge pass", so an unavailable judge cannot satisfy it.
+    if not (passed and cfg.judge_client is not None):
+        return _cell(passed, failures)
+
+    if not _consume_judge_budget(cfg, counters):
+        return _cell(False, failures + [
+            f"judge_budget_exhausted: max_judge_calls="
+            f"{cfg.max_judge_calls} reached. The hybrid match contract "
+            f"(ADR-0046) requires both DSL and judge to pass; without "
+            f"a judge score this cell cannot pass."
+        ])
+
+    judge_result = evaluate_judge(trajectory, trace, cfg.judge_client)
+    threshold = get_threshold(trajectory)
+    if judge_result.score < threshold:
+        # Distinguish infra failures from quality failures so operators
+        # reading the matrix can route a 429 to "retry overnight" and a
+        # quality miss to "regression to investigate."
+        prefix = (
+            "judge_infra_fail"
+            if judge_result.is_infra_error
+            else "llm_judge"
+        )
+        failures.append(
+            f"{prefix}: score {judge_result.score:.2f} "
+            f"below threshold {threshold} "
+            f"(reasoning: {judge_result.reasoning})"
+        )
+        return _cell(False, failures)
+
+    return _cell(True, failures)
+
+
 # Adapter registry lives in adapters/trace_record.py; reuse the frozenset
 # rather than maintain a parallel copy here (third-review finding:
 # triplicate registry meant Phase 3 shims would silently drift).
@@ -200,26 +373,14 @@ def _call_provider_with_retry(
 def run_harness(cfg: HarnessConfig) -> Matrix:
     """Execute the matrix and return the aggregated result.
 
-    Raises ValueError if filters narrow the run to zero cells. A typo
-    like ADAPTER=claud-code (note the missing `e`) would otherwise exit
-    green with zero cells, which is misleading CI output (codex review
-    finding).
+    Raises ValueError if filters narrow the run to zero cells (a typo
+    like ADAPTER=claud-code would otherwise exit green with zero cells,
+    which is misleading CI output) or if `--strict` is on and a
+    trajectory has `llm_judge` configured without a judge_client
+    wired (silent DSL-only-pass case the strict mode rejects).
     """
     content = PlaybookContent.load(cfg.repo_root)
     matrix = Matrix()
-
-    if cfg.strict:
-        # Phase 1 has no live adapters and therefore no `adapter_unavailable`
-        # to escalate to a hard failure. Make the no-op visible so a CI
-        # configuration that sets STRICT=1 expecting enforcement gets a
-        # clear advisory rather than a silent green pass.
-        import warnings as _warnings
-        _warnings.warn(
-            "strict mode is a Phase 2 feature; no live adapters to flag "
-            "as unavailable. STRICT=1 has no effect in Phase 1.",
-            UserWarning,
-            stacklevel=2,
-        )
 
     if cfg.adapter_filter and cfg.adapter_filter not in KNOWN_TRACE_ADAPTERS:
         raise ValueError(
@@ -253,126 +414,35 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
                 f"trajectories use these adapters: {adapter_options}"
             )
 
-    provider_calls = 0
-    judge_calls = 0
+    # --strict: refuse to start when judge is required but unwired.
+    # Previously --strict was a no-op warning (review-fold P2 #7). Now
+    # it catches the silent "trajectory configured an LLM judge but the
+    # operator forgot --judge" failure mode before any spawn happens.
+    if cfg.strict and cfg.judge_client is None:
+        traj_with_judge = [
+            t for t in candidate_trajectories if t.llm_judge
+        ]
+        if traj_with_judge:
+            names = sorted({
+                f"{t.skill}/{t.scenario}" for t in traj_with_judge
+            })
+            raise ValueError(
+                "strict mode: the following trajectories configure an "
+                "llm_judge block but no judge_client was provided to "
+                f"the harness: {names}. Either pass --judge (with "
+                "ANTHROPIC_API_KEY set) or remove --strict if a "
+                "DSL-only run is acceptable."
+            )
 
+    counters = _HarnessCounters()
     for traj in candidate_trajectories:
         adapters = traj.adapter_scope
         if cfg.adapter_filter:
             adapters = [a for a in adapters if a == cfg.adapter_filter]
-
         for adapter in adapters:
             for phrasing in traj.input_phrasings:
-                # Dry-run: never invoke the provider or judge; record
-                # every cell as a planned-skip so the matrix shows the
-                # full intended workload.
-                if cfg.dry_run:
-                    matrix.cells.append(
-                        MatrixCell(
-                            skill=traj.skill,
-                            scenario=traj.scenario,
-                            phrasing=phrasing,
-                            adapter=adapter,
-                            passed=False,
-                            failures=["dry_run: cell counted, not executed"],
-                        )
-                    )
-                    continue
-
-                # Cost ceiling on provider calls. Cells past the cap are
-                # recorded as budget-exhausted so the matrix shows what
-                # was skipped (rather than silently shrinking).
-                if (
-                    cfg.max_provider_calls is not None
-                    and provider_calls >= cfg.max_provider_calls
-                ):
-                    matrix.cells.append(
-                        MatrixCell(
-                            skill=traj.skill,
-                            scenario=traj.scenario,
-                            phrasing=phrasing,
-                            adapter=adapter,
-                            passed=False,
-                            failures=[
-                                f"budget_exhausted: max_provider_calls="
-                                f"{cfg.max_provider_calls} reached"
-                            ],
-                        )
-                    )
-                    continue
-
-                provider_calls += 1
-                trace_or_exc = _call_provider_with_retry(
-                    cfg.trace_provider, traj, phrasing, adapter,
-                    max_retries=cfg.max_retries,
-                    backoff_s=cfg.retry_backoff_s,
-                )
-                if isinstance(trace_or_exc, Exception):
-                    exc = trace_or_exc
-                    matrix.cells.append(
-                        MatrixCell(
-                            skill=traj.skill,
-                            scenario=traj.scenario,
-                            phrasing=phrasing,
-                            adapter=adapter,
-                            passed=False,
-                            failures=[
-                                f"infra_fail: trace_provider raised "
-                                f"{type(exc).__name__}: {exc}"
-                            ],
-                        )
-                    )
-                    continue
-                trace = trace_or_exc
-
-                result = evaluate_assertions(traj.assertions, trace)
-                failures = list(result.failures)
-                passed = result.passed
-
-                # Phase 2A: if DSL passed AND a judge_client is wired,
-                # run the LLM judge and gate on the trajectory threshold.
-                # DSL failures short-circuit the judge to save cost.
-                if passed and cfg.judge_client is not None:
-                    if (
-                        cfg.max_judge_calls is not None
-                        and judge_calls >= cfg.max_judge_calls
-                    ):
-                        failures.append(
-                            f"judge_budget_exhausted: max_judge_calls="
-                            f"{cfg.max_judge_calls}; treating cell as DSL-only pass"
-                        )
-                    else:
-                        judge_calls += 1
-                        judge_result = evaluate_judge(
-                            traj, trace, cfg.judge_client,
-                        )
-                        threshold = get_threshold(traj)
-                        if judge_result.score < threshold:
-                            passed = False
-                            # Distinguish infra failures from quality
-                            # failures so operators reading the matrix
-                            # can route a 429 to "retry overnight" and a
-                            # quality miss to "regression to investigate."
-                            prefix = (
-                                "judge_infra_fail"
-                                if judge_result.is_infra_error
-                                else "llm_judge"
-                            )
-                            failures.append(
-                                f"{prefix}: score {judge_result.score:.2f} "
-                                f"below threshold {threshold} "
-                                f"(reasoning: {judge_result.reasoning})"
-                            )
-
                 matrix.cells.append(
-                    MatrixCell(
-                        skill=traj.skill,
-                        scenario=traj.scenario,
-                        phrasing=phrasing,
-                        adapter=adapter,
-                        passed=passed,
-                        failures=failures,
-                    )
+                    _evaluate_cell(cfg, traj, phrasing, adapter, counters)
                 )
 
     return matrix

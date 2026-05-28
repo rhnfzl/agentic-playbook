@@ -429,11 +429,12 @@ def test_harness_failure_details_route_to_stderr(tmp_path: Path, capsys) -> None
     assert "Bash" in captured.err
 
 
-def test_harness_strict_mode_warns_in_phase_1(tmp_path: Path) -> None:
-    """Codex review finding: --strict is currently a no-op; surface a
-    warning so CI that sets STRICT=1 expecting enforcement gets a clear
-    advisory rather than silent green pass."""
-    import warnings as _warnings
+def test_harness_strict_mode_refuses_unwired_judge(tmp_path: Path) -> None:
+    """Review-fold semantic for --strict (was a no-op warning): when a
+    trajectory configures an `llm_judge` block but `judge_client` is
+    None, --strict refuses the run before any spawn happens. Prevents
+    the silent DSL-only-pass mode the operator did not ask for."""
+    import pytest
     from trajectory_harness import HarnessConfig, run_harness
 
     _make_trajectory(tmp_path)
@@ -441,8 +442,63 @@ def test_harness_strict_mode_warns_in_phase_1(tmp_path: Path) -> None:
         repo_root=tmp_path,
         trace_provider=lambda _t, _p, _a: _fixture_trace(),
         strict=True,
+        # judge_client intentionally None.
     )
-    with _warnings.catch_warnings(record=True) as caught:
-        _warnings.simplefilter("always")
+    with pytest.raises(ValueError, match=r"strict mode.*llm_judge"):
         run_harness(cfg)
-    assert any("strict" in str(w.message).lower() for w in caught)
+
+
+def test_harness_strict_mode_runs_when_judge_is_wired(tmp_path: Path) -> None:
+    """--strict is satisfied when the judge_client is provided."""
+    from trajectory_harness import HarnessConfig, run_harness
+    from trajectory_judge import JudgeResult
+
+    class _PassJudge:
+        def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+            return JudgeResult(score=0.95, reasoning="ok", raw_response="", model="x")
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        strict=True,
+        judge_client=_PassJudge(),
+    )
+    matrix = run_harness(cfg)
+    assert matrix.passed == 1
+
+
+def test_harness_strict_mode_inert_when_no_llm_judge(tmp_path: Path) -> None:
+    """When no candidate trajectory has llm_judge, --strict is a no-op
+    and does not require a judge_client."""
+    from trajectory_harness import HarnessConfig, run_harness
+
+    # Build a trajectory without an llm_judge block.
+    skill_dir = tmp_path / "base" / "skills" / "engineering" / "demo2"
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: demo2\ndescription: x\nversion: 0.1.0\n"
+        "owner: test\nlast_reviewed: 2026-05-28\n---\n\n# x\n",
+        encoding="utf-8",
+    )
+    traj_dir = tmp_path / "base" / "trajectories" / "demo2"
+    traj_dir.mkdir(parents=True, exist_ok=True)
+    (traj_dir / "happy-path.yaml").write_text(
+        "---\nname: demo2/happy-path\ndescription: x\nskill: demo2\n"
+        "scenario: happy-path\nversion: 0.1.0\nowner: test\n"
+        "last_reviewed: 2026-05-28\nadapter_scope: [claude-code]\n"
+        "model_pinned: claude-opus-4-7\n---\n\n"
+        "input:\n  phrasings:\n"
+        '    - "one"\n    - "two"\n    - "three"\n'
+        '    - "four"\n    - "five"\n\n'
+        "assertions:\n  - first_skill_loaded: demo2\n"
+        "  - must_invoke_tool: Write\n",
+        encoding="utf-8",
+    )
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(skill="demo2"),
+        strict=True,
+    )
+    matrix = run_harness(cfg)
+    assert matrix.passed == 1

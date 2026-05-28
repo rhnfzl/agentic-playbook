@@ -272,6 +272,110 @@ def test_max_retries_records_final_failure_after_exhausting(tmp_path: Path) -> N
     assert "rate-limited" in joined
 
 
+# --- review-fold P2: retries count against max_provider_calls ---
+
+
+def test_retries_count_against_max_provider_calls(tmp_path: Path) -> None:
+    """Review-fold P2 finding: previous behavior counted only the
+    initial provider call against max_provider_calls, so
+    `--max-spawns=3 --max-retries=2` could spawn up to 9 subprocesses.
+    The fix: every attempt (initial + retries) consumes one budget
+    slot. With max_spawns=3 and an always-failing provider, at most 3
+    spawns happen total even when max_retries=5."""
+    from trajectory_harness import HarnessConfig, run_harness
+
+    attempts = {"n": 0}
+
+    def provider(t, p, a):
+        attempts["n"] += 1
+        raise RuntimeError("transient")
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=provider,
+        max_provider_calls=3,
+        max_retries=5,
+        retry_backoff_s=0.0,
+    )
+    matrix = run_harness(cfg)
+    # 3 spawns max across the run, not 5 cells x 6 attempts each.
+    assert attempts["n"] == 3
+    # Cells beyond the budget are recorded as budget_exhausted.
+    joined = "\n".join(f for c in matrix.cells for f in c.failures)
+    assert "budget_exhausted" in joined
+
+
+def test_retries_inside_one_cell_consume_budget(tmp_path: Path) -> None:
+    """A single cell that succeeds on attempt 3 (after 2 transient
+    failures) consumes 3 budget slots. The next cell then sees
+    budget_exhausted."""
+    from trajectory_harness import HarnessConfig, run_harness
+
+    attempts_per_cell: dict = {}
+
+    def provider(t, p, a):
+        attempts_per_cell.setdefault(p, 0)
+        attempts_per_cell[p] += 1
+        if attempts_per_cell[p] < 3:
+            raise TimeoutError("transient")
+        return _fixture_trace()
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=provider,
+        max_provider_calls=3,
+        max_retries=2,
+        retry_backoff_s=0.0,
+    )
+    matrix = run_harness(cfg)
+    # Exactly one cell finishes (after 3 attempts); the remaining 4
+    # cells skip with budget_exhausted.
+    successful_cells = [c for c in matrix.cells if c.passed]
+    assert len(successful_cells) == 1
+    skipped = [c for c in matrix.cells if not c.passed]
+    assert len(skipped) == 4
+    assert all(
+        any("budget_exhausted" in f for f in c.failures)
+        for c in skipped
+    )
+
+
+# --- review-fold P2: judge budget exhausted must fail the cell ---
+
+
+def test_judge_budget_exhausted_fails_the_cell(tmp_path: Path) -> None:
+    """Review-fold P2 finding: previously a cell with DSL pass but
+    judge budget exhausted stayed passed=True, contradicting ADR-0046's
+    'DSL pass AND judge pass' hybrid contract. The fix flips passed to
+    False so the matrix shows the cell as failed."""
+    from trajectory_harness import HarnessConfig, run_harness
+    from trajectory_judge import JudgeResult
+
+    class _PassJudge:
+        def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+            return JudgeResult(
+                score=0.95, reasoning="ok", raw_response="",
+                model="claude-sonnet-4-6",
+            )
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda t, p, a: _fixture_trace(),
+        judge_client=_PassJudge(),
+        max_judge_calls=0,  # budget exhausted before first cell.
+    )
+    matrix = run_harness(cfg)
+    # Every cell DSL-passes but judge budget is zero. Each cell must FAIL.
+    assert matrix.passed == 0
+    assert matrix.failed == 1  # one trajectory (5 phrasings, all failed)
+    assert all(not c.passed for c in matrix.cells)
+    joined = "\n".join(f for c in matrix.cells for f in c.failures)
+    assert "judge_budget_exhausted" in joined
+
+
 def test_judge_failures_are_not_retried(tmp_path: Path) -> None:
     """Retry applies only to the provider call. The judge has its own
     is_infra_error flag; harness retries don't compound on judge calls."""
