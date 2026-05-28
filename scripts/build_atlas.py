@@ -160,28 +160,34 @@ def _render_index(graph: graph_builder.Graph) -> str:
     return tpl.page(title="Why Atlas", root="./", body=body)
 
 
-def _render_adr(node: graph_builder.Node, source_text: str,
-                incoming_edges: list[graph_builder.Edge],
-                node_index: dict) -> str:
+def _render_adr(
+    node: graph_builder.Node,
+    source_text: str,
+    incoming_edges: list[graph_builder.Edge],
+    node_index: dict,
+) -> str:
     incoming = [
         tpl.link(f"../{node_index[e.source].href}", node_index[e.source].label)
-        for e in incoming_edges if e.target == node.id and e.source in node_index
+        for e in incoming_edges
+        if e.target == node.id and e.source in node_index
     ]
     body = (
         f"<h1>{tpl.escape(node.label)}</h1>"
         f'<p class="muted">Source: <code>{tpl.escape(node.meta.get("source_path", ""))}</code></p>'
-        f'<pre>{tpl.escape(source_text)}</pre>'
+        f"<pre>{tpl.escape(source_text)}</pre>"
         + tpl.section("Mentioned by", incoming or [])
     )
     return tpl.page(title=node.label, root="../", body=body)
 
 
-def _render_skill(node: graph_builder.Node,
-                  bom_index: dict,
-                  telemetry_index: dict,
-                  trajectory_targets: list,
-                  incoming_adrs: list,
-                  node_index: dict) -> str:
+def _render_skill(
+    node: graph_builder.Node,
+    bom_index: dict,
+    telemetry_index: dict,
+    trajectory_targets: list,
+    incoming_adrs: list,
+    node_index: dict,
+) -> str:
     meta = node.meta
     bom_entry = bom_index.get(meta.get("source_path", "").rsplit("/SKILL.md", 1)[0], {})
     vetted = bom_entry.get("vetted_as_of")
@@ -193,11 +199,16 @@ def _render_skill(node: graph_builder.Node,
     elif bom_entry:
         badges.append(tpl.badge("warn", "vetted", "unvetted"))
     if telemetry_entry is not None:
-        badges.append(tpl.badge("info", "triggers", str(telemetry_entry["trigger_count"])))
-        badges.append(tpl.badge(
-            "info", "last fired",
-            telemetry_entry["last_fired_at"][:10] or "unknown",
-        ))
+        badges.append(
+            tpl.badge("info", "triggers", str(telemetry_entry["trigger_count"]))
+        )
+        badges.append(
+            tpl.badge(
+                "info",
+                "last fired",
+                telemetry_entry["last_fired_at"][:10] or "unknown",
+            )
+        )
     if trajectory_targets:
         badges.append(tpl.badge("info", "trajectories", str(len(trajectory_targets))))
 
@@ -217,32 +228,40 @@ def _render_skill(node: graph_builder.Node,
 
     body = (
         f"<h1>{tpl.escape(node.label)}</h1>"
-        f'<p>{tpl.escape(meta.get("description", ""))}</p>'
+        f"<p>{tpl.escape(meta.get('description', ''))}</p>"
         f"<p>{' '.join(badges)}</p>"
         f"<dl>{detail_rows}</dl>"
         + tpl.section(
             "Trajectories targeting this skill",
-            [tpl.link(f"../{node_index[tid].href}", node_index[tid].label)
-             for tid in trajectory_targets if tid in node_index],
+            [
+                tpl.link(f"../{node_index[tid].href}", node_index[tid].label)
+                for tid in trajectory_targets
+                if tid in node_index
+            ],
         )
         + tpl.section(
             "ADRs mentioning this skill",
-            [tpl.link(f"../{node_index[aid].href}", node_index[aid].label)
-             for aid in incoming_adrs if aid in node_index],
+            [
+                tpl.link(f"../{node_index[aid].href}", node_index[aid].label)
+                for aid in incoming_adrs
+                if aid in node_index
+            ],
         )
     )
     return tpl.page(title=node.label, root="../", body=body)
 
 
-def _render_trajectory(node: graph_builder.Node, source_text: str,
-                       node_index: dict, edges: list) -> str:
+def _render_trajectory(
+    node: graph_builder.Node, source_text: str, node_index: dict, edges: list
+) -> str:
     target_id = next(
         (e.target for e in edges if e.source == node.id and e.kind == "belongs_to"),
         None,
     )
     skill_link = (
         tpl.link(f"../{node_index[target_id].href}", node_index[target_id].label)
-        if target_id and target_id in node_index else "<em>unknown</em>"
+        if target_id and target_id in node_index
+        else "<em>unknown</em>"
     )
     body = (
         f"<h1>{tpl.escape(node.label)}</h1>"
@@ -285,31 +304,43 @@ def build_site(repo_root: Path, out_dir: Path) -> int:
 
         if node.kind == "adr":
             source_text = (repo_root / node.meta["source_path"]).read_text(
-                encoding="utf-8", errors="replace",
+                encoding="utf-8",
+                errors="replace",
             )
             html_text = _render_adr(
-                node, source_text,
-                incoming_by_target.get(node.id, []), node_index,
+                node,
+                source_text,
+                incoming_by_target.get(node.id, []),
+                node_index,
             )
         elif node.kind == "skill":
             trajectory_targets = [
-                e.source for e in incoming_by_target.get(node.id, [])
+                e.source
+                for e in incoming_by_target.get(node.id, [])
                 if e.kind == "belongs_to"
             ]
             incoming_adrs = [
-                e.source for e in incoming_by_target.get(node.id, [])
+                e.source
+                for e in incoming_by_target.get(node.id, [])
                 if e.kind == "mentions"
             ]
             html_text = _render_skill(
-                node, bom_index, telemetry_index,
-                trajectory_targets, incoming_adrs, node_index,
+                node,
+                bom_index,
+                telemetry_index,
+                trajectory_targets,
+                incoming_adrs,
+                node_index,
             )
         elif node.kind == "trajectory":
             source_text = (repo_root / node.meta["source_path"]).read_text(
-                encoding="utf-8", errors="replace",
+                encoding="utf-8",
+                errors="replace",
             )
             html_text = _render_trajectory(
-                node, source_text, node_index,
+                node,
+                source_text,
+                node_index,
                 outgoing_by_source.get(node.id, []),
             )
         else:
@@ -324,18 +355,24 @@ def build_site(repo_root: Path, out_dir: Path) -> int:
         # the absolute path keeps the success message useful and avoids
         # raising a ValueError on the documented `--out /tmp/atlas` path.
         display_path = str(out_dir)
-    print(f"  ok  atlas built at {display_path} "
-          f"({len(graph.nodes)} node(s), {len(graph.edges)} edge(s))")
+    print(
+        f"  ok  atlas built at {display_path} "
+        f"({len(graph.nodes)} node(s), {len(graph.edges)} edge(s))"
+    )
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--repo-root", type=Path, default=Path(__file__).resolve().parent.parent,
+        "--repo-root",
+        type=Path,
+        default=Path(__file__).resolve().parent.parent,
     )
     parser.add_argument(
-        "--out", type=Path, default=None,
+        "--out",
+        type=Path,
+        default=None,
         help="defaults to <repo-root>/docs/atlas",
     )
     args = parser.parse_args(argv)

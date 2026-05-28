@@ -234,7 +234,7 @@ def _call_provider_with_retry(
         except (TimeoutError, RuntimeError) as exc:
             last_exc = exc
             if attempt < max_retries and backoff_s > 0:
-                _time.sleep(backoff_s * (2 ** attempt))
+                _time.sleep(backoff_s * (2**attempt))
             attempt += 1
         except Exception as exc:
             # Non-retriable: ValueError (bad adapter), etc.
@@ -244,7 +244,8 @@ def _call_provider_with_retry(
 
 
 def _make_provider_budget_consumer(
-    cfg: HarnessConfig, counters: _HarnessCounters,
+    cfg: HarnessConfig,
+    counters: _HarnessCounters,
 ) -> Callable[[], bool]:
     """Return a per-attempt budget hook for `_call_provider_with_retry`.
 
@@ -254,6 +255,7 @@ def _make_provider_budget_consumer(
     NOT increment and the function returns False (caller aborts). A
     `None` cap acts as unlimited.
     """
+
     def _consume() -> bool:
         if (
             cfg.max_provider_calls is not None
@@ -267,14 +269,12 @@ def _make_provider_budget_consumer(
 
 
 def _consume_judge_budget(
-    cfg: HarnessConfig, counters: _HarnessCounters,
+    cfg: HarnessConfig,
+    counters: _HarnessCounters,
 ) -> bool:
     """Check + consume one slot in the judge budget. Mirrors the
     provider variant but as a one-shot call (no retry on judge)."""
-    if (
-        cfg.max_judge_calls is not None
-        and counters.judge_calls >= cfg.max_judge_calls
-    ):
+    if cfg.max_judge_calls is not None and counters.judge_calls >= cfg.max_judge_calls:
         return False
     counters.judge_calls += 1
     return True
@@ -295,6 +295,7 @@ def _evaluate_cell(
     170-line nested loop where each concern added another `if` at the
     same indentation).
     """
+
     def _cell(passed: bool, failures: list[str]) -> MatrixCell:
         return MatrixCell(
             skill=trajectory.skill,
@@ -316,13 +317,16 @@ def _evaluate_cell(
         # spawn. The retry loop also rechecks per attempt; this guard
         # is the "no first attempt at all" case so its message names
         # the cell-start condition, not the mid-retry condition.
-        return _cell(False, [
-            f"budget_exhausted: max_provider_calls="
-            f"{cfg.max_provider_calls} reached"
-        ])
+        return _cell(
+            False,
+            [f"budget_exhausted: max_provider_calls={cfg.max_provider_calls} reached"],
+        )
 
     trace_or_exc = _call_provider_with_retry(
-        cfg.trace_provider, trajectory, phrasing, adapter,
+        cfg.trace_provider,
+        trajectory,
+        phrasing,
+        adapter,
         max_retries=cfg.max_retries,
         backoff_s=cfg.retry_backoff_s,
         consume_budget=_make_provider_budget_consumer(cfg, counters),
@@ -340,15 +344,17 @@ def _evaluate_cell(
         # crashed".
         msg = str(exc)
         if msg.startswith("budget_exhausted:"):
-            return _cell(False, [
-                f"budget_exhausted: max_provider_calls="
-                f"{cfg.max_provider_calls} reached during retry "
-                f"({type(exc).__name__})"
-            ])
-        return _cell(False, [
-            f"infra_fail: trace_provider raised "
-            f"{type(exc).__name__}: {exc}"
-        ])
+            return _cell(
+                False,
+                [
+                    f"budget_exhausted: max_provider_calls="
+                    f"{cfg.max_provider_calls} reached during retry "
+                    f"({type(exc).__name__})"
+                ],
+            )
+        return _cell(
+            False, [f"infra_fail: trace_provider raised {type(exc).__name__}: {exc}"]
+        )
 
     trace = trace_or_exc
     result = evaluate_assertions(trajectory.assertions, trace)
@@ -372,12 +378,16 @@ def _evaluate_cell(
         return _cell(passed, failures)
 
     if not _consume_judge_budget(cfg, counters):
-        return _cell(False, failures + [
-            f"judge_budget_exhausted: max_judge_calls="
-            f"{cfg.max_judge_calls} reached. The hybrid match contract "
-            f"(ADR-0046) requires both DSL and judge to pass; without "
-            f"a judge score this cell cannot pass."
-        ])
+        return _cell(
+            False,
+            failures
+            + [
+                f"judge_budget_exhausted: max_judge_calls="
+                f"{cfg.max_judge_calls} reached. The hybrid match contract "
+                f"(ADR-0046) requires both DSL and judge to pass; without "
+                f"a judge score this cell cannot pass."
+            ],
+        )
 
     judge_result = evaluate_judge(trajectory, trace, cfg.judge_client)
     threshold = get_threshold(trajectory)
@@ -385,11 +395,7 @@ def _evaluate_cell(
         # Distinguish infra failures from quality failures so operators
         # reading the matrix can route a 429 to "retry overnight" and a
         # quality miss to "regression to investigate."
-        prefix = (
-            "judge_infra_fail"
-            if judge_result.is_infra_error
-            else "llm_judge"
-        )
+        prefix = "judge_infra_fail" if judge_result.is_infra_error else "llm_judge"
         failures.append(
             f"{prefix}: score {judge_result.score:.2f} "
             f"below threshold {threshold} "
@@ -436,13 +442,12 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
     # == 0 falsely reports success (third-review P2 finding). Fail loud.
     if cfg.adapter_filter:
         scopes_with_adapter = [
-            t for t in candidate_trajectories
-            if cfg.adapter_filter in t.adapter_scope
+            t for t in candidate_trajectories if cfg.adapter_filter in t.adapter_scope
         ]
         if not scopes_with_adapter:
-            adapter_options = sorted({
-                a for t in candidate_trajectories for a in t.adapter_scope
-            })
+            adapter_options = sorted(
+                {a for t in candidate_trajectories for a in t.adapter_scope}
+            )
             raise ValueError(
                 f"adapter filter '{cfg.adapter_filter}' is valid but no "
                 f"trajectory in scope declares it in adapter_scope; "
@@ -454,13 +459,9 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
     # it catches the silent "trajectory configured an LLM judge but the
     # operator forgot --judge" failure mode before any spawn happens.
     if cfg.strict and cfg.judge_client is None:
-        traj_with_judge = [
-            t for t in candidate_trajectories if t.llm_judge
-        ]
+        traj_with_judge = [t for t in candidate_trajectories if t.llm_judge]
         if traj_with_judge:
-            names = sorted({
-                f"{t.skill}/{t.scenario}" for t in traj_with_judge
-            })
+            names = sorted({f"{t.skill}/{t.scenario}" for t in traj_with_judge})
             raise ValueError(
                 "strict mode: the following trajectories configure an "
                 "llm_judge block but no judge_client was provided to "
@@ -504,7 +505,9 @@ def print_summary(matrix: Matrix) -> None:
     print()
     print(f"  {'skill':<24} {'scenario':<18} {'adapter':<14} result")
     print("  " + "-" * 70)
-    for (skill, scenario, adapter), (passed, total, _failures) in sorted(by_key.items()):
+    for (skill, scenario, adapter), (passed, total, _failures) in sorted(
+        by_key.items()
+    ):
         verdict = "PASS" if passed == total else f"FAIL ({passed}/{total})"
         print(f"  {skill:<24} {scenario:<18} {adapter:<14} {verdict}")
 
@@ -516,7 +519,9 @@ def print_summary(matrix: Matrix) -> None:
         # stderr so `make trajectory-check 2>diag.log` captures them.
         print(file=sys.stderr)
         print("Failures:", file=sys.stderr)
-        for (skill, scenario, adapter), (passed, total, failures) in sorted(by_key.items()):
+        for (skill, scenario, adapter), (passed, total, failures) in sorted(
+            by_key.items()
+        ):
             if passed == total:
                 continue
             print(f"  {skill}/{scenario} on {adapter}:", file=sys.stderr)

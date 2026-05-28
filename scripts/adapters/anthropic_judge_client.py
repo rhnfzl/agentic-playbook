@@ -88,13 +88,15 @@ class HttpAnthropicJudgeClient:
         temperature: float = 0.0,
     ) -> JudgeResult:
         messages = build_judge_messages(rubric, trace_summary)
-        body = json.dumps({
-            "model": model,
-            "max_tokens": _DEFAULT_MAX_TOKENS,
-            "system": _SYSTEM_PROMPT,
-            "messages": messages,
-            "temperature": temperature,
-        }).encode("utf-8")
+        body = json.dumps(
+            {
+                "model": model,
+                "max_tokens": _DEFAULT_MAX_TOKENS,
+                "system": _SYSTEM_PROMPT,
+                "messages": messages,
+                "temperature": temperature,
+            }
+        ).encode("utf-8")
 
         request = urllib.request.Request(
             _ANTHROPIC_URL,

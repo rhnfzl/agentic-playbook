@@ -87,7 +87,9 @@ def main() -> int:
     # overlays/team/skills/ per --scope. Old skills/<cat>/<name>/ path
     # is no longer walked by the loader.
     if args.scope == "team":
-        skill_dir = repo_root / "overlays" / "team" / "skills" / args.category / args.name
+        skill_dir = (
+            repo_root / "overlays" / "team" / "skills" / args.category / args.name
+        )
     else:
         skill_dir = repo_root / "base" / "skills" / args.category / args.name
     skill_md = skill_dir / "SKILL.md"

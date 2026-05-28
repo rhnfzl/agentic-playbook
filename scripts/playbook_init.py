@@ -306,12 +306,8 @@ def main() -> int:
         return 2
     unknown = [name for name in profile_names if name not in VALID_PROFILES]
     if unknown:
-        print(
-            f"ERROR: unknown profile(s): {', '.join(unknown)}", file=sys.stderr
-        )
-        print(
-            f"Available: {', '.join(sorted(VALID_PROFILES))}", file=sys.stderr
-        )
+        print(f"ERROR: unknown profile(s): {', '.join(unknown)}", file=sys.stderr)
+        print(f"Available: {', '.join(sorted(VALID_PROFILES))}", file=sys.stderr)
         return 2
     profile_value = ",".join(profile_names)
 
@@ -326,6 +322,7 @@ def main() -> int:
     content_scope = args.scope
     if not content_scope:
         from scope_resolution import detect_scope_from_remote
+
         detected = detect_scope_from_remote(target, REPO_ROOT)
         if detected:
             content_scope = ",".join(detected)

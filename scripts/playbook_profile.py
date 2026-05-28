@@ -122,9 +122,7 @@ def load_profiles(repo_root: Path, names: list[str]) -> Profile:
     )
 
 
-def validate_profile_scope(
-    profile: Profile, active_scope: list[str]
-) -> None:
+def validate_profile_scope(profile: Profile, active_scope: list[str]) -> None:
     """Raise ValueError if the profile requires overlays not in the active scope.
 
     Per ADR-0040 (v0.11): a profile may declare `requires_overlays =

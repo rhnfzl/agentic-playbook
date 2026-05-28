@@ -250,10 +250,7 @@ def sync_set(set_name: str, clones: dict[str, Path]) -> tuple[int, int]:
             shutil.rmtree(child)
             removed += 1
 
-    print(
-        f"  {set_name}: {copied} skill(s) copied, "
-        f"{removed} stale dir(s) removed"
-    )
+    print(f"  {set_name}: {copied} skill(s) copied, {removed} stale dir(s) removed")
     return (copied, removed)
 
 
@@ -276,7 +273,9 @@ def main() -> int:
         for entry in data.get("skills", []):
             upstreams_needed.add(entry["upstream"])
 
-    print(f"Syncing {len(set_dirs)} imported set(s): {', '.join(d.name for d in set_dirs)}")
+    print(
+        f"Syncing {len(set_dirs)} imported set(s): {', '.join(d.name for d in set_dirs)}"
+    )
     print(f"Upstreams needed: {', '.join(sorted(upstreams_needed))}")
 
     # Validate upstream names BEFORE the first clone. Without this, a typo in

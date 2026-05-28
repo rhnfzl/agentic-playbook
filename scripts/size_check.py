@@ -47,6 +47,7 @@ def _skill_roots(repo_root: Path) -> list[Path]:
         repo_root / "overlays" / "team" / "skills",
     ]
 
+
 # First-party skills explicitly exempted from the warn threshold. Each
 # entry pairs the relative SKILL.md path with the documented reason.
 # Goal: every entry justifies why progressive disclosure would *worsen*
@@ -94,7 +95,9 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
     roots = [r for r in _skill_roots(repo_root) if r.is_dir()]
     if not roots:
-        print("  no skill roots found at base/skills/ or overlays/team/skills/; nothing to check")
+        print(
+            "  no skill roots found at base/skills/ or overlays/team/skills/; nothing to check"
+        )
         return 0
 
     warnings: list[str] = []
@@ -131,7 +134,9 @@ def main() -> int:
         )
 
     if vendored_warns:
-        print(f"\nSize check: {len(vendored_warns)} vendored skill(s) over the soft line (informational)")
+        print(
+            f"\nSize check: {len(vendored_warns)} vendored skill(s) over the soft line (informational)"
+        )
         for w in vendored_warns:
             print(f"  i  {w}")
 

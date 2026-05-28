@@ -42,10 +42,17 @@ def _print_findings(findings: list[Finding]) -> None:
         key=lambda f: (SEVERITY_ORDER.get(f.severity, 99), f.skill_path),
     )
     for f in findings_sorted:
-        prefix = {"critical": "X", "high": "X", "medium": "!",
-                  "low": ".", "info": "."}.get(f.severity, "?")
-        print(f"  {prefix}  [{f.severity}] {f.source}: {f.skill_path}: "
-              f"{f.category}: {f.message}")
+        prefix = {
+            "critical": "X",
+            "high": "X",
+            "medium": "!",
+            "low": ".",
+            "info": ".",
+        }.get(f.severity, "?")
+        print(
+            f"  {prefix}  [{f.severity}] {f.source}: {f.skill_path}: "
+            f"{f.category}: {f.message}"
+        )
 
 
 def _summary_line(results: list[WrapperResult], findings: list[Finding]) -> str:
@@ -73,11 +80,13 @@ def run_security_audit(repo_root: Path) -> int:
     results.append(agent_skill_evaluator_wrapper.run(skill_dirs, repo_root))
 
     ddipe_findings = ddipe_detector.scan_skill_dirs(skill_dirs, repo_root)
-    results.append(WrapperResult(
-        tool="ddipe",
-        status="findings" if ddipe_findings else "ok",
-        findings=ddipe_findings,
-    ))
+    results.append(
+        WrapperResult(
+            tool="ddipe",
+            status="findings" if ddipe_findings else "ok",
+            findings=ddipe_findings,
+        )
+    )
 
     try:
         rc = ai_bom.main(["--repo-root", str(repo_root)])
@@ -103,7 +112,8 @@ def run_security_audit(repo_root: Path) -> int:
     skipped_count = sum(1 for r in results if r.status == "skipped")
     error_results = [r for r in results if r.status == "error"]
     blocking_findings = [
-        f for f in all_findings
+        f
+        for f in all_findings
         if SEVERITY_ORDER.get(f.severity, 99) <= SEVERITY_ORDER["medium"]
     ]
 
@@ -113,11 +123,15 @@ def run_security_audit(repo_root: Path) -> int:
         # ADR-0047: a wrapper exiting unexpectedly is a gate failure, not
         # a soft-skip. We do not know what the wrapper would have flagged,
         # so we cannot let the build through.
-        print(f"  {len(error_results)} wrapper(s) errored unexpectedly; "
-              "ADR-0047 treats this as a blocking failure")
+        print(
+            f"  {len(error_results)} wrapper(s) errored unexpectedly; "
+            "ADR-0047 treats this as a blocking failure"
+        )
         return 1
     if strict and skipped_count > 0:
-        print(f"  STRICT_SECURITY=1: {skipped_count} wrapper(s) skipped, treating as failure")
+        print(
+            f"  STRICT_SECURITY=1: {skipped_count} wrapper(s) skipped, treating as failure"
+        )
         return 1
     return 0
 
@@ -132,7 +146,9 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
-        "--repo-root", type=Path, default=Path(__file__).resolve().parent.parent,
+        "--repo-root",
+        type=Path,
+        default=Path(__file__).resolve().parent.parent,
         help="defaults to the parent of this script (the playbook checkout)",
     )
     args = parser.parse_args(argv)

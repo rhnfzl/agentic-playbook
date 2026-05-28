@@ -81,8 +81,7 @@ def main(
 
     content = PlaybookContent.load(repo_root)
     matching = [
-        t for t in content.trajectories
-        if t.skill == skill and t.scenario == scenario
+        t for t in content.trajectories if t.skill == skill and t.scenario == scenario
     ]
     if not matching:
         print(
@@ -139,11 +138,7 @@ def main(
         judge_result = evaluate_judge(traj, trace, client)
         threshold = get_threshold(traj)
         if judge_result.score < threshold:
-            prefix = (
-                "judge_infra_fail"
-                if judge_result.is_infra_error
-                else "llm_judge"
-            )
+            prefix = "judge_infra_fail" if judge_result.is_infra_error else "llm_judge"
             judge_failure_msg = (
                 f"{prefix}: score {judge_result.score:.2f} below "
                 f"threshold {threshold} (reasoning: {judge_result.reasoning})"

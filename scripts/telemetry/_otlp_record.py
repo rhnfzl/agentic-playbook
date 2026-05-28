@@ -31,21 +31,23 @@ from . import TelemetryRecord
 
 # Attribute keys we keep. Everything outside this allowlist is dropped
 # before write or comparison.
-ALLOWED_KEYS = frozenset({
-    "gen_ai.system",
-    "gen_ai.request.model",
-    "gen_ai.response.model",
-    "gen_ai.usage.input_tokens",
-    "gen_ai.usage.output_tokens",
-    "gen_ai.usage.prompt_tokens",   # legacy alias
-    "gen_ai.usage.completion_tokens",  # legacy alias
-    "gen_ai.agent.id",
-    "gen_ai.agent.name",
-    "gen_ai.query.source",
-    "skill.name",
-    "skill.id",
-    "playbook.adapter",
-})
+ALLOWED_KEYS = frozenset(
+    {
+        "gen_ai.system",
+        "gen_ai.request.model",
+        "gen_ai.response.model",
+        "gen_ai.usage.input_tokens",
+        "gen_ai.usage.output_tokens",
+        "gen_ai.usage.prompt_tokens",  # legacy alias
+        "gen_ai.usage.completion_tokens",  # legacy alias
+        "gen_ai.agent.id",
+        "gen_ai.agent.name",
+        "gen_ai.query.source",
+        "skill.name",
+        "skill.id",
+        "playbook.adapter",
+    }
+)
 
 # Banned keys we ACTIVELY strip even if the upstream sends them. The
 # privacy guarantee in ADR-0048: no prompt or response body reaches

@@ -97,9 +97,7 @@ def run(ctx: CheckContext) -> CheckResult:
             if verdict == "ok":
                 continue
             tag = "FAIL" if verdict == "fail" else "WARN"
-            issues.append(
-                f"{allowlist}:{idx}: {tag}: {raw_line.strip()[:120]!r}"
-            )
+            issues.append(f"{allowlist}:{idx}: {tag}: {raw_line.strip()[:120]!r}")
             if verdict == "fail":
                 has_fail = True
             else:

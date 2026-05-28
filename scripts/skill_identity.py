@@ -41,7 +41,7 @@ def parse_frontmatter(content: str) -> tuple[dict[str, str], str]:
     except ValueError:
         return {}, content
     block = content[3:end]
-    body = content[end + 3:].lstrip("\n")
+    body = content[end + 3 :].lstrip("\n")
     fm: dict[str, str] = {}
     for line in block.splitlines():
         line = line.strip()

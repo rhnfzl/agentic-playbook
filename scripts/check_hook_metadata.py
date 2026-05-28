@@ -77,7 +77,9 @@ def main(repo_root: Path | None = None) -> int:
     ]
     hook_roots = [r for r in hook_roots if r.is_dir()]
     if not hook_roots:
-        print("  no hooks dirs at base/hooks/ or overlays/team/hooks/; nothing to check")
+        print(
+            "  no hooks dirs at base/hooks/ or overlays/team/hooks/; nothing to check"
+        )
         return 0
 
     missing_event: list[Path] = []
@@ -108,9 +110,7 @@ def main(repo_root: Path | None = None) -> int:
             unknown = declared_adapters - _VALID_ADAPTERS
             valid = declared_adapters & _VALID_ADAPTERS
             if unknown:
-                bad_adapters.append(
-                    (hook, f"unknown slug(s): {sorted(unknown)}")
-                )
+                bad_adapters.append((hook, f"unknown slug(s): {sorted(unknown)}"))
             elif not valid:
                 bad_adapters.append((hook, "empty after parse"))
 

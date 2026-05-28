@@ -49,14 +49,25 @@ def _normalize_severity(value: str) -> str:
     return SEVERITY_MAP.get((value or "").upper(), "medium")
 
 
-def _invoke(tool_pkg: str, config_path: Path) -> subprocess.CompletedProcess[str] | None:
+def _invoke(
+    tool_pkg: str, config_path: Path
+) -> subprocess.CompletedProcess[str] | None:
     cmd = [
-        "uvx", f"{tool_pkg}@latest", "scan",
-        "--json", "--skills", "--ci", str(config_path),
+        "uvx",
+        f"{tool_pkg}@latest",
+        "scan",
+        "--json",
+        "--skills",
+        "--ci",
+        str(config_path),
     ]
     try:
         return subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120, check=False,
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
         )
     except (subprocess.TimeoutExpired, OSError):
         return None
@@ -70,14 +81,16 @@ def _parse_findings(payload: dict, repo_root: Path) -> list[Finding]:
             rel = str(Path(skill_path).resolve().relative_to(repo_root))
         except (ValueError, OSError):
             rel = skill_path
-        findings.append(Finding(
-            source="snyk-agent-scan",
-            severity=_normalize_severity(row.get("severity", row.get("level", ""))),
-            skill_path=rel,
-            category=row.get("rule", row.get("code", "unspecified")),
-            message=row.get("message", "")[:200],
-            raw=json.dumps(row)[:500],
-        ))
+        findings.append(
+            Finding(
+                source="snyk-agent-scan",
+                severity=_normalize_severity(row.get("severity", row.get("level", ""))),
+                skill_path=rel,
+                category=row.get("rule", row.get("code", "unspecified")),
+                message=row.get("message", "")[:200],
+                raw=json.dumps(row)[:500],
+            )
+        )
     return findings
 
 
@@ -94,21 +107,27 @@ def run(skill_dirs: list[Path], repo_root: Path) -> WrapperResult:
 
     if not _have_uvx():
         return WrapperResult(
-            tool=tool, status="skipped", findings=[],
+            tool=tool,
+            status="skipped",
+            findings=[],
             note="uvx not on PATH; install uv to enable the Snyk skill scanner",
         )
 
     config_env = os.environ.get("SNYK_AGENT_SCAN_CONFIG", "").strip()
     if not config_env:
         return WrapperResult(
-            tool=tool, status="skipped", findings=[],
+            tool=tool,
+            status="skipped",
+            findings=[],
             note="set SNYK_AGENT_SCAN_CONFIG=<path-to-mcp-config> to opt in",
         )
 
     config_path = Path(config_env).expanduser().resolve()
     if not config_path.is_file():
         return WrapperResult(
-            tool=tool, status="skipped", findings=[],
+            tool=tool,
+            status="skipped",
+            findings=[],
             note=f"SNYK_AGENT_SCAN_CONFIG points at missing file: {config_path}",
         )
 
@@ -120,8 +139,7 @@ def run(skill_dirs: list[Path], repo_root: Path) -> WrapperResult:
             continue
         if proc.returncode not in (0, 1):
             last_error = (
-                f"{candidate} exit={proc.returncode}: "
-                f"{proc.stderr.strip()[:200]}"
+                f"{candidate} exit={proc.returncode}: {proc.stderr.strip()[:200]}"
             )
             continue
         try:
@@ -138,6 +156,8 @@ def run(skill_dirs: list[Path], repo_root: Path) -> WrapperResult:
         )
 
     return WrapperResult(
-        tool=tool, status="skipped", findings=[],
+        tool=tool,
+        status="skipped",
+        findings=[],
         note=f"no candidate scanner resolved; last error: {last_error}",
     )

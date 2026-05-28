@@ -48,7 +48,7 @@ class _DecayBands(NamedTuple):
 SKILL_BANDS = _DecayBands(notice=60, warn=90, block=180)
 TRAJECTORY_BANDS = _DecayBands(notice=60, warn=90, block=180)
 
-USAGE_DECAY_DAYS = 60   # no triggers in this many days = decaying
+USAGE_DECAY_DAYS = 60  # no triggers in this many days = decaying
 
 # Back-compat aliases for any consumer that imports these constants directly.
 NOTICE_DAYS = SKILL_BANDS.notice
@@ -145,9 +145,7 @@ def _usage_decay_findings(
         rel = skill_md.relative_to(repo_root)
         last = fired_by_skill.get(skill_name)
         if last is None:
-            notices.append(
-                f"{rel}: no telemetry events recorded (no usage signal)"
-            )
+            notices.append(f"{rel}: no telemetry events recorded (no usage signal)")
             continue
         try:
             last_date = datetime.strptime(last[:10], "%Y-%m-%d").date()

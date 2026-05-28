@@ -87,7 +87,9 @@ def main(
         parser = argparse.ArgumentParser(description="Scaffold a new trajectory")
         parser.add_argument("--skill", required=True, help="Skill slug (must exist)")
         parser.add_argument(
-            "--scenario", required=True, help="Scenario slug (kebab-case, e.g. happy-path)"
+            "--scenario",
+            required=True,
+            help="Scenario slug (kebab-case, e.g. happy-path)",
         )
         parser.add_argument(
             "--owner",

@@ -52,9 +52,7 @@ def _check_first_skill_loaded(value: str, trace: TraceRecord) -> str | None:
             f"appeared in the trace"
         )
     if loads[0].name != value:
-        return (
-            f"first_skill_loaded: expected '{value}', got '{loads[0].name}'"
-        )
+        return f"first_skill_loaded: expected '{value}', got '{loads[0].name}'"
     return None
 
 
@@ -68,8 +66,7 @@ def _check_must_not_invoke_tool(value: str, trace: TraceRecord) -> str | None:
     for call in trace.tool_calls():
         if call.name == value:
             return (
-                f"must_not_invoke_tool: '{value}' was called "
-                f"(at event seq={call.seq})"
+                f"must_not_invoke_tool: '{value}' was called (at event seq={call.seq})"
             )
     return None
 
@@ -216,7 +213,7 @@ def _check_no_skill_load_after(value, trace: TraceRecord) -> str | None:
     """value is a list of allowed skill names. Any skill_load event whose
     name is not in the allowed list is a failure."""
     if not isinstance(value, list):
-        return f"no_skill_load_after: expected list of allowed skill slugs"
+        return "no_skill_load_after: expected list of allowed skill slugs"
     allowed = set(value)
     for event in trace.skill_loads():
         if event.name not in allowed:

@@ -72,7 +72,9 @@ def main(repo_root: Path | None = None) -> int:
     ]
     skill_roots = [r for r in skill_roots if r.is_dir()]
     if not skill_roots:
-        print("  no skill roots found at base/skills/ or overlays/team/skills/; nothing to check")
+        print(
+            "  no skill roots found at base/skills/ or overlays/team/skills/; nothing to check"
+        )
         return 0
 
     failures: list[tuple[Path, int]] = []

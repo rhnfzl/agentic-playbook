@@ -201,8 +201,8 @@ def _print_report_human(report: CalibrationReport) -> None:
         )
     elif report.is_noisy:
         print(
-            f"  NOISY: score range exceeds threshold. Per ADR-0046, "
-            f"tighten the rubric or drop the LLM-judge half."
+            "  NOISY: score range exceeds threshold. Per ADR-0046, "
+            "tighten the rubric or drop the LLM-judge half."
         )
     elif report.infra_errors:
         print(
@@ -210,7 +210,7 @@ def _print_report_human(report: CalibrationReport) -> None:
             f"run(s) failed at the transport layer; retry to confirm."
         )
     else:
-        print(f"  ok  rubric within calibration threshold")
+        print("  ok  rubric within calibration threshold")
     print()
 
 
@@ -232,7 +232,9 @@ def main(
         parser.add_argument("--scenario", required=True)
         parser.add_argument("--runs", type=int, default=_DEFAULT_RUNS)
         parser.add_argument(
-            "--noise-threshold", type=float, default=_DEFAULT_NOISE_THRESHOLD,
+            "--noise-threshold",
+            type=float,
+            default=_DEFAULT_NOISE_THRESHOLD,
         )
         parser.add_argument("--json", action="store_true")
         args = parser.parse_args()
@@ -247,8 +249,7 @@ def main(
 
     content = PlaybookContent.load(repo_root)
     matching = [
-        t for t in content.trajectories
-        if t.skill == skill and t.scenario == scenario
+        t for t in content.trajectories if t.skill == skill and t.scenario == scenario
     ]
     if not matching:
         print(
@@ -263,7 +264,11 @@ def main(
         # non-None. Narrow for pyright.
         assert skill is not None and scenario is not None
         fixture_path = (
-            repo_root / "base" / "trajectories" / skill / "fixtures"
+            repo_root
+            / "base"
+            / "trajectories"
+            / skill
+            / "fixtures"
             / f"{scenario}-pass.jsonl"
         )
         if not fixture_path.is_file():
@@ -277,7 +282,9 @@ def main(
 
         prompt = traj.input_phrasings[0] if traj.input_phrasings else ""
         trace = parse_otel_jsonl(
-            fixture_path, session_id="calibrate", prompt=prompt,
+            fixture_path,
+            session_id="calibrate",
+            prompt=prompt,
         )
     else:
         trace = trace_provider(traj)

@@ -36,12 +36,9 @@ def compute_coverage(repo_root: Path) -> dict:
     ratio = (trajectory_count / skill_count) if skill_count else 0.0
 
     claude_only = sum(
-        1 for t in content.trajectories
-        if t.adapter_scope == ["claude-code"]
+        1 for t in content.trajectories if t.adapter_scope == ["claude-code"]
     )
-    claude_only_share = (
-        (claude_only / trajectory_count) if trajectory_count else 0.0
-    )
+    claude_only_share = (claude_only / trajectory_count) if trajectory_count else 0.0
 
     return {
         "skill_count": skill_count,
@@ -72,15 +69,19 @@ def main() -> int:
         return 0
 
     print()
-    print(f"Trajectory coverage (ADR-0044 reject-if metric)")
+    print("Trajectory coverage (ADR-0044 reject-if metric)")
     print()
     print(f"  Skills shipped:           {summary['skill_count']}")
     print(f"  Trajectories committed:   {summary['trajectory_count']}")
-    print(f"  Coverage ratio:           {summary['ratio']}  (target >= {summary['target_ratio']})")
+    print(
+        f"  Coverage ratio:           {summary['ratio']}  (target >= {summary['target_ratio']})"
+    )
     print(f"  Meets target:             {'yes' if summary['meets_target'] else 'NO'}")
     print()
     print(f"  Claude-only trajectories: {summary['claude_only_trajectories']}")
-    print(f"  Claude-only share:        {summary['claude_only_share']}  (alert > {summary['claude_only_threshold']})")
+    print(
+        f"  Claude-only share:        {summary['claude_only_share']}  (alert > {summary['claude_only_threshold']})"
+    )
     print(
         f"  Cross-adapter coverage:   "
         f"{'BELOW threshold' if summary['claude_only_share_above_threshold'] else 'ok'}"

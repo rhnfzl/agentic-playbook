@@ -113,14 +113,16 @@ _DEFAULT_TIMEOUT_S = 300.0  # 5 minutes per cell; harness can override.
 # `ClaudeCodeProvider(extra_allowed_tools=frozenset({"Bash"}))` or via
 # a future per-trajectory `allowed_tools:` frontmatter field. Doing it
 # explicitly keeps the threat model visible in the trajectory file.
-_DEFAULT_ALLOWED_TOOLS: frozenset[str] = frozenset({
-    "Read",
-    "Write",
-    "Edit",
-    "NotebookEdit",
-    "Glob",
-    "Grep",
-})
+_DEFAULT_ALLOWED_TOOLS: frozenset[str] = frozenset(
+    {
+        "Read",
+        "Write",
+        "Edit",
+        "NotebookEdit",
+        "Glob",
+        "Grep",
+    }
+)
 
 # Opt-in env var that switches back to the legacy
 # `--dangerously-skip-permissions` behavior. Only honored when set to
@@ -134,31 +136,33 @@ _DANGEROUS_OPT_IN_VAR = "PHASE2_LIVE_DANGEROUS"
 # leaking AWS_*, GITHUB_TOKEN, etc., into the spawned session. We
 # allowlist only the vars Claude Code documents as inputs plus the
 # bare minimum a POSIX process needs to run.
-_ALLOWED_ENV_KEYS: frozenset[str] = frozenset({
-    # Anthropic / Claude Code
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_AUTH_TOKEN",
-    "ANTHROPIC_BASE_URL",
-    "CLAUDE_CODE_ENABLE_TELEMETRY",
-    "CLAUDE_CODE_USE_BEDROCK",
-    "CLAUDE_CODE_USE_VERTEX",
-    # OTel
-    "OTEL_TRACES_EXPORTER",
-    "OTEL_LOG_USER_PROMPTS",
-    "OTEL_LOG_TOOL_DETAILS",
-    "OTEL_EXPORTER_OTLP_ENDPOINT",
-    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-    # POSIX minimum
-    "PATH",
-    "HOME",
-    "TMPDIR",
-    "LANG",
-    "LC_ALL",
-    "TERM",
-    # Node (Claude Code is Node)
-    "NODE_OPTIONS",
-    "NVM_DIR",
-})
+_ALLOWED_ENV_KEYS: frozenset[str] = frozenset(
+    {
+        # Anthropic / Claude Code
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_BASE_URL",
+        "CLAUDE_CODE_ENABLE_TELEMETRY",
+        "CLAUDE_CODE_USE_BEDROCK",
+        "CLAUDE_CODE_USE_VERTEX",
+        # OTel
+        "OTEL_TRACES_EXPORTER",
+        "OTEL_LOG_USER_PROMPTS",
+        "OTEL_LOG_TOOL_DETAILS",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        # POSIX minimum
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "LANG",
+        "LC_ALL",
+        "TERM",
+        # Node (Claude Code is Node)
+        "NODE_OPTIONS",
+        "NVM_DIR",
+    }
+)
 
 
 class ClaudeCodeProvider:
@@ -266,8 +270,7 @@ class ClaudeCodeProvider:
                 )
             except subprocess.TimeoutExpired as exc:
                 raise TimeoutError(
-                    f"`claude` did not return within {self._timeout}s "
-                    f"({exc.cmd!r})"
+                    f"`claude` did not return within {self._timeout}s ({exc.cmd!r})"
                 ) from exc
 
             # Non-zero exit means the agent crashed mid-task or the CLI
@@ -347,7 +350,8 @@ class ClaudeCodeProvider:
             )
             return [
                 claude_bin,
-                "-p", phrasing,
+                "-p",
+                phrasing,
                 "--dangerously-skip-permissions",
             ]
         # Sorted for deterministic args across runs; aids reproducibility
@@ -355,8 +359,10 @@ class ClaudeCodeProvider:
         allowlist_csv = ",".join(sorted(self._allowed_tools))
         return [
             claude_bin,
-            "-p", phrasing,
-            "--allowedTools", allowlist_csv,
+            "-p",
+            phrasing,
+            "--allowedTools",
+            allowlist_csv,
         ]
 
 

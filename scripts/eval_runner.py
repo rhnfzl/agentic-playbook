@@ -198,7 +198,11 @@ def run_suite(suite_dir: Path, active_scope: set[str] | None = None) -> tuple[in
     for case in cases:
         name = case.get("name", "(unnamed)")
         required_scope = set(case.get("required_scope", []))
-        if active_scope is not None and required_scope and not required_scope.issubset(active_scope):
+        if (
+            active_scope is not None
+            and required_scope
+            and not required_scope.issubset(active_scope)
+        ):
             print(
                 f"    [SKIP] {name}: required_scope "
                 f"{sorted(required_scope)} not in active scope "

@@ -178,9 +178,12 @@ def _span_to_event(span: dict, seq: int) -> TraceEvent | None:
     if op == "chat":
         model_attr = attrs.get("gen_ai.request.model")
         return TraceEvent(
-            seq=seq, kind="model_response",
+            seq=seq,
+            kind="model_response",
             name=str(model_attr or "chat"),
-            arguments=None, duration_ms=duration_ms, raw_attrs=attrs,
+            arguments=None,
+            duration_ms=duration_ms,
+            raw_attrs=attrs,
         )
     if op == "tool_call":
         tool_name = attrs.get("tool.name") or span.get("name", "unknown")
@@ -192,25 +195,34 @@ def _span_to_event(span: dict, seq: int) -> TraceEvent | None:
             except json.JSONDecodeError:
                 arguments_dict = {"raw": arguments_str}
         return TraceEvent(
-            seq=seq, kind="tool_call",
+            seq=seq,
+            kind="tool_call",
             name=str(tool_name),
-            arguments=arguments_dict, duration_ms=duration_ms, raw_attrs=attrs,
+            arguments=arguments_dict,
+            duration_ms=duration_ms,
+            raw_attrs=attrs,
         )
     if op == "skill_load":
         skill_name = attrs.get("skill.name") or span.get("name", "unknown")
         return TraceEvent(
-            seq=seq, kind="skill_load",
+            seq=seq,
+            kind="skill_load",
             name=str(skill_name),
-            arguments=None, duration_ms=duration_ms, raw_attrs=attrs,
+            arguments=None,
+            duration_ms=duration_ms,
+            raw_attrs=attrs,
         )
     # Unknown op: preserve as model_response with raw_attrs so the matcher
     # does not crash but a human can inspect (fixture-replay legacy
     # behavior; the provider previously dropped these silently, which is
     # the divergence the unified parser closes).
     return TraceEvent(
-        seq=seq, kind="model_response",
+        seq=seq,
+        kind="model_response",
         name=str(span.get("name", "unknown")),
-        arguments=None, duration_ms=duration_ms, raw_attrs=attrs,
+        arguments=None,
+        duration_ms=duration_ms,
+        raw_attrs=attrs,
     )
 
 

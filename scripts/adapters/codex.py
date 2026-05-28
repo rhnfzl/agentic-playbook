@@ -249,9 +249,7 @@ class CodexAdapter:
                 comment_prefix="#",
                 comment_suffix="",
             )
-            print(
-                f"   mcp:     {config_toml} ({action}, {len(new_configs)} server(s))"
-            )
+            print(f"   mcp:     {config_toml} ({action}, {len(new_configs)} server(s))")
             yield InstalledPath(config_toml, "managed")
         elif config_toml.exists():
             # Narrow to zero MCPs (or all-skipped): remove any prior

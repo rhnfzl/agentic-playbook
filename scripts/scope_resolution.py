@@ -117,10 +117,7 @@ def detect_scope_from_remote(target: Path | None, repo_root: Path) -> list[str]:
     origin_url = _extract_remote_origin_url(config_text)
     if origin_url is None:
         return []
-    if (
-        "<vcs-host>:<team>/" in origin_url
-        or "<vcs-host>:<team>/" in origin_url
-    ):
+    if "<vcs-host>:<team>/" in origin_url or "<vcs-host>:<team>/" in origin_url:
         return ["team"]
     return []
 

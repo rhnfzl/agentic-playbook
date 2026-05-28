@@ -183,23 +183,21 @@ def main() -> int:
         if lockfile_path.is_file():
             try:
                 import json as _json
+
                 lockdata = _json.loads(lockfile_path.read_text(encoding="utf-8"))
                 lock_scope = lockdata.get("content_scope")
                 if isinstance(lock_scope, list) and lock_scope:
                     scope = ",".join(str(s) for s in lock_scope)
-                    print(
-                        f"Content scope: {scope} (restored from .playbook-lock.json)"
-                    )
+                    print(f"Content scope: {scope} (restored from .playbook-lock.json)")
             except (OSError, ValueError):
                 pass
     if not scope:
         from scope_resolution import detect_scope_from_remote
+
         detected = detect_scope_from_remote(target, REPO_ROOT)
         if detected:
             scope = ",".join(detected)
-            print(
-                f"Content scope: {scope} (auto-detected from target remote)"
-            )
+            print(f"Content scope: {scope} (auto-detected from target remote)")
     print(f"Target: {target}")
     print(f"Profile: {profile}")
     if scope and "(restored" not in str(scope) and "(auto-detected" not in str(scope):

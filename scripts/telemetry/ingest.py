@@ -136,21 +136,25 @@ def aggregate(records: Iterable[TelemetryRecord]) -> list[SkillAggregate]:
         latencies = [r.latency_ms for r in rows]
         last_fired = max(r.fired_at for r in rows) if rows else ""
         adapters = sorted({r.adapter for r in rows})
-        out.append(SkillAggregate(
-            skill=skill,
-            trigger_count=len(rows),
-            p50_latency_ms=median(latencies) if latencies else 0.0,
-            p95_latency_ms=_percentile(latencies, 95),
-            total_input_tokens=sum(r.input_tokens for r in rows),
-            total_output_tokens=sum(r.output_tokens for r in rows),
-            last_fired_at=last_fired,
-            adapters=tuple(adapters),
-        ))
+        out.append(
+            SkillAggregate(
+                skill=skill,
+                trigger_count=len(rows),
+                p50_latency_ms=median(latencies) if latencies else 0.0,
+                p95_latency_ms=_percentile(latencies, 95),
+                total_input_tokens=sum(r.input_tokens for r in rows),
+                total_output_tokens=sum(r.output_tokens for r in rows),
+                last_fired_at=last_fired,
+                adapters=tuple(adapters),
+            )
+        )
     out.sort(key=lambda a: a.trigger_count, reverse=True)
     return out
 
 
-def filter_recent(records: Iterable[TelemetryRecord], days: int) -> list[TelemetryRecord]:
+def filter_recent(
+    records: Iterable[TelemetryRecord], days: int
+) -> list[TelemetryRecord]:
     """Keep records fired within the last `days` calendar days.
 
     Naive ISO timestamps (no `+00:00`) are coerced to UTC so the

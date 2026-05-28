@@ -25,26 +25,36 @@ from . import Finding
 FENCE = re.compile(r"```(?:\w+)?\n(.*?)```", re.DOTALL)
 
 RISKY = [
-    (re.compile(r"\bcurl\s+[^\n]*\|\s*(?:sh|bash|zsh|python|node)"), "high",
-     "curl piped to shell"),
-    (re.compile(r"\bwget\s+[^\n]*\|\s*(?:sh|bash|zsh|python|node)"), "high",
-     "wget piped to shell"),
-    (re.compile(r"\beval\s+[\"`]\$\("), "high",
-     "eval of command substitution"),
-    (re.compile(r"\beval\s*\(\s*atob\(", re.IGNORECASE), "critical",
-     "eval of base64-decoded payload"),
-    (re.compile(r"\brm\s+-rf\s+~?/?\s*$", re.MULTILINE), "critical",
-     "rm -rf of home or root"),
-    (re.compile(r"\bsudo\s+rm\s+-rf"), "critical",
-     "sudo rm -rf"),
-    (re.compile(r"\bchmod\s+\+s\b"), "high",
-     "setuid bit set"),
-    (re.compile(r"\bnc\s+-l\b"), "high",
-     "netcat listener"),
-    (re.compile(r"\bpython\s+-c\s+[\"']import\s+os.*?system\("), "high",
-     "python -c os.system payload"),
-    (re.compile(r">\s*/dev/tcp/"), "high",
-     "bash /dev/tcp redirection (reverse shell)"),
+    (
+        re.compile(r"\bcurl\s+[^\n]*\|\s*(?:sh|bash|zsh|python|node)"),
+        "high",
+        "curl piped to shell",
+    ),
+    (
+        re.compile(r"\bwget\s+[^\n]*\|\s*(?:sh|bash|zsh|python|node)"),
+        "high",
+        "wget piped to shell",
+    ),
+    (re.compile(r"\beval\s+[\"`]\$\("), "high", "eval of command substitution"),
+    (
+        re.compile(r"\beval\s*\(\s*atob\(", re.IGNORECASE),
+        "critical",
+        "eval of base64-decoded payload",
+    ),
+    (
+        re.compile(r"\brm\s+-rf\s+~?/?\s*$", re.MULTILINE),
+        "critical",
+        "rm -rf of home or root",
+    ),
+    (re.compile(r"\bsudo\s+rm\s+-rf"), "critical", "sudo rm -rf"),
+    (re.compile(r"\bchmod\s+\+s\b"), "high", "setuid bit set"),
+    (re.compile(r"\bnc\s+-l\b"), "high", "netcat listener"),
+    (
+        re.compile(r"\bpython\s+-c\s+[\"']import\s+os.*?system\("),
+        "high",
+        "python -c os.system payload",
+    ),
+    (re.compile(r">\s*/dev/tcp/"), "high", "bash /dev/tcp redirection (reverse shell)"),
 ]
 
 
@@ -59,14 +69,16 @@ def scan_skill_md(skill_md: Path, repo_root: Path) -> list[Finding]:
         for pat, severity, label in RISKY:
             for hit in pat.finditer(block):
                 snippet = hit.group(0).replace("\n", " ")[:120]
-                findings.append(Finding(
-                    source="ddipe",
-                    severity=severity,
-                    skill_path=str(skill_md.parent.relative_to(repo_root)),
-                    category=label,
-                    message=f"fenced block contains {label}: {snippet}",
-                    raw=snippet,
-                ))
+                findings.append(
+                    Finding(
+                        source="ddipe",
+                        severity=severity,
+                        skill_path=str(skill_md.parent.relative_to(repo_root)),
+                        category=label,
+                        message=f"fenced block contains {label}: {snippet}",
+                        raw=snippet,
+                    )
+                )
     return findings
 
 

@@ -67,11 +67,11 @@ def storage_path() -> Path:
 class TelemetryRecord(NamedTuple):
     """Privacy-bounded record. Only metadata, never bodies."""
 
-    skill: str               # e.g. "to-prd"
-    adapter: str             # e.g. "claude-code"
-    model: str               # e.g. "claude-opus-4-7"
-    fired_at: str            # ISO 8601 with TZ
-    latency_ms: float        # end-to-end skill duration
+    skill: str  # e.g. "to-prd"
+    adapter: str  # e.g. "claude-code"
+    model: str  # e.g. "claude-opus-4-7"
+    fired_at: str  # ISO 8601 with TZ
+    latency_ms: float  # end-to-end skill duration
     input_tokens: int
     output_tokens: int
-    session_id: str = ""     # optional, may be redacted
+    session_id: str = ""  # optional, may be redacted
