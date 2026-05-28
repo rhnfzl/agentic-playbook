@@ -1,10 +1,11 @@
-"""Live Claude Code trace_provider (Phase 2B, ADR-0045 work).
+"""Live Claude Code trace_provider (Phase 2B, ADR-0045).
 
 Spawns the `claude` CLI in headless `-p`/--print mode with OTel
 emission enabled (console exporter), parses the emitted spans into a
-TraceRecord, and returns it to the harness.
+TraceRecord via the shared `claude_code_trace.events_from_text`, and
+returns it to the harness.
 
-Contract: same as Phase 1's TraceProvider:
+Contract: TraceProvider callable:
 
     provider(trajectory, phrasing, adapter) -> TraceRecord
 

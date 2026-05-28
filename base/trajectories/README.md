@@ -1,18 +1,27 @@
 # trajectories/
 
-Cross-adapter trajectory specs for the trajectory harness (ADR-0044).
+A trajectory is a CI artifact that asserts a skill works the same way
+across every Tier-1 coding agent (Claude Code, Codex, Cursor,
+Windsurf). When an author wants to claim "this skill is portable,"
+the trajectory is the executable evidence: it captures the prompt,
+the tool calls the agent should make, and the quality bar the result
+should clear. The harness re-runs each trajectory against every
+adapter in its scope and surfaces any divergence in the matrix output.
 
-A trajectory binds one (skill, scenario) pair to:
+A trajectory file binds one (skill, scenario) pair to:
 
 1. A set of user-prompt phrasings (typically 5, per Anthropic guidance).
-2. DSL assertions over the resulting tool-call trace (must-call, must-not-call,
-   call_order, artifact-path, total-call bounds).
-3. An LLM-judge rubric scored in `[0, 1]` against a per-trajectory threshold.
+2. DSL assertions over the resulting tool-call trace (must-call,
+   must-not-call, call_order, artifact-path, total-call bounds).
+3. An LLM-judge rubric scored in `[0, 1]` against a per-trajectory
+   threshold.
 
-The harness (`scripts/trajectory_harness.py`, lands in Phase 1) consumes
-trajectories and replays them across each adapter listed in
-`adapter_scope`. Phase 0 (current) ships the content type, the loader, the
-linter, the decay check, the scaffolder, and one canary fixture.
+Status (2026-05-28): all three pieces ship. `make trajectory-check`
+runs the live matrix against Claude Code today (other adapters land
+incrementally per ADR-0044's reject-if budget). `make
+verify-trajectory` is the single-trajectory fixture-only inner loop.
+`make trajectory-calibrate` reports rubric score range. `make
+record-trajectory` captures a live session as a fixture + draft YAML.
 
 ## Layout
 
@@ -49,14 +58,13 @@ validate.
   captured against. When you re-record after a model upgrade, bump this
   field and re-review the diff.
 - **Decay bands match skills today** (60-day notice / 90-day warn /
-  180-day block). The design intuition is that trajectories rot faster
-  than skills because they're model-coupled, but tightening the bands
-  before the Phase 1 harness produces actual drift data would generate
-  noise the team is likely to stop reading. Revisit after Phase 1.
+  180-day block). The design intuition is that trajectories rot
+  faster than skills because they are model-coupled; the bands stay
+  loose until we have drift data from CI runs to tighten on.
   Refresh `last_reviewed` whenever you confirm the trajectory passes.
 
 ## Related ADRs
 
 - ADR-0044: trajectories as the 8th content type
-- ADR-0045: cross-adapter trace contract (Phase 1)
-- ADR-0046: hybrid DSL + LLM-judge match semantics (Phase 1)
+- ADR-0045: cross-adapter trace contract
+- ADR-0046: hybrid DSL + LLM-judge match semantics

@@ -1,7 +1,7 @@
 # Scripts
 
 Owner: Rehan
-last_reviewed: 2026-05-28
+last_reviewed: 2026-05-28 (review-fold sync: trajectory Phase 2 scripts added)
 
 ## Purpose
 
@@ -13,7 +13,18 @@ Python scripts that power the installer, linters, checks, and lifecycle commands
 - `install_verify.py` for `--verify` (ADR-0036 layer-3 verification); `hook_native_config.py` is the adapter shape registry it consumes.
 - `frontmatter_lint.py`, `check_agents_md.py`, `audit_external_skill.py`, `size_check.py`, `decay_check.py`, `check_em_dashes.py` for `make check`.
 - `bulk_import.py`, `new_skill.py`, `promote_skill.py`, `retrospective.py`, `new_trajectory.py` for authoring lifecycle.
-- `trajectory_matcher.py` (DSL evaluator), `trajectory_harness.py` (matrix runner; pluggable trace_provider seam for Phase 2 live spawn), `trajectory_verify.py` (single-trajectory inner-loop tool) for ADR-0044 trajectory work. `adapters/trace_record.py` is the normalized cross-adapter trace shape; `adapters/claude_code_trace.py` is the Phase 1 OTel JSONL shim.
+- Trajectory work (ADR-0044, ADR-0045, ADR-0046):
+  - `trajectory_matcher.py` evaluates the DSL primitives against a `TraceRecord`.
+  - `trajectory_judge.py` defines the `JudgeClient` Protocol and `evaluate_judge` for the LLM-judge half of the hybrid contract.
+  - `trajectory_harness.py` runs the matrix; `_evaluate_cell` is the per-cell decision tree that honors cost ceilings, retries, and the hybrid contract.
+  - `trajectory_verify.py` is the single-trajectory inner-loop tool.
+  - `trajectory_calibrate.py` reports rubric score range across N runs; isolates judge infra errors from the noise metric.
+  - `trajectory_coverage.py` emits the ADR-0044 reject-if coverage ratio.
+  - `trajectory_record.py` spawns a live Claude Code session and drafts a `<scenario>.yaml.draft` (or `.draft.2`, `.draft.3` ...) plus the JSONL fixture for the author to edit.
+  - `adapters/trace_record.py` defines the normalized cross-adapter trace shape (NamedTuples + `KNOWN_TRACE_ADAPTERS`).
+  - `adapters/claude_code_trace.py` is the canonical OTel parser used by BOTH the fixture replay (`parse_otel_jsonl`) and the live provider; exports `spans_from_text` + `events_from_text`.
+  - `adapters/claude_code_provider.py` is the Phase 2B live provider; spawns `claude -p` under a default tool allowlist (`PHASE2_LIVE_DANGEROUS=1` opts into `--dangerously-skip-permissions` with a stderr warning per spawn).
+  - `adapters/anthropic_judge_client.py` calls the Anthropic Messages API via stdlib `urllib` to score rubrics; surfaces transport failures via `JudgeResult(is_infra_error=True)`.
 - `test_adapters.py` smoke tests.
 - `playbook_init.py`, `playbook_update.py` for per-project init.
 - `sync_distribution.py` for distributing `base/` to an external destination per ADR-0042. Scheduled via the wrapper in `templates/distribution-cron.example.sh`; runbook at `docs/runbooks/distribution-sync-cron.md`. Calls `marketplace_emitter.emit()` after content sync when `[marketplace]` is configured in the manifest.
