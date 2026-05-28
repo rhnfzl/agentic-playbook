@@ -71,7 +71,10 @@ Python scripts that power the installer, linters, checks, and lifecycle commands
 ## Do Not
 
 - Add external dependencies casually. Each new dep is a new install burden.
-- Modify files outside the playbook repo from scripts run in the repo. **Carve-out for distribution sync**: `sync_distribution.py` and `marketplace_emitter.py` write to an operator-configured external destination by design (ADR-0042, ADR-0043). Their boundary is the manifest's `[destination].path` and the path-traversal safety check in `_resolve_sources` (sync) plus `_within(target, base_dir) and _within(base_dir, destination)` (emitter symlinks); nothing else in `scripts/` should reach outside `$PLAYBOOK_HOME`.
+- Modify files outside the playbook repo from scripts run in the repo. **Carve-outs**:
+  - **Distribution sync**: `sync_distribution.py` and `marketplace_emitter.py` write to an operator-configured external destination by design (ADR-0042, ADR-0043). Their boundary is the manifest's `[destination].path` and the path-traversal safety check in `_resolve_sources` (sync) plus `_within(target, base_dir) and _within(base_dir, destination)` (emitter symlinks).
+  - **Telemetry (ADR-0048)**: `telemetry/pyotel_collector.py`, the docker collector in `telemetry/otel_collector/`, and the `telemetry/ingest.py` consumer all read or write under `~/.coding-agents-playbook/telemetry/` (or `$TELEMETRY_DIR` when set). The destination is operator-controlled, the JSONL contract is privacy-bounded (banned-prefix list at `telemetry/_otlp_record.py`), and the entire layer is off unless the user explicitly opts in. The boundary is `telemetry.storage_path()`.
+  Nothing else in `scripts/` should reach outside `$PLAYBOOK_HOME`.
 - Skip `--help` when adding a new entry point.
 
 ## Owner And Freshness

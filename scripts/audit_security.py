@@ -18,6 +18,7 @@ Exit codes:
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -121,9 +122,21 @@ def run_security_audit(repo_root: Path) -> int:
     return 0
 
 
-def main() -> int:
-    repo_root = Path(__file__).resolve().parent.parent
-    return run_security_audit(repo_root)
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Aggregate supply-chain security wrappers (mcp-scan, "
+            "agent-skill-evaluator, DDIPE) and emit an AI-BOM. "
+            "Soft-by-default; STRICT_SECURITY=1 escalates skipped "
+            "wrappers to errors. See ADR-0047."
+        ),
+    )
+    parser.add_argument(
+        "--repo-root", type=Path, default=Path(__file__).resolve().parent.parent,
+        help="defaults to the parent of this script (the playbook checkout)",
+    )
+    args = parser.parse_args(argv)
+    return run_security_audit(args.repo_root.resolve())
 
 
 if __name__ == "__main__":
