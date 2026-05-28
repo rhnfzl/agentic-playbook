@@ -95,7 +95,7 @@ The installer detects which coding agents you have on this machine, lets you tog
 make init TARGET=<path-to-your-project>
 ```
 
-Scaffolds the target project with an `AGENTS.md` (pointer back to the playbook plus a fillable 8-section template) and a `.playbook-config.yaml` that records the profile. The profile binding happens at the install step, not at `make init`; after `make init`, run `make install PROFILE=<role>` (or `make install PROFILE=role1,role2` to compose). Profiles available: `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`, `tech-lead`.
+Scaffolds the target project with an `AGENTS.md` (pointer back to the playbook plus a fillable 8-section template) and a `.playbook-config.yaml` that records a default profile (`tech-lead`). After `make init`, run `make install PROFILE=<role>` to materialize the right content for the role you actually want, where `<role>` overrides the recorded default. Compose with `make install PROFILE=role1,role2`. Profiles available: `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`, `tech-lead`.
 
 ### I want my coding agent to read this playbook and integrate what fits
 

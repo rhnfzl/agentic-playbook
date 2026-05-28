@@ -133,4 +133,4 @@ For a first read, the three highest-leverage ADRs are:
 
 For the security and operations story, read ADR-0047 → 0048 → 0049 in order.
 
-For the marketplace plugin story, read ADR-0043. The plugin packs themselves are designed in the upstream and intentionally not shipped in this public mirror (per the portfolio's distribution choice; see `~/Documents/handoffs/2026-05-28-portfolio-scrub-leak-structural-fix.md`).
+The marketplace plugin story (ADR-0043) is designed in the upstream and intentionally not shipped in this public mirror; the ADR text, the emitter source, and the per-role packs all live upstream-only. For the sync model that decides which artifacts flow downstream, read ADR-0042.

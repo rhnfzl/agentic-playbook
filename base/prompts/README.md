@@ -27,7 +27,7 @@ Prompts are the lowest-ceremony content type. No frontmatter is required, no ins
 ## The prompts
 
 - `bootstrap-your-playbook.md`, paste into your coding agent to scaffold this entire structure for your project.
-- `global-audit.md`, audit your user-level setup (`~/.claude/`, `~/.codex/`, `~/.cursor/`, etc.) and propose a phased rollout of playbook content. The "I want my coding agent to read this playbook and integrate what fits" entry point in the root [README.md](../README.md) links here.
+- `global-audit.md`, audit your user-level setup (`~/.claude/`, `~/.codex/`, `~/.cursor/`, etc.) and propose a phased rollout of playbook content. The "I want my coding agent to read this playbook and integrate what fits" entry point in the root [README.md](../../README.md) links here.
 - `project-audit.md`, audit the current working directory and propose project-level files (`AGENTS.md`, `.cursor/rules/`, `.github/copilot-instructions.md`, `.windsurfrules`, project hooks, project MCP).
 - `onboard-a-new-teammate.md`, get a new joiner agent-ready in one ~20-minute session: install the playbook, verify one skill / rule / hook fires, bookmark the locations they need.
 - `add-a-new-skill.md`, walk through adding your workflow as a skill following the SKILL.md pattern.
