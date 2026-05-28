@@ -310,21 +310,42 @@ def main() -> int:
         action="store_true",
         help="Adapter unavailable counts as hard failure (default: degraded).",
     )
+    parser.add_argument(
+        "--judge",
+        action="store_true",
+        help="After DSL passes, run the LLM judge against the trajectory "
+        "rubric (Phase 2A). Requires ANTHROPIC_API_KEY.",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=300.0,
+        help="Per-cell timeout in seconds for the Claude Code spawn.",
+    )
     args = parser.parse_args()
 
-    def _missing_provider(_traj, _phrasing, _adapter):
-        """Phase 1 CLI default: the live trace provider is Phase 2 work.
-        Calling the CLI without a custom provider explicitly errors so
-        no one mistakes the matrix for a real test run."""
-        raise RuntimeError(
-            "trace_provider not configured; Phase 1 CLI requires tests "
-            "to inject a provider. Phase 2 ships the live Claude Code "
-            "spawner that wires this automatically."
-        )
+    # Phase 2B: live Claude Code provider is the default. The harness's
+    # per-cell try/except converts any RuntimeError / TimeoutError raised
+    # here into an `infra_fail` cell, so a missing `claude` binary or a
+    # hung agent does not crash the run.
+    from adapters.claude_code_provider import ClaudeCodeProvider
+
+    provider = ClaudeCodeProvider(timeout=args.timeout)
+
+    judge_client = None
+    if args.judge:
+        from adapters.anthropic_judge_client import HttpAnthropicJudgeClient
+
+        try:
+            judge_client = HttpAnthropicJudgeClient()
+        except ValueError as exc:
+            print(f"  error  cannot enable judge: {exc}", file=sys.stderr)
+            return 1
 
     cfg = HarnessConfig(
         repo_root=REPO_ROOT_DEFAULT,
-        trace_provider=_missing_provider,
+        trace_provider=provider,
+        judge_client=judge_client,
         skill_filter=args.skill,
         adapter_filter=args.adapter,
         strict=args.strict,
