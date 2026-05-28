@@ -37,7 +37,7 @@ REPO_ROOT_DEFAULT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT_DEFAULT / "scripts"))
 
 from adapters._loader import PlaybookContent, Trajectory  # noqa: E402
-from adapters.trace_record import TraceRecord  # noqa: E402
+from adapters.trace_record import KNOWN_TRACE_ADAPTERS, TraceRecord  # noqa: E402
 from trajectory_matcher import evaluate_assertions  # noqa: E402
 
 
@@ -123,7 +123,9 @@ def _iter_trajectories(
         yield traj
 
 
-_KNOWN_ADAPTERS_FOR_VALIDATION = {"claude-code", "codex", "cursor", "windsurf"}
+# Adapter registry lives in adapters/trace_record.py; reuse the frozenset
+# rather than maintain a parallel copy here (third-review finding:
+# triplicate registry meant Phase 3 shims would silently drift).
 
 
 def run_harness(cfg: HarnessConfig) -> Matrix:
@@ -150,11 +152,11 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
             stacklevel=2,
         )
 
-    if cfg.adapter_filter and cfg.adapter_filter not in _KNOWN_ADAPTERS_FOR_VALIDATION:
+    if cfg.adapter_filter and cfg.adapter_filter not in KNOWN_TRACE_ADAPTERS:
         raise ValueError(
             f"adapter filter '{cfg.adapter_filter}' is not in the known "
-            f"adapter set {sorted(_KNOWN_ADAPTERS_FOR_VALIDATION)}; check "
-            f"for a typo or add the adapter to the registry."
+            f"adapter set {sorted(KNOWN_TRACE_ADAPTERS)}; check for a "
+            f"typo or add the adapter to KNOWN_TRACE_ADAPTERS."
         )
 
     candidate_trajectories = list(_iter_trajectories(content, cfg.skill_filter))
@@ -163,6 +165,24 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
             f"skill filter '{cfg.skill_filter}' matched no trajectories; "
             f"available skills: {sorted({t.skill for t in content.trajectories})}"
         )
+
+    # Pre-flight: if the adapter filter is valid but no trajectory has it
+    # in adapter_scope, the loop below produces zero cells and matrix.failed
+    # == 0 falsely reports success (third-review P2 finding). Fail loud.
+    if cfg.adapter_filter:
+        scopes_with_adapter = [
+            t for t in candidate_trajectories
+            if cfg.adapter_filter in t.adapter_scope
+        ]
+        if not scopes_with_adapter:
+            adapter_options = sorted({
+                a for t in candidate_trajectories for a in t.adapter_scope
+            })
+            raise ValueError(
+                f"adapter filter '{cfg.adapter_filter}' is valid but no "
+                f"trajectory in scope declares it in adapter_scope; "
+                f"trajectories use these adapters: {adapter_options}"
+            )
 
     for traj in candidate_trajectories:
         adapters = traj.adapter_scope
@@ -272,7 +292,13 @@ def main() -> int:
         adapter_filter=args.adapter,
         strict=args.strict,
     )
-    matrix = run_harness(cfg)
+    try:
+        matrix = run_harness(cfg)
+    except ValueError as exc:
+        # Controlled exit instead of traceback (scripts/AGENTS.md exit-code
+        # contract): filter validation errors print to stderr with exit 1.
+        print(f"  error  {exc}", file=sys.stderr)
+        return 1
     print_summary(matrix)
     return 0 if matrix.failed == 0 else 1
 

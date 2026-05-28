@@ -80,7 +80,8 @@ def main(
     if not matching:
         print(
             f"  error  trajectory '{skill}/{scenario}' not found under "
-            f"base/trajectories/{skill}/{scenario}.yaml"
+            f"base/trajectories/{skill}/{scenario}.yaml",
+            file=sys.stderr,
         )
         return 1
     traj = matching[0]
@@ -88,12 +89,13 @@ def main(
     if fixture is None:
         print(
             "  error  --fixture is required in Phase 1 (live Claude Code "
-            "spawning lands in Phase 2). Provide a captured trace JSONL."
+            "spawning lands in Phase 2). Provide a captured trace JSONL.",
+            file=sys.stderr,
         )
         return 1
 
     if not fixture.is_file():
-        print(f"  error  fixture file not found: {fixture}")
+        print(f"  error  fixture file not found: {fixture}", file=sys.stderr)
         return 1
 
     # Use the first phrasing as the prompt unless the author overrode
@@ -116,10 +118,11 @@ def main(
 
     print(
         f"  fail  trajectory '{skill}/{scenario}' FAILED against fixture "
-        f"({fixture.name}):"
+        f"({fixture.name}):",
+        file=sys.stderr,
     )
     for failure in result.failures:
-        print(f"    - {failure}")
+        print(f"    - {failure}", file=sys.stderr)
     return 1
 
 

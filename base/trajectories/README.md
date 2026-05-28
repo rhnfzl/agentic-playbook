@@ -48,9 +48,12 @@ validate.
 - **Pin the model.** `model_pinned` records the model the reference was
   captured against. When you re-record after a model upgrade, bump this
   field and re-review the diff.
-- **60-day decay.** Trajectories rot faster than skills because they're
-  model-coupled. Refresh `last_reviewed` whenever you confirm the
-  trajectory still passes.
+- **Decay bands match skills today** (60-day notice / 90-day warn /
+  180-day block). The design intuition is that trajectories rot faster
+  than skills because they're model-coupled, but tightening the bands
+  before the Phase 1 harness produces actual drift data would generate
+  noise the team is likely to stop reading. Revisit after Phase 1.
+  Refresh `last_reviewed` whenever you confirm the trajectory passes.
 
 ## Related ADRs
 

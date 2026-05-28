@@ -28,6 +28,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from adapters.trace_record import KNOWN_TRACE_ADAPTERS
+
 from . import CheckContext, CheckResult
 
 
@@ -47,16 +49,9 @@ REQUIRED_FRONTMATTER = (
 REQUIRED_JUDGE_KEYS = ("threshold", "rubric", "model")
 
 
-# Known adapters the harness can run against (subset of the playbook's
-# install adapters). Updated when new trace shims land per ADR-0045.
-# v0.2 Phase 0: only adapter shape is locked; the actual shims arrive in
-# Phase 1 (Claude Code) and Phase 3-4 (Codex, Cursor, Windsurf).
-KNOWN_TRAJECTORY_ADAPTERS = {
-    "claude-code",
-    "codex",
-    "cursor",
-    "windsurf",
-}
+# Known adapters live in adapters/trace_record.py as the single source.
+# The linter imports the same set the harness and trace shims use.
+KNOWN_TRAJECTORY_ADAPTERS = KNOWN_TRACE_ADAPTERS
 
 
 MIN_PHRASING_COUNT_WARN = 5  # Anthropic best-practice: 5 phrasings for trigger tests
@@ -192,6 +187,47 @@ def run(ctx: CheckContext) -> CheckResult:
                 f"{rel}: only {len(traj.input_phrasings)} phrasing(s); "
                 f"Anthropic best-practice is {MIN_PHRASING_COUNT_WARN}"
             )
+
+        # Body TODO scan: phrasings and rubric must not carry scaffolder
+        # placeholders (third-review P2). The scaffolder writes "TODO first
+        # phrasing" and "TODO Score the trajectory on:" intentionally; the
+        # linter must refuse to accept them.
+        for phrasing in traj.input_phrasings:
+            if phrasing.strip().upper().startswith("TODO"):
+                errors.append(
+                    f"{rel}: input.phrasings still contains a TODO "
+                    f"placeholder ({phrasing!r}); replace before committing"
+                )
+                break
+        rubric_text = traj.llm_judge.get("rubric", "")
+        if isinstance(rubric_text, str) and rubric_text.strip().upper().startswith("TODO"):
+            errors.append(
+                f"{rel}: llm_judge.rubric starts with TODO; replace the "
+                f"scaffolded placeholder text before committing"
+            )
+
+        # Block-style call_order is intentionally NOT supported by the naive
+        # YAML reader (third-review P2). The reader returns the value as an
+        # empty string when it sees `- call_order:` followed by indented
+        # block-list items, which would otherwise reach the matcher as
+        # "expected list of dicts, got str." Fail closed at the linter.
+        for assertion in traj.assertions:
+            if "call_order" in assertion:
+                value = assertion["call_order"]
+                if not isinstance(value, list):
+                    errors.append(
+                        f"{rel}: call_order assertion must use inline "
+                        f"list-of-dicts syntax (e.g. "
+                        f"`call_order: [{{tool: X, before: Y}}]`). Block-style "
+                        f"`- call_order:` followed by indented dict items is "
+                        f"not supported by the naive YAML reader."
+                    )
+                else:
+                    for entry in value:
+                        if not isinstance(entry, dict):
+                            errors.append(
+                                f"{rel}: call_order entry is not a dict: {entry!r}"
+                            )
 
         if not traj.assertions:
             errors.append(

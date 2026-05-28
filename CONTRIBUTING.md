@@ -1,6 +1,6 @@
 # Contributing
 
-Anyone can contribute a skill, rule, hook, MCP config, subagent, slash command, prompt template, or profile (the 7 content types). This guide covers the how.
+Anyone can contribute a skill, rule, hook, MCP config, subagent, slash command, prompt template, trajectory, or profile (the 8 content types per ADR-0044). This guide covers the how.
 
 For the why (inspiration-repo philosophy, design rationale), see `README.md` and `docs/adr/`.
 

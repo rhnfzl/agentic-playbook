@@ -80,9 +80,12 @@ def _check_final_artifact_path(value: str, trace: TraceRecord) -> str | None:
     not just any artifact in the run. We find the last Write/Edit/NotebookEdit
     tool call by scanning trace.events in reverse and check its path.
 
-    The glob uses fnmatch semantics: `*` does NOT cross path separators by
-    default (Python fnmatch uses translate-with-special-handling per the
-    stdlib). Authors who want recursive matching write `**/*.md`.
+    Path-aware glob semantics (third-review fix): `*` does NOT cross path
+    separators. We enforce this explicitly by matching the BASENAME of the
+    artifact against patterns that contain no `/`. Patterns that include
+    `/` (e.g. `docs/**/*.md`) are matched against the full path so authors
+    can target specific directories. Python's stdlib `fnmatch.fnmatch`
+    treats `*` as matching anything including `/`; we wrap it.
     """
     if not trace.artifacts:
         return (
@@ -110,12 +113,32 @@ def _check_final_artifact_path(value: str, trace: TraceRecord) -> str | None:
             f"final_artifact_path: artifacts exist ({sorted(trace.artifacts)}) "
             f"but no Write/Edit/NotebookEdit tool call recorded a path"
         )
-    if not fnmatch.fnmatch(last_path, value):
+    if not _path_aware_glob_match(last_path, value):
         return (
             f"final_artifact_path: last artifact '{last_path}' does not "
             f"match '{value}'. Earlier artifacts: {sorted(trace.artifacts)}"
         )
     return None
+
+
+def _path_aware_glob_match(path: str, pattern: str) -> bool:
+    """Path-aware glob: `*` does NOT cross path separators.
+
+    Patterns containing no `/` match ROOT-LEVEL files only (i.e. the
+    artifact path must itself be a basename with no separator). So
+    `*.md` matches `foo.md` but NOT `subdir/foo.md`. Authors wanting
+    nested matches use `**/*.md` or a specific path like `docs/*.md`.
+
+    Patterns containing `/` match against the full path with stdlib
+    `fnmatch`. Note that stdlib `fnmatch`'s `*` matches `/` too, so
+    `**/*.md` and `*/*.md` both work for "one level deep markdown."
+    """
+    if "/" not in pattern:
+        # Pattern is basename-style; require artifact at root.
+        if "/" in path:
+            return False
+        return fnmatch.fnmatch(path, pattern)
+    return fnmatch.fnmatch(path, pattern)
 
 
 def _check_max_total_tool_calls(value, trace: TraceRecord) -> str | None:

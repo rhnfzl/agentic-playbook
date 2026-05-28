@@ -191,6 +191,42 @@ def test_final_artifact_path_passes_when_LAST_write_matches(tmp_path) -> None:
     assert result.passed
 
 
+def test_final_artifact_path_glob_does_not_cross_path_separator(tmp_path) -> None:
+    """Third-review P2: `*.md` must NOT match `subdir/foo.md`. Python's
+    stdlib `fnmatch.fnmatch` does (because `*` matches any character),
+    but trajectory authors writing `*.md` expect basename-only matching.
+    The matcher wraps fnmatch to enforce that contract."""
+    from trajectory_matcher import evaluate_assertions
+
+    trace = _trace(
+        events=[
+            _event(0, "tool_call", "Write", arguments={"path": "subdir/foo.md"}),
+        ],
+        artifacts={"subdir/foo.md": "sha256:a"},
+    )
+    result = evaluate_assertions([{"final_artifact_path": "*.md"}], trace)
+    assert not result.passed, (
+        "`*.md` must not match `subdir/foo.md`; use `**/*.md` or `subdir/*.md`"
+    )
+
+
+def test_final_artifact_path_recursive_glob_crosses_separator(tmp_path) -> None:
+    """Path-aware: patterns containing `/` use stdlib fnmatch against the
+    full path. `subdir/*.md` matches `subdir/foo.md`."""
+    from trajectory_matcher import evaluate_assertions
+
+    trace = _trace(
+        events=[
+            _event(0, "tool_call", "Write", arguments={"path": "subdir/foo.md"}),
+        ],
+        artifacts={"subdir/foo.md": "sha256:a"},
+    )
+    result = evaluate_assertions(
+        [{"final_artifact_path": "subdir/*.md"}], trace
+    )
+    assert result.passed
+
+
 # --- max_total_tool_calls / min_total_tool_calls ---
 
 

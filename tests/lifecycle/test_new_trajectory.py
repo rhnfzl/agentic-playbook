@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import io
 import sys
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
@@ -26,17 +26,21 @@ def _seed_skill(repo_root: Path, skill: str, category: str = "engineering") -> N
 
 
 def _invoke(repo_root: Path, skill: str, scenario: str) -> tuple[int, str]:
+    """Return (rc, combined_stdout_and_stderr). Both streams are captured
+    so tests can assert on either kind of message without caring which
+    stream the CLI uses."""
     import new_trajectory
 
-    buf = io.StringIO()
-    with redirect_stdout(buf):
+    out = io.StringIO()
+    err = io.StringIO()
+    with redirect_stdout(out), redirect_stderr(err):
         rc = new_trajectory.main(
             skill=skill,
             scenario=scenario,
             owner="test",
             repo_root=repo_root,
         )
-    return rc, buf.getvalue()
+    return rc, out.getvalue() + err.getvalue()
 
 
 def test_scaffold_creates_yaml_at_canonical_path(tmp_path: Path) -> None:

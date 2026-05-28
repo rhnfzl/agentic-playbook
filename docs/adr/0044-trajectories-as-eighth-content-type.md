@@ -1,4 +1,4 @@
-# 0043. trajectories/ as 8th content type
+# 0044. trajectories/ as 8th content type
 
 ## Status
 Accepted (2026-05-28)

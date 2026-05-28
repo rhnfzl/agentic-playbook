@@ -303,6 +303,51 @@ def test_lint_accepts_quoted_frontmatter_values(tmp_path: Path) -> None:
     assert result.status == "ok", "\n".join(result.details)
 
 
+def test_lint_fails_when_phrasing_starts_with_TODO(tmp_path: Path) -> None:
+    """Third-review P2: scaffolder writes `TODO first phrasing` etc.; the
+    linter must catch body-level TODOs, not just frontmatter."""
+    yaml = VALID_FRONTMATTER.replace(
+        '"first phrasing"', '"TODO first phrasing"'
+    )
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    joined = "\n".join(result.details).lower()
+    assert "todo" in joined and "phrasing" in joined
+
+
+def test_lint_fails_when_rubric_starts_with_TODO(tmp_path: Path) -> None:
+    """Third-review P2: the scaffolder leaves a TODO rubric scaffold."""
+    yaml = VALID_FRONTMATTER.replace(
+        '  rubric: "Score it."',
+        '  rubric: "TODO Score the trajectory on:"',
+    )
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    joined = "\n".join(result.details).lower()
+    assert "rubric" in joined and "todo" in joined
+
+
+def test_lint_fails_when_call_order_uses_block_style(tmp_path: Path) -> None:
+    """Third-review P2: block-style call_order parses as an empty string
+    (the naive reader does not handle indented block sequences). The
+    linter must fail loud rather than let an unrunnable trajectory pass."""
+    yaml = VALID_FRONTMATTER.replace(
+        "  - first_skill_loaded: demo-skill",
+        "  - first_skill_loaded: demo-skill\n"
+        "  - call_order:\n"
+        "      - tool: AskUserQuestion\n"
+        "        before: Write",
+    )
+    repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
+    result = _run_check(repo)
+    assert result.status == "fail"
+    joined = "\n".join(result.details).lower()
+    assert "call_order" in joined
+    assert "inline" in joined or "block" in joined
+
+
 def test_lint_resolves_imported_skill(tmp_path: Path) -> None:
     """Trajectories may target imported skills at base/skills/imported/<source>/<name>/."""
     yaml = VALID_FRONTMATTER.replace(

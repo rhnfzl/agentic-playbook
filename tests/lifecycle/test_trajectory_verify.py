@@ -14,7 +14,7 @@ from __future__ import annotations
 import io
 import json
 import sys
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
@@ -111,8 +111,9 @@ def test_verify_fails_when_trajectory_does_not_exist(tmp_path: Path) -> None:
     import trajectory_verify
 
     _seed(tmp_path)
-    buf = io.StringIO()
-    with redirect_stdout(buf):
+    out = io.StringIO()
+    err = io.StringIO()
+    with redirect_stdout(out), redirect_stderr(err):
         rc = trajectory_verify.main(
             skill="demo",
             scenario="no-such-scenario",
@@ -120,7 +121,8 @@ def test_verify_fails_when_trajectory_does_not_exist(tmp_path: Path) -> None:
             repo_root=tmp_path,
         )
     assert rc == 1
-    assert "not found" in buf.getvalue().lower()
+    # Errors go to stderr per scripts/AGENTS.md output-routing rule.
+    assert "not found" in err.getvalue().lower()
 
 
 def test_verify_fails_against_failing_fixture(tmp_path: Path) -> None:
@@ -140,8 +142,9 @@ def test_verify_fails_against_failing_fixture(tmp_path: Path) -> None:
     failing = tmp_path / "bad.jsonl"
     failing.write_text(json.dumps(spans[0]), encoding="utf-8")
 
-    buf = io.StringIO()
-    with redirect_stdout(buf):
+    out = io.StringIO()
+    err = io.StringIO()
+    with redirect_stdout(out), redirect_stderr(err):
         rc = trajectory_verify.main(
             skill="demo",
             scenario="happy-path",
@@ -149,5 +152,7 @@ def test_verify_fails_against_failing_fixture(tmp_path: Path) -> None:
             repo_root=tmp_path,
         )
     assert rc == 1
-    assert "FAIL" in buf.getvalue() or "fail" in buf.getvalue().lower()
-    assert "Write" in buf.getvalue()
+    # Failures route to stderr per output-routing rule; the matcher
+    # failure list ("Write was never called") also surfaces on stderr.
+    assert "FAIL" in err.getvalue() or "fail" in err.getvalue().lower()
+    assert "Write" in err.getvalue()

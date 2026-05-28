@@ -117,7 +117,8 @@ def main(
     if not _skill_directory(repo_root, skill_str):
         print(
             f"  error  skill '{skill_str}' not found under base/skills/<category>/{skill_str}/. "
-            f"Create the skill first via `make new SKILL={skill_str}`."
+            f"Create the skill first via `make new SKILL={skill_str}`.",
+            file=sys.stderr,
         )
         return 1
 
@@ -125,7 +126,10 @@ def main(
     target_dir.mkdir(parents=True, exist_ok=True)
     target = target_dir / f"{scenario_str}.yaml"
     if target.exists():
-        print(f"  error  trajectory already exists: {target.relative_to(repo_root)}")
+        print(
+            f"  error  trajectory already exists: {target.relative_to(repo_root)}",
+            file=sys.stderr,
+        )
         return 1
 
     body = TEMPLATE.format(
