@@ -276,3 +276,87 @@ def test_shim_handles_mixed_flat_and_nested_envelope_lines(tmp_path: Path) -> No
     names = [e.name for e in record.tool_calls()]
     assert "Write" in names
     assert "Edit" in names
+
+
+# --- review-fold: events_from_text + time-sort guarantees ---
+
+
+def test_events_from_text_sorts_spans_by_start_time() -> None:
+    """Review-fold P2 (thermo-nuclear #1): the live provider concatenated
+    stdout-then-stderr spans, assigning seq by pipe order rather than
+    span time. A skill_load emitted to stderr BEFORE the first stdout
+    span would land at the end of the event list, flipping
+    `first_skill_loaded`. The unified `events_from_text` sorts spans by
+    `startTimeUnixNano` before sequencing so seq reflects time order."""
+    from adapters.claude_code_trace import events_from_text
+
+    later_span = _span(
+        "Write",
+        attributes={
+            "gen_ai.operation.name": "tool_call",
+            "tool.name": "Write",
+            "tool.arguments": '{"path": "z.md"}',
+        },
+        start_unix_nano=1_717_000_001_000_000_000,
+    )
+    earlier_skill_load = _span(
+        "skill-a",
+        attributes={
+            "gen_ai.operation.name": "skill_load",
+            "skill.name": "skill-a",
+        },
+        start_unix_nano=1_717_000_000_000_000_000,
+    )
+
+    # Pipe-order would put Write first; time-order puts skill-a first.
+    text = json.dumps(later_span) + "\n" + json.dumps(earlier_skill_load)
+    events = events_from_text(text)
+
+    assert [e.kind for e in events] == ["skill_load", "tool_call"]
+    assert [e.seq for e in events] == [0, 1]
+    assert events[0].name == "skill-a"
+    assert events[1].name == "Write"
+
+
+def test_events_from_text_skips_non_dict_attribute_entries() -> None:
+    """Codex review-fold finding: the unified `_attrs_to_dict` lost the
+    isinstance(attr, dict) guard the provider's local copy had. A
+    malformed span row with a non-dict in `attributes` would raise
+    AttributeError on the `.get()` call. The fix restores the guard so
+    one broken span does not poison the trace."""
+    from adapters.claude_code_trace import events_from_text
+
+    malformed_span = {
+        "name": "Write",
+        "startTimeUnixNano": "1717000000000000000",
+        "endTimeUnixNano":   "1717000000010000000",
+        "attributes": [
+            "this should be a dict, not a string",
+            {"key": "gen_ai.operation.name", "value": {"stringValue": "tool_call"}},
+            {"key": "tool.name", "value": {"stringValue": "Write"}},
+            None,  # also tolerated
+        ],
+    }
+    events = events_from_text(json.dumps(malformed_span))
+    # The valid entries still produce a clean tool_call event.
+    assert len(events) == 1
+    assert events[0].kind == "tool_call"
+    assert events[0].name == "Write"
+
+
+def test_events_from_text_preserves_unknown_ops_as_model_response() -> None:
+    """Review-fold thermo-nuclear #1 follow-up: the provider's old
+    `_span_to_event` silently dropped unknown ops; the fixture path
+    preserved them as model_response with raw_attrs. Unification picks
+    the lenient behavior so the live and fixture paths produce the
+    same kind of events for an emerging operation name."""
+    from adapters.claude_code_trace import events_from_text
+
+    unknown = _span(
+        "mystery",
+        attributes={"gen_ai.operation.name": "experimental_op"},
+    )
+    events = events_from_text(json.dumps(unknown))
+    assert len(events) == 1
+    assert events[0].kind == "model_response"
+    assert events[0].name == "mystery"

@@ -105,6 +105,27 @@ def draft_trajectory_yaml(
     return "\n".join(lines)
 
 
+def _next_draft_path(canonical_yaml: Path) -> Path:
+    """Return the next non-existing draft path for a canonical YAML.
+
+    First call: `<scenario>.yaml.draft`.
+    Subsequent calls (when `.draft` already exists): `<scenario>.yaml.draft.2`,
+    `.draft.3`, etc. Avoids the silent-clobber failure mode where a
+    second recording destroys the author's in-progress edits to the
+    first draft. Walks linearly; the practical limit is the number of
+    times an author re-records before reviewing the existing drafts.
+    """
+    base = canonical_yaml.with_suffix(".yaml.draft")
+    if not base.exists():
+        return base
+    n = 2
+    while True:
+        candidate = canonical_yaml.with_suffix(f".yaml.draft.{n}")
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
 def save_fixture(
     repo_root: Path,
     skill: str,
@@ -235,11 +256,17 @@ def main(
     yaml_text = draft_trajectory_yaml(skill, scenario, user_prompt, trace)
 
     # Refuse to clobber an existing trajectory; write .draft sibling.
+    # Review-fold P2 #6: the .draft path was also unconditionally
+    # overwritten, so a second `make record-trajectory` run silently
+    # destroyed whatever the author had typed into the first .draft.
+    # Now we walk a numeric suffix (.draft, .draft.2, .draft.3, ...) so
+    # the author's in-progress work is preserved and the new draft
+    # lands beside it for diffing.
     canonical = (
         repo_root / "base" / "trajectories" / skill / f"{scenario}.yaml"
     )
     canonical.parent.mkdir(parents=True, exist_ok=True)
-    draft_path = canonical.with_suffix(".yaml.draft")
+    draft_path = _next_draft_path(canonical)
     draft_path.write_text(yaml_text, encoding="utf-8")
 
     rel_fixture = fixture_path.relative_to(repo_root)

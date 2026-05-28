@@ -244,9 +244,7 @@ def test_main_records_fixture_and_writes_draft(tmp_path: Path) -> None:
 
 def test_main_refuses_to_overwrite_existing_trajectory(tmp_path: Path) -> None:
     """If the trajectory YAML already exists, the recorder writes a
-    .draft sibling rather than clobbering. Two consecutive runs both
-    succeed; the second's draft is at <scenario>.yaml.draft (not
-    .yaml)."""
+    .draft sibling rather than clobbering."""
     import io
     from contextlib import redirect_stderr, redirect_stdout
 
@@ -285,3 +283,60 @@ def test_main_refuses_to_overwrite_existing_trajectory(tmp_path: Path) -> None:
     ).read_text(encoding="utf-8") == "already exists"
     # Draft sibling written.
     assert (traj_dir / "happy-path.yaml.draft").is_file()
+
+
+def test_main_does_not_overwrite_existing_draft(tmp_path: Path) -> None:
+    """Review-fold P2 #6: a second `make record-trajectory` used to
+    overwrite the first run's `.draft` silently, destroying any author
+    edits. The recorder now walks `.draft`, `.draft.2`, `.draft.3`, ...
+    so the in-progress draft is preserved and the new draft lands
+    alongside it for diffing."""
+    import io
+    from contextlib import redirect_stderr, redirect_stdout
+
+    skill_dir = tmp_path / "base" / "skills" / "engineering" / "demo"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: demo\ndescription: x\nversion: 0.1.0\n"
+        "owner: t\nlast_reviewed: 2026-05-28\n---\n\n# x\n",
+        encoding="utf-8",
+    )
+
+    import trajectory_record
+
+    def fake_provider(trajectory_stub, phrasing: str, adapter: str):
+        return _make_trace([("Write", {"path": "spec.md"})], skill="demo")
+
+    # First run: writes .yaml.draft. Simulate author edits.
+    out = io.StringIO()
+    err = io.StringIO()
+    with redirect_stdout(out), redirect_stderr(err):
+        rc1 = trajectory_record.main(
+            skill="demo",
+            scenario="happy-path",
+            user_prompt="first prompt",
+            repo_root=tmp_path,
+            provider=fake_provider,
+        )
+    assert rc1 == 0
+    traj_dir = tmp_path / "base" / "trajectories" / "demo"
+    first_draft = traj_dir / "happy-path.yaml.draft"
+    assert first_draft.is_file()
+    first_draft.write_text("# author-edited draft", encoding="utf-8")
+
+    # Second run: must not clobber. Goes to .yaml.draft.2.
+    out2 = io.StringIO()
+    err2 = io.StringIO()
+    with redirect_stdout(out2), redirect_stderr(err2):
+        rc2 = trajectory_record.main(
+            skill="demo",
+            scenario="happy-path",
+            user_prompt="second prompt",
+            repo_root=tmp_path,
+            provider=fake_provider,
+        )
+    assert rc2 == 0
+    assert first_draft.read_text(encoding="utf-8") == "# author-edited draft"
+    second_draft = traj_dir / "happy-path.yaml.draft.2"
+    assert second_draft.is_file()
+    assert "second prompt" in second_draft.read_text(encoding="utf-8")

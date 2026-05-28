@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
-"""Judge calibration check (Phase 2C-β, ADR-0046).
+"""Judge calibration check (Phase 2C-beta, ADR-0046).
 
 Runs a trajectory's LLM-judge rubric N times against a fixed trace and
-reports per-rubric score variance. A rubric whose scores swing by more
-than `noise_threshold` between consecutive temperature=0 runs is too
-subjective for the hybrid match contract; the report flags it so the
-author can tighten the rubric (or drop the judge half for that
-trajectory).
+reports the score range (`max(scores) - min(scores)`) across runs. A
+rubric whose scores swing by more than `noise_threshold` between
+temperature=0 runs is too subjective for the hybrid match contract;
+the report flags it so the author can tighten the rubric (or drop the
+judge half for that trajectory).
+
+Judge infra errors (HTTP 429, parse failures, timeouts) are surfaced
+separately from rubric variance. A synthetic `score=0.0` from a
+`JudgeResult(is_infra_error=True)` would otherwise pollute the range
+and mark a stable rubric as noisy (review-fold P2 #5). Infra-errored
+runs are excluded from the score set, counted independently, and
+become their own non-zero exit reason so the operator retries instead
+of treating the rubric as broken.
 
 Usage:
 
@@ -15,15 +23,14 @@ Usage:
         --skill demo --scenario happy-path --runs 5 [--json]
 
 In production the rubric is graded against a real fixture trace (from
-`base/trajectories/<skill>/fixtures/<scenario>-pass.jsonl`). For Phase
-2C-β the tool accepts an injected `trace_provider` and `client_factory`
-so tests can run without a real LLM. The CLI default reads the canary
-fixture and instantiates `HttpAnthropicJudgeClient` from
-`ANTHROPIC_API_KEY`.
+`base/trajectories/<skill>/fixtures/<scenario>-pass.jsonl`). The tool
+accepts an injected `trace_provider` and `client_factory` so tests can
+run without a real LLM. The CLI default reads the canary fixture and
+instantiates `HttpAnthropicJudgeClient` from `ANTHROPIC_API_KEY`.
 
 Out of scope: cross-model calibration (running the same rubric against
-different judge models). The ADR-0046 reject-if criterion is variance
-at a single temperature, not cross-model agreement.
+different judge models). The ADR-0046 reject-if criterion is range at
+a single temperature, not cross-model agreement.
 """
 
 from __future__ import annotations
@@ -49,20 +56,42 @@ _DEFAULT_RUNS = 5
 class CalibrationReport(NamedTuple):
     """Per-trajectory calibration result.
 
-    scores         -- the N raw scores, in invocation order.
-    variance       -- max(scores) - min(scores); simple range metric
-                      that matches the ADR's "0.1 between consecutive
-                      runs" language better than statistical variance.
-    is_noisy       -- variance > threshold; the report's go/no-go bit.
-    min/max/median -- distribution snapshot for the author's eye.
+    scores            -- the successful raw scores, in invocation order.
+                         Excludes infra-error runs so a flaky judge
+                         endpoint cannot poison the range (review-fold
+                         P2 #5).
+    score_range       -- max(scores) - min(scores); the metric the ADR
+                         actually describes ("noise above 0.1 between
+                         consecutive runs"). Renamed from `variance`
+                         which was misleading because the value is a
+                         range, not statistical variance (review-fold
+                         thermo-nuclear nice-to-have).
+    is_noisy          -- score_range > threshold AND at least one
+                         successful run happened. A run with all-infra
+                         errors is `is_noisy=False` but
+                         `usable_signal=False`; the operator should
+                         retry rather than treat the rubric as broken.
+    usable_signal     -- True iff `scores` has at least 2 entries (so
+                         range is meaningful). When False, treat the
+                         report as "couldn't measure" rather than "the
+                         rubric is fine."
+    requested_runs    -- the N the caller asked for.
+    successful_runs   -- len(scores); how many runs returned a real
+                         judgement.
+    infra_errors      -- count of runs that returned
+                         `JudgeResult(is_infra_error=True)`.
+    min/max/median    -- distribution snapshot for the author's eye.
     """
 
     skill: str
     scenario: str
-    runs: int
+    requested_runs: int
+    successful_runs: int
+    infra_errors: int
     scores: list[float]
-    variance: float
+    score_range: float
     is_noisy: bool
+    usable_signal: bool
     noise_threshold: float
     min_score: float
     max_score: float
@@ -77,31 +106,73 @@ def calibrate_trajectory(
     runs: int = _DEFAULT_RUNS,
     noise_threshold: float = _DEFAULT_NOISE_THRESHOLD,
 ) -> CalibrationReport:
-    """Run the rubric `runs` times against `trace`; return a report."""
+    """Run the rubric `runs` times against `trace`; return a report.
+
+    Calls `evaluate_judge` `runs` times. Each call returns a
+    `JudgeResult`; if `is_infra_error=True` (HTTP failure, parse
+    failure, refusal phrase) the synthetic 0.0 score is NOT folded
+    into the variance set. That avoids the review-fold P2 #5 failure
+    mode where one 429 retroactively marks an otherwise stable rubric
+    as noisy.
+    """
     if runs < 2:
         raise ValueError(
             f"calibration requires runs >= 2 (got {runs}); a single "
-            f"score has no variance signal"
+            f"score has no range signal"
         )
     scores: list[float] = []
+    infra_errors = 0
     model = "unknown"
     for _ in range(runs):
         result = evaluate_judge(trajectory, trace, client)
-        scores.append(result.score)
         if result.model:
             model = result.model
-    variance = max(scores) - min(scores)
+        if result.is_infra_error:
+            infra_errors += 1
+            continue
+        scores.append(result.score)
+
+    # Distribution snapshot uses whatever scores landed (even a single
+    # surviving run carries information the operator wants to see).
+    # `score_range` and `is_noisy` only get a verdict when we have >= 2
+    # scores, because one score has no range signal. Codex review-fold
+    # finding: a previous version zeroed min/max/median when
+    # `usable_signal` was False, hiding the one real score behind 0.0
+    # and confusing the JSON output.
+    if scores:
+        min_score = min(scores)
+        max_score = max(scores)
+        median_score = statistics.median(scores)
+    else:
+        min_score = 0.0
+        max_score = 0.0
+        median_score = 0.0
+
+    usable_signal = len(scores) >= 2
+    if usable_signal:
+        score_range = max_score - min_score
+        is_noisy = score_range > noise_threshold
+    else:
+        # One or zero successful runs. Range is undefined; defer to the
+        # operator. is_noisy=False so the report does not blame the
+        # rubric for what is really a transport problem.
+        score_range = 0.0
+        is_noisy = False
+
     return CalibrationReport(
         skill=trajectory.skill,
         scenario=trajectory.scenario,
-        runs=runs,
+        requested_runs=runs,
+        successful_runs=len(scores),
+        infra_errors=infra_errors,
         scores=scores,
-        variance=variance,
-        is_noisy=variance > noise_threshold,
+        score_range=score_range,
+        is_noisy=is_noisy,
+        usable_signal=usable_signal,
         noise_threshold=noise_threshold,
-        min_score=min(scores),
-        max_score=max(scores),
-        median_score=statistics.median(scores),
+        min_score=min_score,
+        max_score=max_score,
+        median_score=median_score,
         model=model,
     )
 
@@ -109,9 +180,12 @@ def calibrate_trajectory(
 def _print_report_human(report: CalibrationReport) -> None:
     print()
     print(f"Calibration: {report.skill}/{report.scenario}")
-    print(f"  runs:             {report.runs}")
+    print(f"  requested runs:   {report.requested_runs}")
+    print(f"  successful runs:  {report.successful_runs}")
+    if report.infra_errors:
+        print(f"  infra errors:     {report.infra_errors}")
     print(f"  scores:           {[round(s, 3) for s in report.scores]}")
-    print(f"  variance (range): {report.variance:.3f}")
+    print(f"  score range:      {report.score_range:.3f}")
     print(f"  threshold:        {report.noise_threshold}")
     print(
         f"  min / median / max: "
@@ -119,10 +193,21 @@ def _print_report_human(report: CalibrationReport) -> None:
         f"{report.max_score:.3f}"
     )
     print(f"  model:            {report.model}")
-    if report.is_noisy:
+    if not report.usable_signal:
         print(
-            f"  NOISY: variance exceeds threshold. Per ADR-0046, "
+            f"  UNUSABLE: only {report.successful_runs} successful "
+            f"run(s) out of {report.requested_runs}. Retry the "
+            f"calibration before treating the rubric as broken."
+        )
+    elif report.is_noisy:
+        print(
+            f"  NOISY: score range exceeds threshold. Per ADR-0046, "
             f"tighten the rubric or drop the LLM-judge half."
+        )
+    elif report.infra_errors:
+        print(
+            f"  ok  rubric within threshold, but {report.infra_errors} "
+            f"run(s) failed at the transport layer; retry to confirm."
         )
     else:
         print(f"  ok  rubric within calibration threshold")
@@ -220,7 +305,17 @@ def main(
         print(_json.dumps(report._asdict(), indent=2))
     else:
         _print_report_human(report)
-    return 1 if report.is_noisy else 0
+    # Exit 0 only when the rubric is within threshold AND every run
+    # produced a real score. Infra errors are surfaced as a non-zero
+    # exit so the operator knows to retry rather than treating the
+    # rubric as confirmed.
+    if not report.usable_signal:
+        return 1
+    if report.is_noisy:
+        return 1
+    if report.infra_errors:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 ---
 name: trajectory-summarizer
-description: Use when an author has captured a Claude Code session as a trajectory fixture (via `make record-trajectory`) and wants help turning the recorded trace into a publishable trajectory YAML — picking good paraphrasings, tightening DSL assertions, and drafting a rubric that the calibration check will accept.
+description: Use when an author has captured a Claude Code session as a trajectory fixture (via `make record-trajectory`) and wants help turning the recorded trace into a publishable trajectory YAML, by picking good paraphrasings, tightening DSL assertions, and drafting a rubric that the calibration check will accept.
 version: 0.1.0
 owner: rehan
 last_reviewed: 2026-05-28
@@ -26,9 +26,9 @@ make record-trajectory SKILL=<name> SCENARIO=<name> PROMPT="<prompt>"
 
 You will have:
 
-- `base/trajectories/<skill>/fixtures/<scenario>-pass.jsonl` — the
+- `base/trajectories/<skill>/fixtures/<scenario>-pass.jsonl`, the
   recorded trace.
-- `base/trajectories/<skill>/<scenario>.yaml.draft` — the starter YAML
+- `base/trajectories/<skill>/<scenario>.yaml.draft`, the starter YAML
   with TODO placeholders.
 
 Open both, then walk through this skill.

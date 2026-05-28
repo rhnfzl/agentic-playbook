@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
-"""Per-trajectory verify (Phase 1 task 5).
+"""Per-trajectory verify (single-trajectory inner-loop tool).
 
-Lightweight inner-loop tool authors use during development:
+Authors use this during development to re-check ONE trajectory
+without paying for a full matrix or a live spawn:
 
-    make verify-trajectory SKILL=<name> SCENARIO=<name>
+    make verify-trajectory SKILL=<name> SCENARIO=<name> FIXTURE=trace.jsonl
 
-Runs ONE trajectory against Claude Code (Phase 2) or against a fixture
-trace file (Phase 1; the `--fixture` flag). Phase 1 default behavior is
-intentionally fixture-only: live Claude Code spawning is Phase 2's job.
+Verify is intentionally fixture-driven. Live Claude Code spawning
+lives in `trajectory_harness.py` (Phase 2B) and the recorder
+(`trajectory_record.py`); both write JSONL fixtures the author can
+then replay through this tool. Keeping verify off the live path makes
+the inner loop fast, deterministic, and free of LLM cost.
 
-When the live runner ships:
-
-    make verify-trajectory SKILL=demo SCENARIO=happy-path
-      -> spawn Claude Code with the first phrasing, capture the OTel
-         trace, evaluate DSL assertions, report.
-
-Today (Phase 1):
-
-    make verify-trajectory SKILL=demo SCENARIO=happy-path FIXTURE=trace.jsonl
-      -> parse the JSONL through the Claude Code shim, evaluate DSL
-         against the resulting TraceRecord, report.
+    -> parse the JSONL through the Claude Code shim
+       (`claude_code_trace.parse_otel_jsonl`), evaluate DSL against
+       the resulting TraceRecord, and optionally run the LLM judge
+       via `--judge` (requires ANTHROPIC_API_KEY).
 """
 
 from __future__ import annotations
@@ -56,8 +52,9 @@ def main(
             "--fixture",
             type=Path,
             default=None,
-            help="Path to a JSONL trace fixture; bypasses live Claude Code "
-            "(Phase 2 will make this optional once live spawning lands).",
+            help="Path to a JSONL trace fixture. Verify is fixture-only "
+            "by design; for live spawn, use `make trajectory-check` (full "
+            "matrix) or `make record-trajectory` (capture once, replay here).",
         )
         parser.add_argument(
             "--phrasing",
@@ -98,8 +95,9 @@ def main(
 
     if fixture is None:
         print(
-            "  error  --fixture is required in Phase 1 (live Claude Code "
-            "spawning lands in Phase 2). Provide a captured trace JSONL.",
+            "  error  --fixture is required: verify is fixture-only by "
+            "design. Use `make trajectory-check` for live spawn, or "
+            "`make record-trajectory` to capture a JSONL first.",
             file=sys.stderr,
         )
         return 1
@@ -119,8 +117,8 @@ def main(
     trace = parse_otel_jsonl(fixture, session_id="verify", prompt=prompt)
     result = evaluate_assertions(traj.assertions, trace)
 
-    # Phase 2A: if --judge was requested and DSL passed, run the LLM judge
-    # and gate on the trajectory's threshold.
+    # Hybrid match (ADR-0046): if --judge was requested and DSL passed,
+    # run the LLM judge and gate on the trajectory's threshold.
     judge_failure_msg: str | None = None
     if result.passed and judge:
         client = judge_client

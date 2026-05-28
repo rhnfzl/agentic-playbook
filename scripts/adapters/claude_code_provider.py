@@ -1,10 +1,11 @@
-"""Live Claude Code trace_provider (Phase 2B, ADR-0045 work).
+"""Live Claude Code trace_provider (Phase 2B, ADR-0045).
 
 Spawns the `claude` CLI in headless `-p`/--print mode with OTel
 emission enabled (console exporter), parses the emitted spans into a
-TraceRecord, and returns it to the harness.
+TraceRecord via the shared `claude_code_trace.events_from_text`, and
+returns it to the harness.
 
-Contract: same as Phase 1's TraceProvider:
+Contract: TraceProvider callable:
 
     provider(trajectory, phrasing, adapter) -> TraceRecord
 
@@ -67,7 +68,6 @@ The live-spawn smoke test is gated on PHASE2_LIVE in
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import shutil
 import subprocess
@@ -78,7 +78,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from adapters.claude_code_trace import _attr_value  # noqa: E402  reuse: prevents drift
+from adapters.claude_code_trace import events_from_text  # noqa: E402  shared OTel parser
 from adapters.trace_record import TraceEvent, TraceRecord  # noqa: E402
 
 
@@ -282,12 +282,17 @@ class ClaudeCodeProvider:
                 )
 
             ended_at = datetime.now(timezone.utc)
-            # Parse spans from BOTH stdout and stderr; Node Console
-            # ExportSpanExporter writes to stdout in some builds and
-            # stderr in others. Merging both is defensive and zero-cost.
-            events = _parse_otel_lines(result.stdout) + _parse_otel_lines(
-                result.stderr,
-                start_seq=len(_parse_otel_lines(result.stdout)),
+            # Parse spans from BOTH stdout and stderr (Node Console
+            # SpanExporter writes to stdout in some builds and stderr in
+            # others) using the shared `events_from_text`. That helper
+            # flattens OTLP envelopes and sorts spans by
+            # `startTimeUnixNano` so seq numbers reflect time order, not
+            # pipe order. Without that sort a span emitted to stderr
+            # before a stdout span would have a larger seq, flipping
+            # `first_skill_loaded` / `call_order` assertions on mixed
+            # channels.
+            events = events_from_text(
+                (result.stdout or "") + "\n" + (result.stderr or "")
             )
             artifacts = _scan_workdir_artifacts(workdir)
 
@@ -353,90 +358,6 @@ class ClaudeCodeProvider:
             "-p", phrasing,
             "--allowedTools", allowlist_csv,
         ]
-
-
-def _parse_otel_lines(text: str, start_seq: int = 0) -> list[TraceEvent]:
-    """Pull OTel JSON spans out of mixed text and convert to events.
-
-    Real Claude Code output interleaves spans with startup noise
-    (`Loading skills from...`, etc.). Filter non-JSON lines silently.
-    """
-    events: list[TraceEvent] = []
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line[0] != "{":
-            continue
-        try:
-            span = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(span, dict):
-            continue
-        event = _span_to_event(span, seq=start_seq + len(events))
-        if event is not None:
-            events.append(event)
-    return events
-
-
-def _span_to_event(span: dict, seq: int) -> TraceEvent | None:
-    """Convert one OTel span dict into a TraceEvent.
-
-    Uses `claude_code_trace._attr_value` (imported above) so the
-    string/int/double/bool branch list cannot drift from the Phase 1
-    shim. Adversarial review-round-6 caught a local copy that silently
-    dropped doubleValue and boolValue attributes.
-    """
-    attrs = _attrs_to_dict(span.get("attributes", []))
-    op = attrs.get("gen_ai.operation.name")
-
-    start = int(span.get("startTimeUnixNano", "0") or 0)
-    end = int(span.get("endTimeUnixNano", "0") or 0)
-    duration_ms = max(0, (end - start) // 1_000_000) if end and start else None
-
-    if op == "tool_call":
-        name = attrs.get("tool.name") or span.get("name", "unknown")
-        arguments_str = attrs.get("tool.arguments")
-        arguments: dict | None = None
-        if isinstance(arguments_str, str):
-            try:
-                arguments = json.loads(arguments_str)
-            except json.JSONDecodeError:
-                arguments = {"raw": arguments_str}
-        return TraceEvent(
-            seq=seq, kind="tool_call", name=str(name),
-            arguments=arguments, duration_ms=duration_ms, raw_attrs=attrs,
-        )
-    if op == "skill_load":
-        name = attrs.get("skill.name") or span.get("name", "unknown")
-        return TraceEvent(
-            seq=seq, kind="skill_load", name=str(name),
-            arguments=None, duration_ms=duration_ms, raw_attrs=attrs,
-        )
-    if op == "chat":
-        model = attrs.get("gen_ai.request.model")
-        return TraceEvent(
-            seq=seq, kind="model_response",
-            name=str(model or "chat"),
-            arguments=None, duration_ms=duration_ms, raw_attrs=attrs,
-        )
-    return None
-
-
-def _attrs_to_dict(attrs):  # type: ignore[no-untyped-def]
-    """Flatten OTel attribute list to a dict, reusing the Phase 1
-    `_attr_value` so doubleValue / boolValue / intValue / stringValue
-    all unwrap consistently."""
-    out: dict = {}
-    for entry in attrs or []:
-        if not isinstance(entry, dict):
-            continue
-        key = entry.get("key")
-        if key is None:
-            continue
-        value = _attr_value(entry)
-        if value is not None:
-            out[key] = value
-    return out
 
 
 def _detect_model(events: list[TraceEvent]) -> str | None:

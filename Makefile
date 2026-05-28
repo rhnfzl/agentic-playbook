@@ -22,6 +22,9 @@ help:
 	@echo "  make sync-distribution-memory MANIFEST=/path/to/manifest.toml"
 	@echo "                                     Port curated memory entries to external destination"
 	@echo "  make init TARGET=/path             Per-project init: scaffold AGENTS.md + .playbook-config.yaml"
+	@echo "  make trajectory-check              Live trajectory matrix (default MAX_SPAWNS=8 cap)"
+	@echo "                                     Overrides: SKILL=<name> ADAPTER=<name> JUDGE=1"
+	@echo "                                     STRICT=1 MAX_SPAWNS=N MAX_JUDGE_CALLS=N MAX_RETRIES=N DRY_RUN=1"
 	@echo "  make check                         Full check: frontmatter, AGENTS.md, audit, size, decay, em-dash, no-versions"
 	@echo "  make eval                          Run skill eval suites (LLM-judge driven; slower)"
 	@echo "  make test                          Adapter smoke tests + pytest lifecycle scenarios"
@@ -115,7 +118,12 @@ trajectory-check:
 	@$(PYTHON) scripts/trajectory_harness.py \
 		$(if $(SKILL),--skill "$(SKILL)") \
 		$(if $(ADAPTER),--adapter "$(ADAPTER)") \
-		$(if $(STRICT),--strict)
+		$(if $(STRICT),--strict) \
+		$(if $(JUDGE),--judge) \
+		$(if $(MAX_SPAWNS),--max-spawns $(MAX_SPAWNS),--max-spawns 8) \
+		$(if $(MAX_JUDGE_CALLS),--max-judge-calls $(MAX_JUDGE_CALLS)) \
+		$(if $(MAX_RETRIES),--max-retries $(MAX_RETRIES)) \
+		$(if $(DRY_RUN),--dry-run)
 
 verify-trajectory:
 	@if [ -z "$(SKILL)" ] || [ -z "$(SCENARIO)" ]; then \

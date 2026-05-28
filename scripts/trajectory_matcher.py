@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Trajectory DSL matcher (Phase 1, ADR-0046).
+"""Trajectory DSL matcher (ADR-0046, hybrid match contract step 1).
 
-Evaluates the deterministic-DSL half of a trajectory's assertions against
-a TraceRecord. The LLM-judge half (Phase 2) is a separate module; this
-file is pure logic, no LLM, no I/O, no adapter-specific knowledge.
+Evaluates the deterministic-DSL half of a trajectory's assertions
+against a TraceRecord. The LLM-judge half lives in
+`scripts/trajectory_judge.py`; this file is pure logic, no LLM, no
+I/O, no adapter-specific knowledge. The hybrid contract runs this
+matcher first and the judge second so a DSL failure short-circuits
+the judge call (cost: $0).
 
 Each DSL primitive is implemented as a small function returning either
 None (pass) or a string explaining why it failed. The aggregator
