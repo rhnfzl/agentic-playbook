@@ -1,20 +1,22 @@
 # DevOps profile
 
-The `devops.toml` profile bundles 4 native skills tuned to team's actual DevOps surface (AWS Secrets Manager, error-tracking, the k8s cluster, CI) plus the AGENTS.md curator and a few cross-role helpers.
+The `devops.toml` profile in this public mirror is a thin public-safe subset. It ships:
 
-DevOps tooling that lives outside team (Terraform, Packer, generic Kubernetes helpers) is NOT vendored into this profile. The playbook's import-strategy lock decided "team-native + external reference" for DevOps because:
+- `observability/ha-alert-triage` and `observability/market-audit-deployed-stack` for ops-side observability work.
+- `meta/agents-md-curator`, `meta/playbook-promote`, `meta/playbook-retrospective` for lifecycle.
+- `productivity/handoff` for end-of-session handoff documents.
 
-- The `derisk-ai/awesome-devops-skills` catalog is a metalist of other repos, not a direct skill source.
-- HashiCorp ships an official `hashicorp/agent-skills` collection covering Terraform + Packer that you can install on a per-project basis.
-- team's DevOps surface is org-specific enough that the 6-8 high-leverage moves are not in any upstream skill repo.
+Plus the always-on rules (`writing-style`, `no-em-dashes`, `no-ticket-ids-in-code`, `never-push-to-develop`), the `never-push-to-develop` and `agent-memory-session-brief` hooks, and the `slack` MCP.
+
+The workplace-specific DevOps skills (cloud secrets manager workflows, error-tracker issue triage, internal k8s dashboard verification, vendor-specific CI pipeline debugging) are designed in the upstream and intentionally not shipped in this public mirror. The downstream profile stays thin because the workflows these skills encode are too workplace-shaped to be portable to a generic open-source mirror.
 
 ## External skills to install separately
 
-When you need Terraform / Packer / generic K8s skill coverage on a project, install upstream skills via the agent's own skill-add mechanism. The list below is curated, not exhaustive; pick what fits the project.
+For project-specific DevOps work, the right pattern is to layer in external skill collections published by the tool vendors themselves.
 
 ### Terraform + Packer (HashiCorp official)
 
-Source: [hashicorp/agent-skills](https://github.com/hashicorp/agent-skills) (MPL-2.0). Published by the company that maintains the tooling, so the skill semantics track upstream changes accurately. Treat this collection as the canonical entry point when a project pulls in Terraform or Packer.
+Source: [hashicorp/agent-skills](https://github.com/hashicorp/agent-skills) (MPL-2.0). Published by the company that maintains the tooling, so the skill semantics track upstream changes accurately.
 
 Install per project (when the project actually uses Terraform):
 
@@ -23,39 +25,20 @@ npx skills add hashicorp/terraform
 npx skills add hashicorp/packer
 ```
 
-The HashiCorp skills cover code generation, plan analysis, state inspection, and module authoring. They do not duplicate any team-native DevOps skill in this profile.
+### Generic K8s helpers
 
-### Generic K8s helpers (Helm, K9s, Kompose)
-
-The `derisk-ai/awesome-devops-skills` catalog lists generic Kubernetes skills maintained by various authors. Quality varies; treat each as a candidate, not a guarantee. Inspect the SKILL.md before installing; verify the maintainer + license.
-
-The team-native `devops/k8s-dashboard-verify` skill is the canonical entry point for team's cluster work. Generic K8s skills supplement that for project-specific tasks (Helm chart authoring, K9s navigation patterns), they do not replace it.
+The `derisk-ai/awesome-devops-skills` catalog lists generic Kubernetes skills maintained by various authors. Quality varies; inspect the SKILL.md before installing and verify the maintainer + license.
 
 ### Cloud provider CLIs
 
-AWS, Azure, GCP each have their own agent-skill collections. team is AWS-primary (Secrets Manager, EKS, S3) so an AWS-focused skill set is the highest leverage:
+AWS, Azure, GCP each have their own agent-skill collections. Pick a cloud-specific skill set that matches the project's primary cloud.
 
-- [`awslabs/aws-agent-skills`](https://github.com/awslabs): search for current AWS agent skill collections; AWS publishes several under different sub-orgs.
+## Composing with other roles
 
-The team-native `devops/aws-secrets-configmap-apply` skill covers the specific Secrets Manager configmap path the AI Backend + MCP read from. Generic AWS skills supplement that for broader AWS work (IAM, S3, cost analysis).
-
-## Why this profile is intentionally thin
-
-The 4 native skills cover the four highest-frequency DevOps moves at team:
-
-1. Configmap apply (rotating model deployment names, env-driven config).
-2. error-tracking triage (production error analysis before paging on-call).
-3. K8s dashboard verify ("is X live yet").
-4. CI pipeline debug (post-merge or deploy-time pipeline failures).
-
-Adding a fifth and sixth native skill (`redis-sidecar-debug`, `bedrock-marketplace-iam`) is straightforward when the recurring need shows up. The playbook's promotion path (`/playbook-retrospective` then `/playbook-promote`) is the right way to graduate the next ones.
-
-For DevOps engineers wearing multiple hats (e.g. DevOps + backend), install both profiles together:
+A DevOps engineer who also writes backend code can install both profiles:
 
 ```bash
 make install PROFILE=devops,backend-developer
 ```
-
-(or, equivalently, `python3 scripts/install.py --profile devops,backend-developer`)
 
 The installer unions the skill / rule / hook / MCP lists and dedupes.

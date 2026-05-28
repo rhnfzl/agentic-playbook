@@ -8,15 +8,15 @@ Per the profile-separation principle, each profile is single-role. A teammate wh
 
 ## What ships in this directory
 
-| Profile | Audience | Default content selection |
+| Profile | Audience | Default content selection (public-safe subset) |
 |---|---|---|
-| `backend-developer.toml` | AI Backend / MCP engineers | All engineering skills + backend-relevant rules + code-quality + VCS-host hooks + Jira/Slack/error-tracking MCP |
-| `frontend-developer.toml` | Frontend engineers | UI + presentation skills + VCS-host hooks + Slack MCP |
-| `qa.toml` | QA engineers | Test-discipline skills + bug-triage + code-review + Jira MCP |
-| `tech-lead.toml` | Tech leads | Everything in backend + meeting-brief + handoff + stakeholder-slack-brief + presentation + decay tooling |
-| `product-manager.toml` | Product managers | 15 curated PM skills (PRD, sprint, retro, roadmap, prioritization, stakeholder map) + AGENTS.md curator + Jira/Slack/Tavily MCP |
-| `research.toml` | Researchers, PMs running discovery | 7 research-curated skills (interview script + synthesis, competitor analysis, user personas, market sizing) + Tavily MCP |
-| `devops.toml` | DevOps engineers | 4 team-native DevOps skills (Secrets Manager configmap apply, error-tracking triage, k8s dashboard verify, CI pipeline debug) + observability helpers + error-tracking/code-quality/Atlassian/Slack MCP. External tools (Terraform, Packer, generic k8s skills) documented in `devops.README.md` for opt-in install. |
+| `backend-developer.toml` | Backend developers | ci-failure-triage + post-iter-review + improve-codebase-architecture + tdd + triage + grill-me + handoff + write-a-skill, always-on rules, lint-guard + never-push-to-develop + human-html-autoindex hooks, code-review-graph + slack + tavily MCPs |
+| `frontend-developer.toml` | Frontend developers | code-review-graph-first + post-iter-review + frontend-slides + grill-me + handoff + write-a-skill, always-on rules, lint-guard + never-push-to-develop + human-html-autoindex hooks, slack + tavily MCPs |
+| `qa.toml` | QA engineers | ci-failure-triage + triage + grill-me + handoff + grill-with-docs, always-on rules, human-html-autoindex hook, slack + tavily MCPs |
+| `tech-lead.toml` | Tech leads | All engineering + observability + key productivity + meta skills, always-on rules, full hook set, code-review-graph + slack + tavily MCPs |
+| `product-manager.toml` | Product managers | 15 vendored PM-execution skills under `imported/pm-curated/` + meta lifecycle skills + handoff + grill-me, always-on rules, human-html-advisory + agent-memory-session-brief hooks, slack + tavily MCPs |
+| `research.toml` | Researchers | 7 vendored research skills under `imported/research-curated/` + meta lifecycle skills + handoff + grill-me, always-on rules, human-html-advisory + agent-memory-session-brief hooks, tavily + slack MCPs |
+| `devops.toml` | DevOps engineers | observability skills (ha-alert-triage, market-audit-deployed-stack) + meta lifecycle skills + handoff, always-on rules, never-push-to-develop + agent-memory-session-brief hooks, slack MCP. Workplace-specific DevOps skills (cloud-secrets, CI debugging, dashboard verification) are designed in the upstream and not shipped in this public mirror. |
 
 ## Schema
 
@@ -24,39 +24,37 @@ Each profile is a TOML file:
 
 ```toml
 name = "backend-developer"
-description = "AI Backend and MCP engineers at team"
-owner = "backend-team"
-last_reviewed = "2026-05-24"
+description = "Backend developer profile (public-safe subset)."
+owner = "rehan"
+last_reviewed = "2026-05-28"
 
 [skills]
 include = [
-  "engineering/post-iter-review",
-  # engineering/code-review,  # add when shipped
   "engineering/ci-failure-triage",
+  "engineering/post-iter-review",
   # ...
 ]
 
 [rules]
 include = [
   "never-push-to-develop",
-  "mcp-first-boundary",
+  "no-em-dashes",
   "no-ticket-ids-in-code",
-  # ...
+  "writing-style",
 ]
 
 [hooks]
 include = [
-  "never-push-to-develop",
   "lint-guard",
-  "sonar-advisory",
+  "never-push-to-develop",
+  "human-html-autoindex",
 ]
 
 [mcp]
 include = [
-  "atlassian",
-  "VCS",
-  "error-tracking",
+  "code-review-graph",
   "slack",
+  "tavily",
 ]
 ```
 

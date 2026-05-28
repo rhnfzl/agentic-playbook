@@ -10,7 +10,7 @@ Always-on behavioral constraints. A rule is unconditional; a skill is conditiona
 ## What Lives Here
 
 - Generic rule files at `base/rules/`: never-push-to-develop, no-em-dashes, no-ticket-ids-in-code, writing-style.
-- team-specific rule files at `overlays/<name>/rules/` (per ADR-0040): vcs-not-github, direct-acc-first, full-request-chain, jira-priority-scheme, label-policy, mcp-first-boundary.
+- Workplace-specific rule files live under `overlays/<name>/rules/` per ADR-0040 (the base / overlay split) and are designed in the upstream; this public mirror does not ship them.
 - `README.md` documents the rule contract and installer behavior.
 
 ## Local Commands

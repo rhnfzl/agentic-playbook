@@ -12,16 +12,12 @@ Format: one rule per file, `.md`, single H1 title, plain-language body. No front
 
 | Rule | What it constrains | Why |
 |---|---|---|
-| `vcs-not-github.md` | Never use `gh` CLI for team repos | team repos live on VCS; the gh CLI silently no-ops or fails on them. |
-| `direct-acc-first.md` | Try direct `*.team.com` access before `ssh internal-host` fallback | Direct is faster and avoids stale-DNS / cached-response failure modes. |
-| `full-request-chain.md` | Always trace FE → TM Backend → AI Backend → MCP → Public API end-to-end when debugging recruiter issues | Prevents wrong-layer blame and misrouted Jira tickets. |
-| `jira-priority-scheme.md` | Use P0 through P4 priorities, not Low/Medium/High | team has a custom priority scheme; the default Jira values break leadership rollups. |
-| `label-policy.md` | Apply exact labels per project (R8 / MATCH) | Dashboards filter by these exact labels; drift breaks rollups. |
-| `mcp-first-boundary.md` | MCP owns portable business semantics; AI Backend owns orchestration only | Keeps MCP usable by Claude Desktop / n8n / Cursor without AI-Backend-specific hidden logic. |
-| `never-push-to-develop.md` | Feature branch → PR → review → merge; never push directly to develop | The PR is the audit trail. Direct pushes bypass review. |
-| `no-em-dashes.md` | Never use the em-dash character in authored prose | Em-dashes read as LLM tell; team writes with commas, parentheses, separate sentences. |
-| `no-ticket-ids-in-code.md` | Never put Jira IDs (R8-*, MATCH-*) in code, comments, docstrings, or env example files | Ticket IDs rot; PR descriptions are the right home. |
-| `writing-style.md` | Lead with plain-language product context before technical detail | Engineers + PMs + stakeholders all read the same artifacts; plain-language framing reaches everyone. |
+| `never-push-to-develop.md` | Feature branch then PR then review then merge; never push directly to develop. | The PR is the audit trail. Direct pushes bypass review. |
+| `no-em-dashes.md` | Never use the em-dash character in authored prose. | Em-dashes read as LLM tell; use commas, parentheses, separate sentences instead. |
+| `no-ticket-ids-in-code.md` | Never put ticket IDs in code, comments, docstrings, or env example files. | Ticket IDs rot; PR descriptions are the right home. |
+| `writing-style.md` | Lead with plain-language product context before technical detail. | Engineers, PMs, and stakeholders all read the same artifacts; plain-language framing reaches everyone. |
+
+Workplace-specific rules (priority schemes, label policies, internal-host preferences, request-chain debugging policies, VCS-host bindings, MCP boundary discipline) are designed in the upstream and intentionally not shipped in this public mirror per ADR-0040 (base / overlay split).
 
 ## How the installer wires rules
 
