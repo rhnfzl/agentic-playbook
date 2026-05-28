@@ -212,8 +212,19 @@ def _call_provider_with_retry(
     last_exc: Exception | None = None
     while attempt <= max_retries:
         if consume_budget is not None and not consume_budget():
+            # Budget ran out. Always surface this as a budget_exhausted
+            # exception so `_evaluate_cell` routes the cell to the right
+            # failure label. Without this wrap, a mid-retry exhaustion
+            # would return the last transient exception verbatim and the
+            # cell would land as `infra_fail` instead of
+            # `budget_exhausted` (adversarial review-fold finding).
             if last_exc is not None:
-                return last_exc
+                return RuntimeError(
+                    f"budget_exhausted: max_provider_calls reached "
+                    f"mid-retry after {attempt} attempt(s); last "
+                    f"transient error was {type(last_exc).__name__}: "
+                    f"{last_exc}"
+                )
             return RuntimeError(
                 "budget_exhausted: max_provider_calls reached before "
                 "the first attempt could start"
@@ -318,6 +329,22 @@ def _evaluate_cell(
     )
     if isinstance(trace_or_exc, Exception):
         exc = trace_or_exc
+        # Distinguish mid-retry budget exhaustion from a true provider
+        # crash so the matrix output routes to the right CI action.
+        # `_call_provider_with_retry` synthesizes a RuntimeError whose
+        # message starts with `budget_exhausted:` when the retry loop's
+        # consume_budget callable runs out of slots; that case is a
+        # cost-ceiling event, not infra. Adversarial review-fold finding:
+        # both used to land as `infra_fail` so an operator could not see
+        # the difference between "we hit our spawn cap" and "the agent
+        # crashed".
+        msg = str(exc)
+        if msg.startswith("budget_exhausted:"):
+            return _cell(False, [
+                f"budget_exhausted: max_provider_calls="
+                f"{cfg.max_provider_calls} reached during retry "
+                f"({type(exc).__name__})"
+            ])
         return _cell(False, [
             f"infra_fail: trace_provider raised "
             f"{type(exc).__name__}: {exc}"
@@ -500,7 +527,10 @@ def main() -> int:
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="Adapter unavailable counts as hard failure (default: degraded).",
+        help="Refuse to start the run if any candidate trajectory has "
+        "an llm_judge block but --judge was not passed (no judge_client "
+        "wired). Catches the silent DSL-only-pass mode where the "
+        "operator intended the hybrid contract but forgot the flag.",
     )
     parser.add_argument(
         "--judge",

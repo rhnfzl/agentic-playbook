@@ -306,6 +306,41 @@ def test_retries_count_against_max_provider_calls(tmp_path: Path) -> None:
     assert "budget_exhausted" in joined
 
 
+def test_mid_retry_budget_exhaustion_labels_as_budget_not_infra(tmp_path: Path) -> None:
+    """Review-fold adversarial finding: when a cell enters the retry
+    loop and the budget exhausts mid-retry (e.g. attempt 1 spawns and
+    crashes, attempt 2 has no slot left), `_call_provider_with_retry`
+    synthesizes a `RuntimeError("budget_exhausted: ...")`. Previously
+    the harness wrapped it as `infra_fail: trace_provider raised
+    RuntimeError: budget_exhausted:...`, so an operator could not tell
+    a spawn-cap event from an agent crash. The fix routes those into a
+    cleaner `budget_exhausted: ... reached during retry` message."""
+    from trajectory_harness import HarnessConfig, run_harness
+
+    attempts = {"n": 0}
+
+    def provider(t, p, a):
+        attempts["n"] += 1
+        raise RuntimeError("transient")
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=provider,
+        max_provider_calls=2,
+        max_retries=3,  # cell wants up to 4 attempts; budget caps at 2.
+        retry_backoff_s=0.0,
+    )
+    matrix = run_harness(cfg)
+    # The very first cell spawns twice (initial + 1 retry) and on the
+    # third attempt the budget hook returns False. Cell 1 must be
+    # labelled budget_exhausted, NOT infra_fail.
+    first_cell = matrix.cells[0]
+    joined = "\n".join(first_cell.failures)
+    assert "budget_exhausted" in joined
+    assert "infra_fail" not in joined
+
+
 def test_retries_inside_one_cell_consume_budget(tmp_path: Path) -> None:
     """A single cell that succeeds on attempt 3 (after 2 transient
     failures) consumes 3 budget slots. The next cell then sees
