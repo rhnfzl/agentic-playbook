@@ -114,6 +114,50 @@ def test_telemetry_off_omits_telemetry_badges(
     assert "triggers:" not in skill_html
 
 
+def test_atlas_telemetry_requires_explicit_opt_in(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Privacy: even with TELEMETRY unset (default-enabled per the
+    standard contract), atlas must NOT render telemetry into committed
+    pages. A contributor with local telemetry running would otherwise
+    silently bake personal usage signals into HTML headed to PRs."""
+    monkeypatch.delenv("TELEMETRY", raising=False)
+    monkeypatch.delenv("TELEMETRY_ENABLED", raising=False)
+    monkeypatch.delenv("PLAYBOOK_TELEMETRY", raising=False)
+    _seed_corpus(tmp_path)
+    out_dir = tmp_path / "atlas"
+    build_atlas.build_site(tmp_path, out_dir)
+    skill_html = (out_dir / "skill" / "base-engineering-demo.html").read_text(
+        encoding="utf-8",
+    )
+    assert "triggers:" not in skill_html, (
+        "atlas must default to off for telemetry rendering, not is_enabled()"
+    )
+
+
+def test_atlas_telemetry_renders_when_explicit_opt_in(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Sanity check the inverse: TELEMETRY=on should opt the contributor
+    into local rendering for personal browsing."""
+    _seed_corpus(tmp_path)
+    tele_dir = tmp_path / "tele"
+    tele_dir.mkdir()
+    (tele_dir / "skills.jsonl").write_text(json.dumps({
+        "skill": "demo", "adapter": "claude-code", "model": "m",
+        "fired_at": "2026-05-28T12:00:00+00:00",
+        "latency_ms": 100, "input_tokens": 1, "output_tokens": 2,
+    }) + "\n", encoding="utf-8")
+    monkeypatch.setenv("TELEMETRY", "on")
+    monkeypatch.setenv("TELEMETRY_DIR", str(tele_dir))
+    out_dir = tmp_path / "atlas"
+    build_atlas.build_site(tmp_path, out_dir)
+    skill_html = (out_dir / "skill" / "base-engineering-demo.html").read_text(
+        encoding="utf-8",
+    )
+    assert "triggers: 1" in skill_html
+
+
 def test_skill_page_lists_adr_mentions(tmp_path: Path) -> None:
     """ADR-0001 body mentions the demo skill (heuristic edge); the
     skill page should backlink to the ADR via its 'ADRs mentioning

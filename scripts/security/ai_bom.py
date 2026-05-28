@@ -1,16 +1,21 @@
 """AI Bill of Materials emitter.
 
 Walks the playbook and produces `docs/security/ai-bom.json` listing
-every external skill source, every vendored MCP bundle, and (where
-known) the upstream pinned SHA. Consumers:
+every external skill source and every vendored MCP bundle.
+Consumers:
 
-  * Atlas renders a "vetted as of" badge per skill from the BOM
-  * `make audit-security` checks the BOM is fresh
+  * Atlas renders a "vetted as of" badge per imported skill from the
+    BOM (first-party skills do not carry a vetted-as-of concept; see
+    ADR-0049)
+  * `make audit-security` regenerates the BOM idempotently as part
+    of the supply-chain gate
   * Future supply-chain CVE feeds can diff against the BOM
 
-The BOM is deliberately flat JSON, not SBOM/CycloneDX, because we
-want it readable by people skimming the atlas. A CycloneDX export
-can be added later as a derived view if a customer asks.
+The BOM is flat JSON (not SBOM/CycloneDX) and is intentionally
+idempotent: when component lists are unchanged the prior
+`generated_at` is preserved so `make check` does not dirty a clean
+tree. A CycloneDX export and pinned-SHA enrichment can land as
+follow-ups; both are out of scope for ADR-0047's first cut.
 """
 
 from __future__ import annotations
@@ -20,6 +25,14 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Reuse the canonical frontmatter parser shared with atlas + decay
+# instead of maintaining a third copy that drifts on every quirk fix.
+_SCRIPTS_PARENT = Path(__file__).resolve().parent.parent
+if str(_SCRIPTS_PARENT) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_PARENT))
+
+from skill_identity import frontmatter_field  # noqa: E402
 
 
 def _read_text_safely(path: Path) -> str:
@@ -38,19 +51,7 @@ def _vetted_as_of(skill_dir: Path) -> str | None:
 
 
 def _skill_frontmatter_field(skill_md: Path, key: str) -> str | None:
-    text = _read_text_safely(skill_md)
-    if not text.startswith("---"):
-        return None
-    end = text.find("\n---", 3)
-    if end == -1:
-        return None
-    head = text[3:end]
-    needle = f"{key}:"
-    for line in head.splitlines():
-        line = line.strip()
-        if line.startswith(needle):
-            return line[len(needle):].strip().strip('"').strip("'")
-    return None
+    return frontmatter_field(_read_text_safely(skill_md), key)
 
 
 def _imported_skill_sources(repo_root: Path) -> list[dict]:
@@ -105,6 +106,27 @@ def build_bom(repo_root: Path) -> dict:
     }
 
 
+def _existing_bom(output: Path) -> dict | None:
+    if not output.is_file():
+        return None
+    try:
+        return json.loads(output.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _components_unchanged(new_bom: dict, existing: dict | None) -> bool:
+    """Compare component lists ignoring generated_at; if equal, the
+    BOM hasn't changed semantically and we should preserve the prior
+    timestamp so `make check` does not dirty a clean tree."""
+    if existing is None:
+        return False
+    return (
+        new_bom.get("repo") == existing.get("repo")
+        and new_bom.get("components") == existing.get("components")
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -125,6 +147,11 @@ def main(argv: list[str] | None = None) -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
 
     bom = build_bom(repo_root)
+    existing = _existing_bom(output)
+    if _components_unchanged(bom, existing) and isinstance(existing, dict):
+        # Preserve generated_at so `make check` is idempotent on a
+        # tree where no skills or MCP bundles have changed.
+        bom["generated_at"] = existing.get("generated_at", bom["generated_at"])
     output.write_text(json.dumps(bom, indent=2) + "\n", encoding="utf-8")
     print(f"  ok  AI-BOM written to {output.relative_to(repo_root)} "
           f"({len(bom['components'])} component(s))")

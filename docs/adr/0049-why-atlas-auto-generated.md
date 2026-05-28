@@ -84,8 +84,15 @@ when present:
   skills under `base/skills/<category>/` have no vetted-as-of
   concept and render without the security badge.
 - Telemetry aggregates via `scripts/telemetry.ingest` (ADR-0048):
-  trigger count and last-fired timestamp. Omitted when
-  `TELEMETRY=off` or the JSONL is missing.
+  trigger count and last-fired timestamp. **Atlas inverts the
+  standard telemetry contract: badges render ONLY when the user
+  explicitly sets `TELEMETRY=on` (or `1/true/yes/enabled`)**, not
+  when `is_enabled()` would normally return True. This is a
+  privacy-by-construction guard: a contributor with local telemetry
+  running would otherwise silently bake personal usage signals into
+  committed HTML headed to a public PR. The collector + report CLI +
+  decay consumers retain the standard off-switch shape; only atlas
+  flips to opt-in.
 - Trajectory adjacency via the graph itself: count of trajectories
   targeting this skill, with links.
 

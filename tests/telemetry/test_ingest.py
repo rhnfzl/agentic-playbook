@@ -112,6 +112,41 @@ def test_aggregate_returns_skillaggregate_type() -> None:
     assert isinstance(aggs[0], SkillAggregate)
 
 
+def test_read_jsonl_unwraps_otlp_resourcespan_envelope(tmp_path: Path) -> None:
+    """The docker otelcol file exporter writes one envelope per line
+    that wraps spans inside `resourceSpans -> scopeSpans -> spans`.
+    Without unwrapping, every record would silently drop on the docker
+    path (the entire docker collection path was effectively broken)."""
+    path = _write_jsonl(tmp_path / "skills.jsonl", [{
+        "resourceSpans": [{
+            "scopeSpans": [{
+                "spans": [
+                    {
+                        "startTimeUnixNano": 1_700_000_000_000_000_000,
+                        "endTimeUnixNano": 1_700_000_001_000_000_000,
+                        "attributes": [
+                            {"key": "skill.name", "value": {"stringValue": "to-prd"}},
+                            {"key": "gen_ai.usage.input_tokens",
+                             "value": {"intValue": 50}},
+                        ],
+                    },
+                    {
+                        "startTimeUnixNano": 1_700_000_000_000_000_000,
+                        "endTimeUnixNano": 1_700_000_000_500_000_000,
+                        "attributes": [
+                            {"key": "skill.name", "value": {"stringValue": "code-review"}},
+                            {"key": "gen_ai.usage.input_tokens",
+                             "value": {"intValue": 25}},
+                        ],
+                    },
+                ],
+            }],
+        }],
+    }])
+    records = read_jsonl(path)
+    assert {r.skill for r in records} == {"to-prd", "code-review"}
+
+
 def test_filter_recent_handles_naive_iso_timestamp() -> None:
     """Some collectors write timezone-naive timestamps. Without UTC
     coercion the comparison against `datetime.now(timezone.utc)`

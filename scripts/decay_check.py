@@ -22,12 +22,12 @@ The first cut keeps trajectory bands identical to skills until the Phase
 generate noise the team is likely to stop reading. ADR-0044 lists this
 failure mode in its reject-if criteria.
 
-v0.14 (ADR-0048) added a usage-based layer. When the local telemetry
-JSONL is present AND `TELEMETRY` is not set to off, the check also flags
-skills that have not fired in 60+ days regardless of their
-`last_reviewed` date. This catches "I reviewed it last week but no one
-uses it" decay that the date-based bands miss. Disabled cleanly when
-`TELEMETRY=off`.
+A telemetry-aware layer (ADR-0048) supplements the date-based bands.
+When the local telemetry JSONL is present AND `TELEMETRY` is not set
+to off, the check also flags skills that have not fired in 60+ days
+regardless of their `last_reviewed` date. This catches "I reviewed
+it last week but no one uses it" decay that the date-based bands
+miss. Disabled cleanly when `TELEMETRY=off`.
 """
 
 from __future__ import annotations
@@ -124,6 +124,7 @@ def _usage_decay_findings(
     try:
         from telemetry import is_enabled, storage_path
         from telemetry.ingest import aggregate, read_jsonl
+        from skill_identity import skill_identity
     except ImportError:
         return []
     if not is_enabled():
@@ -136,7 +137,11 @@ def _usage_decay_findings(
 
     notices: list[str] = []
     for skill_md in skill_paths:
-        skill_name = skill_md.parent.name
+        # Canonical join key: frontmatter `name`, falling back to
+        # directory basename. Until this PR the loop used the dirname
+        # only, which was structurally wrong as soon as a skill rename
+        # diverged from its directory slug.
+        skill_name = skill_identity(skill_md)
         rel = skill_md.relative_to(repo_root)
         last = fired_by_skill.get(skill_name)
         if last is None:

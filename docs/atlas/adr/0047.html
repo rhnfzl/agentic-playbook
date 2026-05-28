@@ -79,10 +79,17 @@ installing PyPI tools. Each wrapper returns:
 - `skipped` when the tool is not installed or not configured,
 - `error` when invocation failed unexpectedly (network, JSON parse).
 
-The aggregator blocks the build only on `findings` at severity
-`medium` or higher. Skips are not blocking. `STRICT_SECURITY=1`
-escalates skips to blocking so release branches can gate on full
-coverage.
+The aggregator blocks the build on:
+
+1. `findings` at severity `medium` or higher (any wrapper)
+2. ANY wrapper in `error` state, regardless of strict mode (a wrapper
+   that crashed has unknown signal; we cannot trust the &quot;no findings&quot;
+   answer of a process that did not actually scan)
+3. `STRICT_SECURITY=1` escalates `skipped` wrappers to errors so a
+   release branch can require full coverage
+
+Soft-skips (without strict mode) are not blocking; this is what lets
+fresh clones run `make check` without first installing PyPI tools.
 
 ### Severity thresholds
 

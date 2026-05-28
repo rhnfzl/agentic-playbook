@@ -3,8 +3,13 @@
 
 Walks the corpus, builds the JSON adjacency, renders one HTML page
 per ADR + skill + trajectory, plus an index. Cross-subsystem signals
-(AI-BOM, telemetry, trajectory pass/fail) are picked up at render
-time and shown as badges; missing signals degrade gracefully.
+are picked up at render time:
+
+  * AI-BOM (ADR-0047) -> per-skill vetted-as-of badge (imported only)
+  * Telemetry (ADR-0048) -> trigger count + last-fired (TELEMETRY=on)
+  * Trajectory adjacency -> count + links per skill
+
+Missing signals degrade silently. ADR-0049 documents the policy.
 
 Usage:
   python3 scripts/build_atlas.py
@@ -15,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -89,15 +95,40 @@ def _load_ai_bom(repo_root: Path) -> dict:
         return {"components": []}
 
 
+_TELEMETRY_OPT_IN = {"on", "1", "true", "yes", "enabled"}
+
+
+def _atlas_telemetry_opted_in() -> bool:
+    """Atlas requires EXPLICIT opt-in to render telemetry into committed
+    pages. The standard `is_enabled()` contract is the wrong default
+    here: a contributor with local telemetry running would silently
+    bake personal usage signals into HTML headed to a public PR. The
+    fix is to invert the default for this one consumer.
+
+    Set TELEMETRY=on (or 1, true, yes, enabled) to opt in.
+    """
+    for var in ("TELEMETRY", "TELEMETRY_ENABLED", "PLAYBOOK_TELEMETRY"):
+        raw = os.environ.get(var, "").strip().lower()
+        if raw in _TELEMETRY_OPT_IN:
+            return True
+    return False
+
+
 def _load_telemetry_aggregates() -> list:
-    """Best-effort fetch of per-skill aggregates. Empty when telemetry
-    is off or the JSONL is missing."""
+    """Best-effort fetch of per-skill aggregates. Empty unless the
+    contributor explicitly opts in via TELEMETRY=on; see
+    _atlas_telemetry_opted_in() for the rationale.
+
+    Even when opted in, an empty/missing JSONL or an import failure
+    still returns []."""
+    if not _atlas_telemetry_opted_in():
+        return []
     try:
-        from telemetry import is_enabled, storage_path
+        from telemetry import storage_path
         from telemetry.ingest import aggregate, read_jsonl
     except ImportError:
         return []
-    if not is_enabled() or not storage_path().is_file():
+    if not storage_path().is_file():
         return []
     return aggregate(read_jsonl())
 
@@ -286,7 +317,14 @@ def build_site(repo_root: Path, out_dir: Path) -> int:
         target.write_text(html_text, encoding="utf-8")
 
     graph_builder.write_graph(graph, out_dir / "graph.json")
-    print(f"  ok  atlas built at {out_dir.relative_to(repo_root)} "
+    try:
+        display_path = str(out_dir.relative_to(repo_root))
+    except ValueError:
+        # --out is outside the repo (e.g. /tmp/atlas). Falling back to
+        # the absolute path keeps the success message useful and avoids
+        # raising a ValueError on the documented `--out /tmp/atlas` path.
+        display_path = str(out_dir)
+    print(f"  ok  atlas built at {display_path} "
           f"({len(graph.nodes)} node(s), {len(graph.edges)} edge(s))")
     return 0
 

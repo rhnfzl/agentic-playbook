@@ -20,11 +20,14 @@ from statistics import median
 from typing import Iterable, NamedTuple
 
 from . import TelemetryRecord, storage_path
+from ._otlp_record import span_to_record
 
 
 def _coerce_record(row: dict) -> TelemetryRecord | None:
     """Accept either a TelemetryRecord-shaped row or an OTLP span row
-    from otelcol's file exporter and return TelemetryRecord."""
+    and return TelemetryRecord. The OTLP path delegates to the shared
+    `span_to_record` helper so the docker collector path and the
+    pure-Python collector path produce identical records."""
     if "skill" in row and "fired_at" in row:
         try:
             return TelemetryRecord(
@@ -39,67 +42,31 @@ def _coerce_record(row: dict) -> TelemetryRecord | None:
             )
         except (TypeError, ValueError):
             return None
-
-    # OTLP span shape (otelcol file exporter): pluck attributes.
-    attrs: dict[str, object] = {}
-    for a in row.get("attributes", []):
-        if not isinstance(a, dict):
-            continue
-        key = a.get("key")
-        if isinstance(key, str):
-            attrs[key] = _otlp_value(a.get("value", {}))
-
-    skill = attrs.get("skill.name") or attrs.get("skill.id")
-    if not isinstance(skill, str):
-        return None
-    start_ns = _as_int(row.get("startTimeUnixNano"))
-    end_ns = _as_int(row.get("endTimeUnixNano"))
-    latency_ms = (end_ns - start_ns) / 1_000_000 if end_ns > start_ns else 0.0
-    fired_at = datetime.fromtimestamp(
-        start_ns / 1_000_000_000 if start_ns > 0 else 0,
-        tz=timezone.utc,
-    ).isoformat(timespec="seconds")
-    return TelemetryRecord(
-        skill=skill,
-        adapter=_as_str(
-            attrs.get("playbook.adapter") or attrs.get("gen_ai.system"),
-            "unknown",
-        ),
-        model=_as_str(
-            attrs.get("gen_ai.response.model") or attrs.get("gen_ai.request.model"),
-            "unknown",
-        ),
-        fired_at=fired_at,
-        latency_ms=latency_ms,
-        input_tokens=_as_int(attrs.get("gen_ai.usage.input_tokens")),
-        output_tokens=_as_int(attrs.get("gen_ai.usage.output_tokens")),
-    )
+    return span_to_record(row)
 
 
-def _as_int(value: object) -> int:
-    if isinstance(value, int):
-        return value
-    if isinstance(value, (str, float)):
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return 0
-    return 0
-
-
-def _as_str(value: object, default: str) -> str:
-    if isinstance(value, str) and value:
-        return value
-    return default
-
-
-def _otlp_value(value: object) -> object:
-    if not isinstance(value, dict):
-        return None
-    for k in ("stringValue", "intValue", "doubleValue", "boolValue"):
-        if k in value:
-            return value[k]
-    return None
+def _records_from_row(row: dict) -> list[TelemetryRecord]:
+    """One JSONL row may carry one TelemetryRecord, one raw OTLP span,
+    OR a full OTLP envelope (resourceSpans -> scopeSpans -> spans)
+    which the otelcol file exporter writes by default. Yield every
+    record the row contains."""
+    if "resourceSpans" in row:
+        out: list[TelemetryRecord] = []
+        for resource_span in row.get("resourceSpans", []) or []:
+            if not isinstance(resource_span, dict):
+                continue
+            for scope_span in resource_span.get("scopeSpans", []) or []:
+                if not isinstance(scope_span, dict):
+                    continue
+                for span in scope_span.get("spans", []) or []:
+                    if not isinstance(span, dict):
+                        continue
+                    rec = _coerce_record(span)
+                    if rec is not None:
+                        out.append(rec)
+        return out
+    rec = _coerce_record(row)
+    return [rec] if rec is not None else []
 
 
 def read_jsonl(path: Path | None = None) -> list[TelemetryRecord]:
@@ -108,6 +75,11 @@ def read_jsonl(path: Path | None = None) -> list[TelemetryRecord]:
     Missing file is empty (no events recorded yet). Malformed lines
     are skipped silently; the collector is the source of truth, and
     a malformed line is the collector's bug, not the consumer's.
+
+    Tolerates three row shapes: canonical TelemetryRecord (pure-Python
+    collector), raw OTLP span (older otelcol versions), and OTLP
+    envelope (`resourceSpans` -> `scopeSpans` -> `spans`) which the
+    current otelcol file exporter writes by default.
     """
     p = path if path is not None else storage_path()
     if not p.is_file():
@@ -124,9 +96,7 @@ def read_jsonl(path: Path | None = None) -> list[TelemetryRecord]:
                 continue
             if not isinstance(row, dict):
                 continue
-            rec = _coerce_record(row)
-            if rec is not None:
-                out.append(rec)
+            out.extend(_records_from_row(row))
     return out
 
 

@@ -14,22 +14,22 @@ receivers:
 
 processors:
   # Privacy guard: strip any attribute whose key starts with one of
-  # the body prefixes. Uses regex (not exact-key match) so indexed
-  # variants like gen_ai.input.messages.0.content and
-  # gen_ai.completion.text are also dropped. The pattern matches the
-  # BANNED_PREFIXES list in scripts/telemetry/pyotel_collector.py so
-  # both collector paths enforce the same privacy contract.
+  # the body prefixes. Patterns mirror Python's `str.startswith` on
+  # BANNED_PREFIXES (see scripts/telemetry/_otlp_record.py) so both
+  # collector paths enforce the same contract. The test
+  # `test_banned_prefixes_python_match_yaml_patterns` asserts the
+  # two surfaces stay in lockstep on every change.
   attributes/strip_bodies:
     actions:
-      - pattern: ^gen_ai\.prompt($|\.)
+      - pattern: ^gen_ai\.prompt
         action: delete
-      - pattern: ^gen_ai\.choice($|\.)
+      - pattern: ^gen_ai\.choice
         action: delete
-      - pattern: ^gen_ai\.input\.message($|s($|\.))
+      - pattern: ^gen_ai\.input\.message
         action: delete
-      - pattern: ^gen_ai\.output\.message($|s($|\.))
+      - pattern: ^gen_ai\.output\.message
         action: delete
-      - pattern: ^gen_ai\.completion($|\.)
+      - pattern: ^gen_ai\.completion
         action: delete
   batch:
     timeout: 5s
