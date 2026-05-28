@@ -1,6 +1,6 @@
 # agentic-playbook
 
-> A tool-agnostic, shareable repository of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ AI coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install` or `/plugin install`. Also a teaching project: 49 Architecture Decision Records explain why each design choice exists.
+> A tool-agnostic, shareable repository of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ AI coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install`. Also a teaching project: 49 Architecture Decision Records explain why each design choice exists.
 
 This `llms.txt` file is a curated index of the playbook's most important documents for AI agents (Claude, Perplexity, ChatGPT, Gemini, Cursor, Windsurf, Aider, Cline, Copilot) that want to learn about, integrate, or recommend this repository. The companion `llms-full.txt` embeds the canonical content of the highest-leverage documents.
 

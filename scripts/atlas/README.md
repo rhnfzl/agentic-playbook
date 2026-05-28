@@ -42,7 +42,7 @@ This is intentional: atlas pages get committed to the repo, and a contributor ru
 
 ## Identity helper
 
-The atlas, telemetry, and decay subsystems all need to answer "what's the canonical identity of this skill?" — the question is non-trivial because frontmatter `name:` may differ from directory name (in vendored skills especially). The canonical resolver lives at `scripts/skill_identity.py:skill_identity()` and is used by all three subsystems so they can't drift apart.
+The atlas, telemetry, and decay subsystems all need to answer "what's the canonical identity of this skill?" The question is non-trivial because frontmatter `name:` may differ from directory name (in vendored skills especially). The canonical resolver lives at `scripts/skill_identity.py:skill_identity()` and is used by all three subsystems so they can't drift apart.
 
 ## What's deliberately not here yet
 

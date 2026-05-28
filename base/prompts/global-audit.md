@@ -90,7 +90,7 @@ A markdown audit document, typically 1500-3000 words, that names:
 
 - What you have today across every coding agent installed on this machine.
 - What the playbook ships that would help.
-- A phased rollout you can execute incrementally with `make install --profile <role>` (Phase 1) followed by per-artifact copies for Phase 2 and 3.
+- A phased rollout you can execute incrementally with `make install PROFILE=<role>` (Phase 1) followed by per-artifact copies for Phase 2 and 3.
 - An explicit "not proposing X because Y" list so the agent's selection logic is visible.
 
 ## When to use it

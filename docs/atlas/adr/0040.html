@@ -65,7 +65,7 @@ evals/                      # eval suites (stay at root; cases declare required 
 
 The split rule is grep-driven as a starting point, not a verdict. Each grep match needs a 5-second classification review against this policy:
 
-1. **STRICT team** (file IS an team-only artifact, tied to internal services/tooling):
+1. **STRICT team-only** (file IS a team-only artifact, tied to internal services/tooling):
    - `skills/devops/error-tracking-issue-triage/`, `skills/devops/CI-pipeline-debug/`, `skills/devops/aws-secrets-configmap-apply/`, `skills/devops/k8s-dashboard-verify/`
    - `skills/engineering/code-review/` (uses VCS REST API)
    - `rules/label-policy.md` (team label scheme), any rule that prescribes team-internal procedure

@@ -89,7 +89,7 @@ The off-switch is checked at every layer to avoid surprise.
 
 ## Decay integration
 
-`scripts/decay_check.py` reads recent telemetry to flag skills that have not fired in 60+ days as "decaying via usage" — distinct from time-based decay (which fires on `last_reviewed` age). Usage-decay is informational; it doesn't block `make check`. The point is to surface skills that may be ready for retirement before the maintainer hits the 180-day block band.
+`scripts/decay_check.py` reads recent telemetry to flag skills that have not fired in 60+ days as "decaying via usage", distinct from time-based decay (which fires on `last_reviewed` age). Usage-decay is informational; it doesn't block `make check`. The point is to surface skills that may be ready for retirement before the maintainer hits the 180-day block band.
 
 ## Related
 

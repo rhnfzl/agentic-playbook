@@ -27,7 +27,7 @@ The BOM emitter (`ai_bom.py`) records public attributes only: source URL, compon
 
 ## Idempotency
 
-`ai_bom.py` preserves `generated_at` when the components list is unchanged. A clean `make check` against an unchanged tree produces a bit-identical `docs/security/ai-bom.json` — no dirty diff, no spurious commit churn. The contract is enforced by `tests/security/test_ai_bom.py::test_bom_is_idempotent_when_components_unchanged`.
+`ai_bom.py` preserves `generated_at` when the components list is unchanged. A clean `make check` against an unchanged tree produces a bit-identical `docs/security/ai-bom.json` (no dirty diff, no spurious commit churn). The contract is enforced by `tests/security/test_ai_bom.py::test_bom_is_idempotent_when_components_unchanged`.
 
 ## Soft-fail vs strict mode
 

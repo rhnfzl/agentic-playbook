@@ -3,7 +3,21 @@
 This file is the per-repo `AGENTS.md` for the playbook itself. Any coding agent working in this repo reads it on entry and follows the conventions below. The same conventions land in projects that install the playbook via `make install` (the installer concatenates rules from `base/rules/` into the project's own `AGENTS.md`).
 
 Owner: rehan
-Last reviewed: 2026-05-27
+Last reviewed: 2026-05-28
+
+## Scope: this is a personal portfolio project
+
+This repo is an independent personal project. It exists for portfolio + experimentation purposes. It is NOT a fork, mirror, or downstream of any work-related codebase, and any incidental similarities to work patterns are coincidental.
+
+Work-related rules that ship in `~/AGENTS.md` (employer-specific ticket trackers, internal services, request-chain architectures, vendor inventories, branch policies, etc.) DO NOT apply here. Do not import work-context assumptions when reasoning about this repo:
+
+- Do not assume a specific issue tracker, ticket prefix, or label policy.
+- Do not assume a specific VCS host beyond what this repo's `.git/config` and CI files state.
+- Do not assume a specific internal API, gateway, or backend exists.
+- Do not propose work-internal-tool integrations unless the user explicitly asks for them.
+- Do not pull patterns from work memory or work code into this repo "by analogy" without an explicit request.
+
+If a rule, pattern, or piece of context only makes sense in a work setting, treat it as out-of-scope here. Surface the boundary explicitly to the user instead of silently applying it.
 
 ## Repo purpose
 

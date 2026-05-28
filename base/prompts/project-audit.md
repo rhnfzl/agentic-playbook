@@ -73,9 +73,14 @@ Walk in this order:
         bound to (so `make update TARGET=$(pwd)` knows what to refresh).
 
   Step 4 -- Show me the `make` command.
-    After the audit, name the single `make init TARGET=$(pwd) --profile <best-fit>`
-    command that would do Phase 1 in one step, and the per-file diffs that Phase 2
-    would add on top.
+    After the audit, name the two-step sequence that does Phase 1:
+      make init TARGET=$(pwd)
+      make install TARGET=$(pwd) PROFILE=<best-fit>
+    `make init` scaffolds the project's AGENTS.md and .playbook-config.yaml;
+    `make install` reads the PROFILE env and materializes the role's content.
+    The Makefile reads PROFILE=<role>, not --profile (which is the underlying
+    scripts/install.py flag). Then list the per-file diffs that Phase 2 would
+    add on top.
 
 Output format:
 

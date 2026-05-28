@@ -40,7 +40,7 @@ One `git clone` followed by one `make install` gives you:
 
 ## How is this different from other agent skill libraries
 
-`anthropics/skills` is a curated bundle of skills from Anthropic. `awesome-agent-skills` (heilcheng, VoltAgent) is a curated index of external skill repositories. agentic-playbook is a **distribution-and-governance system**: it ships seven other content types (rules, hooks, MCP server configs, subagents, slash commands, prompt templates, behavior trajectories) alongside skills, with a multi-adapter installer, a 13-gate `make check` quality pipeline, a supply-chain security gate (`make audit`), opt-in OTel telemetry per skill (`make telemetry-report`), and an auto-generated knowledge graph (`make atlas`). It is a teaching project as much as a content library: 49 Architecture Decision Records explain why each choice was made.
+`anthropics/skills` is a curated bundle of skills from Anthropic. `awesome-agent-skills` (heilcheng, VoltAgent) is a curated index of external skill repositories. agentic-playbook is a **distribution-and-governance system**: it ships seven other content types (rules, hooks, MCP server configs, subagents, slash commands, prompt templates, behavior trajectories) alongside skills, with a multi-adapter installer, a 17-gate `make check` quality pipeline, a supply-chain security gate (`make audit`), opt-in OTel telemetry per skill (`make telemetry-report`), and an auto-generated knowledge graph (`make atlas`). It is a teaching project as much as a content library: 49 Architecture Decision Records explain why each choice was made.
 
 ## Supported coding agents
 
@@ -116,4 +116,4 @@ For a first read after this `llms-full.txt`:
 
 For the security and operations story: ADR-0047 → 0048 → 0049 in order.
 
-For the marketplace plugin story: ADR-0043 alongside `plugins/README.md`.
+For the marketplace plugin story (designed in the upstream, not shipped in this public mirror): ADR-0043.

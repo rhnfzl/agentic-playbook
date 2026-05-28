@@ -14,7 +14,7 @@ This directory holds the installer, lint scripts, decay checks, and content-mana
 | [install_orphans.py](install_orphans.py) | Per-adapter orphan cleanup with ADR-0023 ownership + edit guard, ADR-0034 symlink-through guard, ADR-0036 copied_dir drift detection. | (used by `install.py`) |
 | [install_verify.py](install_verify.py) | `--verify` command: walks the lockfile, parses each native config, confirms managed hooks + MCP entries match. Per ADR-0036. | `make doctor-verify` |
 | [hook_native_config.py](hook_native_config.py) | Adapter shape registry (Claude / Codex / Cursor / Windsurf / Cline / Copilot native hook config schemas). Single source of truth shared by install_verify + lifecycle tests. | (library) |
-| [hook_registration.py](hook_registration.py) | Hook header parsers + per-adapter shape emitters (Claude-shaped, Codex auto-promote, Cursor camelCase, Windsurf Cascade). Per ADR-0027 + ADR-0034. | (library) |
+| [hook_registration/](hook_registration/) | Hook header parsers + per-adapter shape emitters (Claude-shaped, Codex auto-promote, Cursor camelCase, Windsurf Cascade) as a package: `_claude_shape.py`, `_codex_shape.py`, `_cursor_shape.py`, `_windsurf_shape.py`, `_common.py`. Per ADR-0027 + ADR-0034. | (library) |
 | [mcp_runtime_probe.py](mcp_runtime_probe.py) | JSON-RPC `initialize` handshake against each registered MCP server. Per ADR-0036. Honors `command`/`args`/`env`/`cwd` + 10s timeout; stdio transports only (HTTP/SSE entries skipped cleanly). | (used by `make doctor-verify`) |
 | [target_materializer.py](target_materializer.py) | Writes the per-project `.agents/` tree + per-tool projections + per-target `AGENTS.md` managed block. Per ADR-0028. | (used by `playbook_init.py` + `playbook_update.py`) |
 | [target_registry.py](target_registry.py) | Machine-wide registry at `~/.coding-agents-playbook-targets.json`. Per ADR-0038. | `make targets-list`, `make targets-doctor` |
@@ -55,7 +55,7 @@ Architecture: self-contained checks (the three at the bottom) implement their lo
 | [retrospective.py](retrospective.py) | Backend for `/playbook-retrospective`: walks session transcripts across Claude Code + Codex storage layouts. | (invoked by skill) |
 | [eval_runner.py](eval_runner.py) | LLM-judge-driven evals for skills. Slow; intentionally split out of `make check` into its own `make eval` target. | `make eval` |
 | [sync_mattpocock.sh](sync_mattpocock.sh) | Pulls `mattpocock/skills` upstream updates into `skills/imported/mattpocock/`. | `make sync-mattpocock` |
-| [adapters/](adapters/) | Per-agent adapter modules. See [adapters/AGENTS.md](adapters/AGENTS.md) for the protocol contract. | (invoked by `install.py`) |
+| [adapters/](adapters/) | Per-agent adapter modules. See `scripts/adapters/_protocol.py` for the Adapter Protocol contract (ADR-0024). | (invoked by `install.py`) |
 | [checks/](checks/) | Pluggable quality-gate modules (see table above). | (invoked by `check.py`) |
 | [templates/](templates/) | Python + shell scaffolds the user customizes locally (workspace-status dashboard, upstream-drift report, launchd installer). Not installed by `make install`. | (manual copy) |
 

@@ -91,7 +91,7 @@ The list below mirrors the files in this directory in numerical order. See each 
 - ADR-0040 Base / overlay subtree split for content tiering.
 - ADR-0041 Content tiering guardrails (automated `scope_boundary` check).
 - ADR-0042 Playbook content distribution (manifest-driven sync to a downstream mirror).
-- ADR-0043 Marketplace distribution (Claude Code + Cursor plugin packs).
+- ADR-0043 Marketplace distribution (designed in the upstream; ADR text and emitter intentionally not shipped in this public mirror per the portfolio's distribution choice).
 
 ### Trajectories (the eighth content type)
 
@@ -118,7 +118,6 @@ The list below mirrors the files in this directory in numerical order. See each 
 | 0034 | Cross-agent hook contract | Every adapter that exposes hook registration |
 | 0036 | Three-layer contract | `scripts/install_verify.py`, `make doctor-verify` |
 | 0042 | Content distribution | `scripts/sync_distribution.py`, `.sync-manifest.json` |
-| 0043 | Marketplace plugins | `plugins/`, `scripts/marketplace_emitter.py` |
 | 0044 | Trajectories | `base/trajectories/`, `scripts/trajectory_harness.py`, `make trajectory-check` |
 | 0047 | Supply-chain gate | `scripts/security/`, `scripts/audit_security.py`, `make audit` |
 | 0048 | Telemetry | `scripts/telemetry/`, `make telemetry-report` |
@@ -134,4 +133,4 @@ For a first read, the three highest-leverage ADRs are:
 
 For the security and operations story, read ADR-0047 → 0048 → 0049 in order.
 
-For the marketplace plugin story, read ADR-0043 alongside `plugins/README.md`.
+For the marketplace plugin story, read ADR-0043. The plugin packs themselves are designed in the upstream and intentionally not shipped in this public mirror (per the portfolio's distribution choice; see `~/Documents/handoffs/2026-05-28-portfolio-scrub-leak-structural-fix.md`).

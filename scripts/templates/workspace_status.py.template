@@ -12,7 +12,7 @@ The seven signals:
   3. meetings index             (scripts/build_meetings_index.py --check)
   4. conversation log age       (filesystem mtime of latest entry)
   5. agents-md lifecycle audit  (scripts/agents_md_audit.py --json)
-  6. launchd agents             (launchctl list grep com.8vance)
+  6. launchd agents             (launchctl list grep com.<your-org>)
   7. meetings/.env keys         (presence of OPENAI/REVO keys)
 
 Each probe reports one of: ok, warn, fail, skip, unknown.

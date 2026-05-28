@@ -31,7 +31,7 @@ One `git clone` followed by one `make install` gives you:
 - **Detection-and-preselect**: the installer probes `~/.claude/`, `~/.codex/`, `~/.cursor/`, `~/.codeium/windsurf/`, and others, then pre-selects the agents it found.
 - **Role profiles** that filter the firehose to the 15-30 items that matter for your specific role (`tech-lead`, `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`).
 - **A lockfile that records every materialized path**, so `make remove` cleanly uninstalls without touching anything you authored by hand.
-- **`make check` quality gates** that catch frontmatter drift, decay, em-dashes, AGENTS.md governance violations, content-tier breaches, and 7 other failure modes before you commit.
+- **`make check` quality gates** (17 in total) that catch frontmatter drift, decay, em-dashes, AGENTS.md governance violations, content-tier breaches, and 12 other failure modes before you commit.
 
 ## What it is (8 content types)
 
@@ -95,7 +95,7 @@ The installer detects which coding agents you have on this machine, lets you tog
 make init TARGET=<path-to-your-project>
 ```
 
-Scaffolds the target project with an `AGENTS.md` (pointer back to the playbook plus a fillable 8-section template) and a `.playbook-config.yaml` that records the profile. Pick from any installed profile (`backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`, `tech-lead`) or compose your own with `--profile <profile1>,<profile2>,<profile3>`.
+Scaffolds the target project with an `AGENTS.md` (pointer back to the playbook plus a fillable 8-section template) and a `.playbook-config.yaml` that records the profile. The profile binding happens at the install step, not at `make init`; after `make init`, run `make install PROFILE=<role>` (or `make install PROFILE=role1,role2` to compose). Profiles available: `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`, `tech-lead`.
 
 ### I want my coding agent to read this playbook and integrate what fits
 

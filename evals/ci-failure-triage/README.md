@@ -17,10 +17,11 @@ Each case is one assertion against the SKILL.md body or frontmatter:
 ## How to run
 
 ```bash
-make eval                                                # all suites
-python3 scripts/eval_runner.py --suite ci-failure-triage # this suite only
-python3 scripts/eval_runner.py --suite ci-failure-triage --case "frontmatter complete"
+make eval                                            # all suites
+python3 scripts/eval_runner.py ci-failure-triage     # this suite only (positional argument)
 ```
+
+Per-case filtering is not supported by the runner today; the entire suite runs or none of it does.
 
 ## Failure modes
 
