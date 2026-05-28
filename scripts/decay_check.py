@@ -22,12 +22,12 @@ The first cut keeps trajectory bands identical to skills until the Phase
 generate noise the team is likely to stop reading. ADR-0044 lists this
 failure mode in its reject-if criteria.
 
-v0.14 (ADR-0048) added a usage-based layer. When the local telemetry
-JSONL is present AND `TELEMETRY` is not set to off, the check also flags
-skills that have not fired in 60+ days regardless of their
-`last_reviewed` date. This catches "I reviewed it last week but no one
-uses it" decay that the date-based bands miss. Disabled cleanly when
-`TELEMETRY=off`.
+A telemetry-aware layer (ADR-0048) supplements the date-based bands.
+When the local telemetry JSONL is present AND `TELEMETRY` is not set
+to off, the check also flags skills that have not fired in 60+ days
+regardless of their `last_reviewed` date. This catches "I reviewed
+it last week but no one uses it" decay that the date-based bands
+miss. Disabled cleanly when `TELEMETRY=off`.
 """
 
 from __future__ import annotations

@@ -1,16 +1,21 @@
 """AI Bill of Materials emitter.
 
 Walks the playbook and produces `docs/security/ai-bom.json` listing
-every external skill source, every vendored MCP bundle, and (where
-known) the upstream pinned SHA. Consumers:
+every external skill source and every vendored MCP bundle.
+Consumers:
 
-  * Atlas renders a "vetted as of" badge per skill from the BOM
-  * `make audit-security` checks the BOM is fresh
+  * Atlas renders a "vetted as of" badge per imported skill from the
+    BOM (first-party skills do not carry a vetted-as-of concept; see
+    ADR-0049)
+  * `make audit-security` regenerates the BOM idempotently as part
+    of the supply-chain gate
   * Future supply-chain CVE feeds can diff against the BOM
 
-The BOM is deliberately flat JSON, not SBOM/CycloneDX, because we
-want it readable by people skimming the atlas. A CycloneDX export
-can be added later as a derived view if a customer asks.
+The BOM is flat JSON (not SBOM/CycloneDX) and is intentionally
+idempotent: when component lists are unchanged the prior
+`generated_at` is preserved so `make check` does not dirty a clean
+tree. A CycloneDX export and pinned-SHA enrichment can land as
+follow-ups; both are out of scope for ADR-0047's first cut.
 """
 
 from __future__ import annotations

@@ -3,8 +3,13 @@
 
 Walks the corpus, builds the JSON adjacency, renders one HTML page
 per ADR + skill + trajectory, plus an index. Cross-subsystem signals
-(AI-BOM, telemetry, trajectory pass/fail) are picked up at render
-time and shown as badges; missing signals degrade gracefully.
+are picked up at render time:
+
+  * AI-BOM (ADR-0047) -> per-skill vetted-as-of badge (imported only)
+  * Telemetry (ADR-0048) -> trigger count + last-fired (TELEMETRY=on)
+  * Trajectory adjacency -> count + links per skill
+
+Missing signals degrade silently. ADR-0049 documents the policy.
 
 Usage:
   python3 scripts/build_atlas.py
