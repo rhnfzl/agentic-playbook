@@ -22,6 +22,8 @@
     "scripts/security",
     "scripts/telemetry",
     "scripts/atlas",
+    "scripts/marketplace",
+    "scripts/marketplace/manifests",
     "base/mcp/anchored-fs",
     "base/mcp/anchored-fs/bundle",
     "base/mcp/anchored-fs/.venv/lib/python3.11/site-packages"
