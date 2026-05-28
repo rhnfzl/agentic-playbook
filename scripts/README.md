@@ -33,7 +33,7 @@ This directory holds the installer, lint scripts, decay checks, and content-mana
 | agents-md | `checks/agents_md.py` -> `check_agents_md.py` | AGENTS.md governance per ADR-0013. |
 | external-skill-audit | `checks/external_skill_audit.py` -> `audit_external_skill.py` | Block-by-default security audit for imported skills. |
 | size | `checks/size.py` -> `size_check.py` | Skill body size budget (warns >=500, blocks >1000) per ADR-0015. |
-| decay | `checks/decay.py` -> `decay_check.py` | Skill freshness (`last_reviewed` within 60 days). |
+| decay | `checks/decay.py` -> `decay_check.py` | Skill freshness bands: 60-day notice (informational), 90-day warn (`make check` flags), 180-day block (`make check` fails). Trajectory freshness uses the same bands per ADR-0044. |
 | em-dashes | `checks/em_dashes.py` -> `check_em_dashes.py` | Enforces `rules/no-em-dashes.md` against authored prose. |
 | no-versions-in-readmes | `checks/no_versions.py` -> `check_no_versions_in_readmes.py` | Keeps playbook version markers out of README.md / AGENTS.md. |
 | skill-description-length | `checks/skill_description.py` -> `check_skill_description.py` | <=1024-char SKILL.md description (Codex schema limit). |
@@ -92,11 +92,11 @@ Shared helpers live in:
 ### First-time install on a fresh machine
 
 ```bash
-git clone <repo>
-cd coding-agents-playbook
-make install                           # detects + prompts
+git clone https://github.com/rhnfzl/agentic-playbook.git
+cd agentic-playbook
+make install                                        # detects + prompts
 # or
-make install AGENTS=auto TARGET=/path  # non-interactive
+make install AGENTS=auto TARGET=<path-to-project>   # non-interactive
 ```
 
 ### Per-project init

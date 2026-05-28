@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-28T13:37:52+00:00",
+  "generated_at": "2026-05-28T16:50:44+00:00",
   "repo": "agentic-playbook",
   "components": [
     {
@@ -247,7 +247,7 @@
       "source": "pm-curated",
       "path": "base/skills/imported/pm-curated/define-problem-statement",
       "name": "define-problem-statement",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "vetted_as_of": null
     },
     {
@@ -359,7 +359,7 @@
       "source": "research-curated",
       "path": "base/skills/imported/research-curated/discover-interview-synthesis",
       "name": "discover-interview-synthesis",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "vetted_as_of": null
     },
     {

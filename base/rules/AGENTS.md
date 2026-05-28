@@ -37,7 +37,7 @@ Always-on behavioral constraints. A rule is unconditional; a skill is conditiona
 ## Do Not
 
 - Promote a rule from a skill body without removing the skill content.
-- Land an team-specific rule in `base/rules/`. Strong markers (R8-/MATCH- ticket IDs, team org name, internal hostnames, VCS.org) belong under `overlays/<name>/rules/` per ADR-0040; `scope_boundary.py` enforces this. A universal rule that uses team as a CONCRETE EXAMPLE (e.g. `never-push-to-develop.md`) stays in `base/` and is allowlisted with rationale in `scripts/checks/scope_boundary_allowlist.toml`.
+- Land a team-specific rule in `base/rules/`. Strong markers (R8-/MATCH- ticket IDs, team org name, internal hostnames, VCS.org) belong under `overlays/<name>/rules/` per ADR-0040; `scope_boundary.py` enforces this. A universal rule that uses team as a CONCRETE EXAMPLE (e.g. `never-push-to-develop.md`) stays in `base/` and is allowlisted with rationale in `scripts/checks/scope_boundary_allowlist.toml`.
 - Use multi-page rules. If it needs subsections beyond what/why/how, it is a skill.
 
 ## Owner And Freshness

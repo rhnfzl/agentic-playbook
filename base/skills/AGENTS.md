@@ -54,7 +54,7 @@ Every new skill lands in either `base/skills/<category>/<name>/` (generic, vendo
 - Add a skill that duplicates an existing one. Search `base/skills/`, `overlays/<name>/skills/`, `base/rules/`, and `overlays/<name>/rules/` first.
 - Author a skill from a one-off task; wait for repetition before packaging.
 - Use ticket IDs in skill descriptions or bodies.
-- Land an team-specific skill in `base/skills/` without an allowlist entry; `scope_boundary.py` will fail.
+- Land a team-specific skill in `base/skills/` without an allowlist entry; `scope_boundary.py` will fail.
 
 ## Skill install surfaces (ADR-0036 three-layer contract)
 

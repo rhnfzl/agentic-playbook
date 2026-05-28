@@ -2,7 +2,7 @@
 
 Canonical vocabulary for this repo. When code, docs, or PRs talk about a term, they use the meaning given here. New terms get added as they're resolved during grill sessions (see `base/skills/productivity/grill-with-docs/`).
 
-## Core terms (the seven content types per ADR-0010)
+## Core terms (the eight content types per ADR-0044)
 
 - **Skill**: a workflow orchestration. A "how to do X" recipe with deterministic steps. Agent-decided invocation: the agent loads the skill when its description matches the user's task. Lives in `base/skills/<category>/<name>/SKILL.md`.
 - **Rule**: a behavioral constraint. An "always / never do X" directive. Lives in `base/rules/<name>.md`. The installer concatenates selected rules into per-project `AGENTS.md`.
@@ -26,7 +26,7 @@ Canonical vocabulary for this repo. When code, docs, or PRs talk about a term, t
 
 ## Tiers
 
-- **Tier 1**: full custom adapter. Currently: Claude Code, Codex, Cursor, Windsurf. Adapter coverage of the seven content types varies; only Claude Code and Cursor materialize the `commands/` surface natively.
+- **Tier 1**: full custom adapter. Currently: Claude Code, Codex, Cursor, Windsurf. Adapter coverage of the seven materialized content types varies (trajectories, the eighth type, are consumed by the harness rather than materialized into any adapter); only Claude Code and Cursor materialize the `commands/` surface natively.
 - **Tier 2**: lighter adapter, surface varies. Currently: GitHub Copilot, Gemini CLI, Aider, Cline, Pi. (Pi materializes skills + rules + prompts to `~/.pi/agent/`; the others materialize skills + rules only via `AGENTS.md`.)
 - **Tier 3**: AGENTS.md only (generated). All other agents that read AGENTS.md natively. 20 named tools currently registered: Kiro, Goose, Junie, Zed, Amp, Augment, OpenCode, Aide, Droid, Jules, Qodo, Q-Developer, SWE-Agent, Devon, Claude-Flow, Kilo, Continue, Tabnine, Cline-CLI, Supermaven.
 

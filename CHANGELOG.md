@@ -10,7 +10,7 @@ Initial public release. Mirrors the maintainer's playbook at the v0.13 upstream 
 
 What this includes:
 
-- **7 content types** end-to-end: skills, rules, hooks, MCP configs, subagents, slash commands, prompt templates.
+- **8 content types** end-to-end: skills, rules, hooks, MCP configs, subagents, slash commands, prompt templates, behavior trajectories (per ADR-0044).
 - **Lifecycle installer** (`scripts/install.py`) supporting Claude Code, Codex CLI, Cursor IDE + CLI, Windsurf, Pi, and 20+ long-tail adapters via Tier 3.
 - **Profile bundles** for 8 roles (tech-lead, engineering, devops, qa, research, product-manager, backend-developer, frontend-developer).
 - **Three-layer governance**: ADR-0036 (canonical / materialization / runtime), ADR-0029 (hook reconciliation), ADR-0033 (AGENTS.md write API).
