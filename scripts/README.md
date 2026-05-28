@@ -25,24 +25,7 @@ This directory holds the installer, lint scripts, decay checks, and content-mana
 
 ### Quality gates
 
-`make check` runs `scripts/check.py`, which iterates the `scripts/checks/` package. 17 gates today (see `scripts/checks/__init__.py:CHECKS` for the source of truth):
-
-| Gate | Module | Implementation |
-|---|---|---|
-| frontmatter | `checks/frontmatter.py` -> `frontmatter_lint.py` | Validates SKILL.md required fields. |
-| agents-md | `checks/agents_md.py` -> `check_agents_md.py` | AGENTS.md governance per ADR-0013. |
-| external-skill-audit | `checks/external_skill_audit.py` -> `audit_external_skill.py` | Block-by-default security audit for imported skills. |
-| size | `checks/size.py` -> `size_check.py` | Skill body size budget (warns >=500, blocks >1000) per ADR-0015. |
-| decay | `checks/decay.py` -> `decay_check.py` | Skill freshness bands: 60-day notice (informational), 90-day warn (`make check` flags), 180-day block (`make check` fails). Trajectory freshness uses the same bands per ADR-0044. |
-| em-dashes | `checks/em_dashes.py` -> `check_em_dashes.py` | Enforces `rules/no-em-dashes.md` against authored prose. |
-| no-versions-in-readmes | `checks/no_versions.py` -> `check_no_versions_in_readmes.py` | Keeps playbook version markers out of README.md / AGENTS.md. |
-| skill-description-length | `checks/skill_description.py` -> `check_skill_description.py` | <=1024-char SKILL.md description (Codex schema limit). |
-| hook-metadata | `checks/hook_metadata.py` -> `check_hook_metadata.py` | Every hook ships PLAYBOOK-HOOK-EVENT + PLAYBOOK-HOOK-MATCHER. |
-| hook-source-unification | `checks/hook_source_unification.py` (self-contained) | Skill-owned hooks live under `skills/<cat>/<name>/hooks/`; root symlinks back. Per ADR-0035. |
-| pyright-zero | `checks/pyright_zero.py` (self-contained) | Pyright errors + warnings must be zero; `# pyright: ignore` lines must carry a `# justification:` note. |
-| human-html-allowlist | `checks/human_html_allowlist.py` (self-contained) | `.human-html-allowlist` patterns must not contain `$(`, backticks, `||`, `&&`, `; ` (shell-substitution risk). |
-
-Architecture: self-contained checks (the three at the bottom) implement their logic directly. The other nine delegate via `checks.run_legacy_main()` to the legacy `scripts/<name>.py` so the legacy scripts stay shellable (e.g., `make audit` invokes `scripts/audit_external_skill.py` directly) while the wrappers in `checks/` are one delegation line each.
+`make check` runs `scripts/check.py`, which iterates the `scripts/checks/` package. See [`scripts/checks/README.md`](checks/README.md) for the canonical gate list, the `CheckResult` / `CheckContext` contract, the self-contained vs legacy-wrapping pattern, and how to add a new gate. `scripts/checks/__init__.py:CHECKS` is the runtime source of truth.
 
 ### Content + meta tooling
 
@@ -59,33 +42,9 @@ Architecture: self-contained checks (the three at the bottom) implement their lo
 | [checks/](checks/) | Pluggable quality-gate modules (see table above). | (invoked by `check.py`) |
 | [templates/](templates/) | Python + shell scaffolds the user customizes locally (workspace-status dashboard, upstream-drift report, launchd installer). Not installed by `make install`. | (manual copy) |
 
-## Adapter module structure (`scripts/adapters/`)
+## Adapter module structure
 
-Each adapter implements the `Adapter` Protocol from `scripts/adapters/_protocol.py`:
-
-```python
-class Adapter(Protocol):
-    name: str
-    tier: int
-    def detect(self) -> bool: ...
-    def install(
-        self,
-        content: PlaybookContent,
-        target: Path | None,
-        prior_managed_keys: dict | None = None,
-    ) -> Iterable[InstalledPath]: ...
-```
-
-Tier 1 (full surface, hook-capable): `claude_code.py`, `codex.py`, `cursor.py`, `windsurf.py`, `cline.py`, `copilot.py`.
-Tier 2 (rules-only): `aider.py`, `gemini_cli.py`, `pi.py`.
-Tier 3 (AGENTS.md-only, declarative): 20 entries in `tier3.toml` produce `TierThreeAdapter` instances via `tier3.py`. Per ADR-0030.
-
-Shared helpers live in:
-- `adapters/_reader.py`: `load_skills`, `load_rules`, `load_hooks`, `load_mcp_configs`, `load_agents`, `load_commands`, `load_prompts`.
-- `adapters/_writer.py`: `copy_skill_payload`, `materialize_mcp_sources`, `merge_managed_mcp_into_json`, `upsert_managed_block`, `agent_to_toml`, `safe_symlink_or_copy` (Windows fallback), `expand_agent_shared_placeholder`.
-- `adapters/_detect.py`: `which`, `vscode_extension_present`, `resolve_target`.
-- `adapters/_protocol.py`: typed contracts (`Skill`, `Rule`, `Hook`, `McpConfig`, `Agent`, `Command`, `Prompt`, `InstalledPath`, `PlaybookContent`) + the `Adapter` Protocol itself + `reconcile_managed_json_mcp` / `reconcile_managed_hook_commands`.
-- `adapters/_loader.py`: re-export shim that preserves the pre-decomposition import surface.
+See [`scripts/adapters/README.md`](adapters/README.md) for the Adapter Protocol contract, the tier breakdown (by adapter constant, not by feature surface), the shared `_reader` / `_writer` / `_detect` / `_protocol` / `_loader` helpers, the hook contract, and how to add a new adapter. The registration seam is `scripts/adapters/__init__.py:ALL_ADAPTERS`.
 
 ## Common workflows
 
@@ -123,9 +82,9 @@ make targets-list    # every target the playbook is bound to
 make targets-doctor  # registry state + missing-dir pruning
 ```
 
-## Templates (workspace-IP scaffolds)
+## Templates (operator-customized scaffolds)
 
-`scripts/templates/` ships Python and shell scaffolds that depend on workspace-specific values and are NOT installed by `make install`. See [`scripts/templates/CUSTOMIZE.md`](templates/CUSTOMIZE.md) for the full list.
+`scripts/templates/` ships Python and shell scaffolds that depend on operator-specific values and are NOT installed by `make install`. See [`scripts/templates/CUSTOMIZE.md`](templates/CUSTOMIZE.md) for the full list.
 
 ## Why Python 3.11+ stdlib only
 
@@ -143,10 +102,7 @@ Python 3.11 is required for `tomllib` (used by `bulk_import.py` for TOML subagen
 
 ## How to add a new check gate
 
-1. Create `scripts/checks/<name>.py` returning a `CheckResult` from `run(ctx)`.
-2. Either implement directly (self-contained) or delegate via `run_legacy_main()` to a legacy `scripts/<name>.py`.
-3. Register in `scripts/checks/__init__.py:CHECKS`.
-4. Add a row to the gates table above.
+See [`scripts/checks/README.md`](checks/README.md). The delegation helper is `capture_legacy_main` from `scripts/checks/_legacy.py` (not `run_legacy_main`); the `resolve_content_paths` helper lives in `scripts/adapters/_protocol.py`.
 
 ## Quality bar
 
