@@ -328,6 +328,63 @@ def test_harness_skips_judge_when_dsl_fails(tmp_path: Path) -> None:
     assert judge.calls == 0
 
 
+def test_harness_marks_judge_infra_error_with_distinct_prefix(tmp_path: Path) -> None:
+    """Adversarial review-round-5 verdict-blocker: an HTTP 429 or
+    network timeout must NOT look the same as a quality regression.
+    Infra failures get the `judge_infra_fail:` prefix; quality failures
+    get `llm_judge:`."""
+    from trajectory_harness import HarnessConfig, run_harness
+    from trajectory_judge import JudgeResult
+
+    class _InfraFailClient:
+        def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+            return JudgeResult(
+                score=0.0,
+                reasoning="HTTP 429 from Anthropic: Too Many Requests",
+                raw_response="",
+                model="claude-sonnet-4-6",
+                is_infra_error=True,
+            )
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        judge_client=_InfraFailClient(),
+    )
+    matrix = run_harness(cfg)
+    joined = "\n".join(f for cell in matrix.cells for f in cell.failures)
+    assert "judge_infra_fail" in joined
+    assert "llm_judge:" not in joined  # quality failures get the other prefix
+
+
+def test_harness_threshold_boundary_passes_at_exact_match(tmp_path: Path) -> None:
+    """Adversarial review-round-5 #3: nail down the threshold boundary.
+    `score < threshold` means a score EQUAL to threshold passes. This
+    test pins the semantic so a future operator change to <= is caught."""
+    from trajectory_harness import HarnessConfig, run_harness
+    from trajectory_judge import JudgeResult
+
+    class _ExactMatchClient:
+        def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+            return JudgeResult(
+                score=0.7,  # equals trajectory's threshold of 0.7
+                reasoning="exactly at threshold",
+                raw_response="",
+                model="claude-sonnet-4-6",
+            )
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        judge_client=_ExactMatchClient(),
+    )
+    matrix = run_harness(cfg)
+    assert matrix.passed == 1
+    assert matrix.failed == 0
+
+
 def test_harness_default_no_judge_means_dsl_only(tmp_path: Path) -> None:
     """Pre-Phase-2 callers (judge_client=None) get DSL-only behavior;
     the matrix passes/fails purely on the matcher."""

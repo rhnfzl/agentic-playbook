@@ -38,7 +38,7 @@ sys.path.insert(0, str(REPO_ROOT_DEFAULT / "scripts"))
 
 from adapters._loader import PlaybookContent, Trajectory  # noqa: E402
 from adapters.trace_record import KNOWN_TRACE_ADAPTERS, TraceRecord  # noqa: E402
-from trajectory_judge import JudgeClient, evaluate_judge  # noqa: E402
+from trajectory_judge import JudgeClient, evaluate_judge, get_threshold  # noqa: E402
 from trajectory_matcher import evaluate_assertions  # noqa: E402
 
 
@@ -224,15 +224,20 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
                 # DSL failures short-circuit the judge to save cost.
                 if passed and cfg.judge_client is not None:
                     judge_result = evaluate_judge(traj, trace, cfg.judge_client)
-                    threshold_raw = traj.llm_judge.get("threshold", 0.7)
-                    try:
-                        threshold = float(threshold_raw)
-                    except (TypeError, ValueError):
-                        threshold = 0.7
+                    threshold = get_threshold(traj)
                     if judge_result.score < threshold:
                         passed = False
+                        # Distinguish infra failures from quality failures
+                        # so operators reading the matrix can route a 429
+                        # to "retry overnight" and a quality miss to
+                        # "regression to investigate."
+                        prefix = (
+                            "judge_infra_fail"
+                            if judge_result.is_infra_error
+                            else "llm_judge"
+                        )
                         failures.append(
-                            f"llm_judge: score {judge_result.score:.2f} "
+                            f"{prefix}: score {judge_result.score:.2f} "
                             f"below threshold {threshold} "
                             f"(reasoning: {judge_result.reasoning})"
                         )

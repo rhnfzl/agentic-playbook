@@ -33,7 +33,7 @@ sys.path.insert(0, str(REPO_ROOT_DEFAULT / "scripts"))
 
 from adapters._loader import PlaybookContent  # noqa: E402
 from adapters.claude_code_trace import parse_otel_jsonl  # noqa: E402
-from trajectory_judge import JudgeClient, evaluate_judge  # noqa: E402
+from trajectory_judge import JudgeClient, evaluate_judge, get_threshold  # noqa: E402
 from trajectory_matcher import evaluate_assertions  # noqa: E402
 
 
@@ -139,14 +139,15 @@ def main(
                 )
                 return 1
         judge_result = evaluate_judge(traj, trace, client)
-        threshold_raw = traj.llm_judge.get("threshold", 0.7)
-        try:
-            threshold = float(threshold_raw)
-        except (TypeError, ValueError):
-            threshold = 0.7
+        threshold = get_threshold(traj)
         if judge_result.score < threshold:
+            prefix = (
+                "judge_infra_fail"
+                if judge_result.is_infra_error
+                else "llm_judge"
+            )
             judge_failure_msg = (
-                f"llm_judge: score {judge_result.score:.2f} below "
+                f"{prefix}: score {judge_result.score:.2f} below "
                 f"threshold {threshold} (reasoning: {judge_result.reasoning})"
             )
 

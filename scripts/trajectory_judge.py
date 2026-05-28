@@ -20,20 +20,30 @@ from typing import NamedTuple, Protocol
 class JudgeResult(NamedTuple):
     """Per-(trajectory, trace) judge verdict.
 
-    score          -- in [0, 1]; the trajectory's threshold gates pass/fail.
-    reasoning      -- short text from the judge explaining the score; surfaces
-                      in the harness report when below threshold.
-    raw_response   -- full LLM response, kept for debugging score-parse
-                      failures or rubric drift investigations.
-    model          -- which model produced the score (so the report can
-                      note drift if `model` differs from the trajectory's
-                      `llm_judge.model`).
+    score              -- in [0, 1]; the trajectory's threshold gates pass/fail.
+    reasoning          -- short text from the judge explaining the score;
+                          surfaces in the harness report when below threshold.
+    raw_response       -- full LLM response, kept for debugging score-parse
+                          failures or rubric drift investigations.
+    model              -- which model produced the score (so the report can
+                          note drift if `model` differs from the trajectory's
+                          `llm_judge.model`).
+    is_infra_error     -- True when score=0.0 was set by an infrastructure
+                          failure (HTTP 429, network timeout, parse error
+                          on the judge response), NOT by the judge scoring
+                          the trace low. The harness uses this to label
+                          failures as `judge_infra_fail` instead of
+                          `llm_judge` so operators distinguish a transient
+                          ops blip from a genuine agent-quality regression.
+                          Mirrors the trace_provider's `infra_fail:` prefix
+                          discipline (adversarial review-round-5 finding).
     """
 
     score: float
     reasoning: str
     raw_response: str
     model: str
+    is_infra_error: bool = False
 
 
 class JudgeClient(Protocol):
@@ -64,6 +74,85 @@ def build_judge_messages(rubric: str, trace_summary: str) -> list[dict]:
     ]
 
 
+_REFUSAL_PHRASES = (
+    "i cannot",
+    "i can't",
+    "i refuse",
+    "i'm unable",
+    "i am unable",
+    "i won't",
+    "i will not",
+)
+
+
+def _parse_to_dict(raw: str):  # type: ignore[no-untyped-def]
+    """Best-effort dict extraction from a judge's raw text.
+
+    Returns:
+      dict -- the parsed JSON object.
+      "refusal" -- the prose around the JSON contained a refusal phrase
+                   (caller treats this as score=0 with refusal reasoning).
+      None -- no usable JSON object was found.
+
+    Defensive design (codex review-round-5 fixes):
+      * Strict `json.loads` may succeed and return a non-dict (list, str,
+        number); we accept only dicts.
+      * The brace-fallback now tries the LAST balanced `{...}` span,
+        not the outer first-to-last slice, so a response with multiple
+        JSON blocks (draft followed by final verdict) parses the final
+        block rather than the unparseable concatenation.
+    """
+    stripped = raw.strip()
+    try:
+        parsed = json.loads(stripped)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    # Refusal check on the raw text first; if the surrounding prose
+    # refuses, no embedded JSON should be trusted regardless of how
+    # many balanced blocks we find.
+    if any(phrase in raw.lower() for phrase in _REFUSAL_PHRASES):
+        return "refusal"
+
+    # Scan for balanced {...} blocks; try the LAST one first because
+    # judges that "think aloud" emit the verdict at the end.
+    blocks = _balanced_brace_blocks(raw)
+    for block in reversed(blocks):
+        try:
+            parsed = json.loads(block)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def _balanced_brace_blocks(text: str) -> list[str]:
+    """Return every balanced `{...}` block in `text`, in source order.
+
+    Naive depth-counter: ignores strings/escapes (judges should not put
+    raw `{` or `}` inside string values; if they do, the affected block
+    is simply skipped). Adequate for the well-formed-JSON case we expect.
+    """
+    blocks: list[str] = []
+    depth = 0
+    start: int | None = None
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start is not None:
+                    blocks.append(text[start : i + 1])
+                    start = None
+    return blocks
+
+
 def parse_judge_response(raw: str, model: str) -> JudgeResult:
     """Pure: extract a JudgeResult from the judge's raw text.
 
@@ -72,39 +161,47 @@ def parse_judge_response(raw: str, model: str) -> JudgeResult:
     JSON in prose despite the system prompt). Returns score=0.0 with
     a clear reasoning string when parsing fails entirely so the caller
     can surface the failure in the harness report rather than crashing.
+
+    Refusal guard (adversarial review-round-5 finding): if the prose
+    surrounding the JSON contains a refusal phrase, we return score=0
+    with `is_infra_error=False` (this is a judge-quality signal, not
+    infra) but the reasoning explicitly names the refusal so the
+    operator does not interpret a hallucinated score as the agent's
+    verdict.
     """
-    try:
-        data = json.loads(raw.strip())
-    except json.JSONDecodeError:
-        start = raw.find("{")
-        end = raw.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            return JudgeResult(
-                score=0.0,
-                reasoning=(
-                    "judge response did not contain parseable JSON; "
-                    "raw response kept for debugging"
-                ),
-                raw_response=raw,
-                model=model,
-            )
-        try:
-            data = json.loads(raw[start : end + 1])
-        except json.JSONDecodeError:
-            return JudgeResult(
-                score=0.0,
-                reasoning=(
-                    "judge response contained brace-bounded text but "
-                    "JSON parse failed; raw response kept for debugging"
-                ),
-                raw_response=raw,
-                model=model,
-            )
+    data = _parse_to_dict(raw)
+    if data is None:
+        return JudgeResult(
+            score=0.0,
+            reasoning=(
+                "judge response did not yield a JSON object with score "
+                "and reasoning; raw response kept for debugging"
+            ),
+            raw_response=raw,
+            model=model,
+        )
+    if data == "refusal":
+        return JudgeResult(
+            score=0.0,
+            reasoning=(
+                "judge response contained a refusal phrase outside "
+                "the JSON block; embedded score is not trusted"
+            ),
+            raw_response=raw,
+            model=model,
+        )
 
     score_raw = data.get("score")
     reasoning = str(data.get("reasoning", "")).strip() or "(no reasoning)"
+    if score_raw is None:
+        return JudgeResult(
+            score=0.0,
+            reasoning="judge JSON object had no 'score' key",
+            raw_response=raw,
+            model=model,
+        )
     try:
-        score = float(score_raw)
+        score = float(score_raw)  # type: ignore[arg-type]  # justification: above None-guard narrows.
     except (TypeError, ValueError):
         return JudgeResult(
             score=0.0,
@@ -119,6 +216,21 @@ def parse_judge_response(raw: str, model: str) -> JudgeResult:
         raw_response=raw,
         model=model,
     )
+
+
+def get_threshold(trajectory) -> float:  # type: ignore[no-untyped-def]
+    """Single-source threshold extraction (review-round-5 dedup).
+
+    Callers in trajectory_harness.py and trajectory_verify.py both
+    needed this exact logic: read llm_judge.threshold, coerce to float,
+    fall back to 0.7 if missing or malformed. Centralizing here means
+    a future ADR amendment to the default flows through one site.
+    """
+    threshold_raw = trajectory.llm_judge.get("threshold", 0.7)
+    try:
+        return float(threshold_raw)
+    except (TypeError, ValueError):
+        return 0.7
 
 
 def build_trace_summary(trace) -> str:  # type: ignore[no-untyped-def]
@@ -141,10 +253,20 @@ def build_trace_summary(trace) -> str:  # type: ignore[no-untyped-def]
     for event in trace.events:
         suffix = ""
         if event.arguments:
-            for key in ("path", "file_path", "notebook_path"):
-                if key in event.arguments:
-                    suffix = f" {key}={event.arguments[key]!r}"
-                    break
+            # Codex review-round-5 #3: surface ALL tool arguments (not
+            # just path-like keys) so rubrics that grade command text,
+            # query strings, etc., have the evidence. Each value is
+            # truncated to keep the summary under the judge's context.
+            arg_bits: list[str] = []
+            for key, value in event.arguments.items():
+                if value is None:
+                    continue
+                text = repr(value)
+                if len(text) > 200:
+                    text = text[:197] + "..."
+                arg_bits.append(f"{key}={text}")
+            if arg_bits:
+                suffix = " " + ", ".join(arg_bits)
         lines.append(f"  {event.seq:>3}. {event.kind} {event.name}{suffix}")
     if trace.artifacts:
         lines.append("")

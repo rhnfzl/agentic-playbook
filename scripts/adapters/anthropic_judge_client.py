@@ -1,5 +1,14 @@
 """Anthropic Messages API client for the trajectory judge (Phase 2A Task 3).
 
+Anthropic Messages API version header is pinned to `2023-06-01`. If
+Anthropic deprecates that header value, the client surfaces an HTTP
+error via `JudgeResult.is_infra_error=True` (HTTP 4xx pathway below)
+rather than crashing the harness. To bump the pinned version, edit
+`_ANTHROPIC_VERSION` and re-run the test suite (the test fixture
+mocks urlopen so live API behavior is not exercised in CI).
+
+
+
 Implements the JudgeClient protocol from `scripts/trajectory_judge.py`.
 Uses stdlib `urllib.request` to stay within the repo's no-deps policy
 (the Anthropic SDK is not a dependency; the Messages API is HTTP).
@@ -107,6 +116,7 @@ class HttpAnthropicJudgeClient:
                 reasoning=f"HTTP {exc.code} from Anthropic: {exc.reason}",
                 raw_response="",
                 model=model,
+                is_infra_error=True,
             )
         except urllib.error.URLError as exc:
             return JudgeResult(
@@ -114,6 +124,7 @@ class HttpAnthropicJudgeClient:
                 reasoning=f"URLError from Anthropic: {exc.reason}",
                 raw_response="",
                 model=model,
+                is_infra_error=True,
             )
         except (TimeoutError, OSError) as exc:
             return JudgeResult(
@@ -121,6 +132,7 @@ class HttpAnthropicJudgeClient:
                 reasoning=f"network error from Anthropic: {exc}",
                 raw_response="",
                 model=model,
+                is_infra_error=True,
             )
 
         text = _extract_text(payload)
