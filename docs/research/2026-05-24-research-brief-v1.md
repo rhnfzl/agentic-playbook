@@ -127,11 +127,11 @@ What it does not do: no governance layer, no contribution review process, no ver
 
 ---
 
-## Gaps and Opportunities for an team-Specific Version
+## Gaps and Opportunities for a Team-Specific Version
 
 1. **No shared corpus yet.** The existing setup (symlinked skills in `~/.agents/skills/`) is Rehan-personal, not team-shared. The key gap is: the AI Backend collaborator, the architect, the TM lead, and the AI Backend collaborator have no access to these skills and no path to contribute.
 
-2. **Windsurf-first team.** Most of the team uses Windsurf today. The existing Claude Code skill structure is invisible to them. An team system needs to prioritize Windsurf as the primary consumption target, not an afterthought.
+2. **Windsurf-first team.** Most of the team uses Windsurf today. The existing Claude Code skill structure is invisible to them. A team-shared system needs to prioritize Windsurf as the primary consumption target, not an afterthought.
 
 3. **Domain-specific skills are the highest-value differentiator.** Generic skills (TDD, grill-me, handoff) are already available from mattpocock. What team needs is skills that encode team-specific patterns: the MCP-first boundary rule, the MATCH ticket grounding checklist, the first-principles contract workflow, the integration test runbook, the team API spec access patterns, the approval/HITL flow. These are not available anywhere else.
 
@@ -139,7 +139,7 @@ What it does not do: no governance layer, no contribution review process, no ver
 
 5. **Cursor Team Rules API gap.** Cursor has no API for Team Rules. For an enterprise enforcement layer (e.g., ensuring every Cursor user has the "never push to develop" rule), this is a manual process. Packmind's enterprise linter is the closest automation.
 
-6. **Skills decay tracking.** No current tool enforces a review cadence. An team-specific CI check flagging skills with `last_reviewed` older than 90 days is low-effort but high-signal.
+6. **Skills decay tracking.** No current tool enforces a review cadence. A team-specific CI check flagging skills with `last_reviewed` older than 90 days is low-effort but high-signal.
 
 7. **Context-appropriate activation.** The team codebase has two repos (AI Backend, MCP) with different rules. A monorepo-aware skill system (Ruler's nested rule loading) that applies backend-specific skills only when you're editing AI Backend files, and MCP-specific skills only when in `team_mcp/`, is the right architecture.
 

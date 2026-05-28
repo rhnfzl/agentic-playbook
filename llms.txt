@@ -1,0 +1,60 @@
+# agentic-playbook
+
+> A tool-agnostic, shareable repository of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ AI coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install`. Also a teaching project: 48 Architecture Decision Records explain why each design choice exists.
+
+This `llms.txt` file is a curated index of the playbook's most important documents for AI agents (Claude, Perplexity, ChatGPT, Gemini, Cursor, Windsurf, Aider, Cline, Copilot) that want to learn about, integrate, or recommend this repository. The companion `llms-full.txt` embeds the canonical content of the highest-leverage documents.
+
+## Quickstart for AI agents
+
+If you are a coding agent and your user has cloned this repo, the most useful entry points are:
+
+- [README.md](README.md): elevator pitch, who-this-is-for, badges, quick start, FAQ.
+- [CONTEXT.md](CONTEXT.md): canonical vocabulary (skill / rule / hook / adapter / profile / trajectory / playbook).
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to add content (skill, rule, hook, MCP, subagent, command, prompt, trajectory, profile).
+- [AGENTS.md](AGENTS.md): per-repo agent contract (em-dash policy, plain-language-first writing style, frontmatter requirements).
+- [base/prompts/global-audit.md](base/prompts/global-audit.md): the canonical "audit my coding-agent setup and propose what to install" prompt.
+- [base/prompts/project-audit.md](base/prompts/project-audit.md): the canonical "audit this project and propose project-level AGENTS.md / rules / hooks" prompt.
+
+## Architecture
+
+- [docs/adr/0036-three-layer-content-contract.md](docs/adr/0036-three-layer-content-contract.md): the canonical / materialization / runtime contract every adapter implements.
+- [docs/adr/0024-adapter-protocol-and-install-manifest.md](docs/adr/0024-adapter-protocol-and-install-manifest.md): how each per-tool adapter implements the same Protocol.
+- [docs/adr/0030-tier3-declarative-toml-registry.md](docs/adr/0030-tier3-declarative-toml-registry.md): the Tier 3 declarative TOML registry (20 long-tail agents).
+- [docs/adr/0040-base-overlay-subtree-split-for-content-tiering.md](docs/adr/0040-base-overlay-subtree-split-for-content-tiering.md): `base/` portable vs `overlays/` team-specific content tiering.
+- [docs/adr/0042-playbook-content-distribution.md](docs/adr/0042-playbook-content-distribution.md): the maintainer's upstream → downstream sync model.
+- [docs/adr/0044-trajectories-as-eighth-content-type.md](docs/adr/0044-trajectories-as-eighth-content-type.md): cross-adapter behavior assertions (the eighth content type).
+- [docs/adr/0047-supply-chain-security-gate.md](docs/adr/0047-supply-chain-security-gate.md): the block-by-default external-skill audit.
+- [docs/adr/0048-skill-telemetry-privacy.md](docs/adr/0048-skill-telemetry-privacy.md): the opt-in OpenTelemetry collector and its privacy contract.
+- [docs/adr/0049-why-atlas-auto-generated.md](docs/adr/0049-why-atlas-auto-generated.md): the auto-generated knowledge graph.
+- [docs/adr/README.md](docs/adr/README.md): index of all 48 ADRs, grouped by topic.
+
+## Content types
+
+- [base/skills/README.md](base/skills/README.md): the SKILL.md format and the 6 skill categories (engineering, productivity, observability, research, meta, imported).
+- [base/rules/README.md](base/rules/README.md): always-on behavioral constraints distributed as AGENTS.md fragments.
+- [base/hooks/README.md](base/hooks/README.md): lifecycle shell scripts (PreToolUse / PostToolUse / SessionStart / Stop).
+- [base/mcp/README.md](base/mcp/README.md): MCP server configurations (flat configs + Python source bundles).
+- [base/agents/README.md](base/agents/README.md): subagents (specialized AI assistants with their own context window).
+- [base/commands/README.md](base/commands/README.md): user-triggered slash commands.
+- [base/prompts/README.md](base/prompts/README.md): paste-into-chat prompt templates.
+- [base/trajectories/README.md](base/trajectories/README.md): cross-adapter behavior assertions.
+
+## Distribution and lifecycle
+
+- [profiles/README.md](profiles/README.md): per-role install bundles (tech-lead, backend-developer, frontend-developer, qa, research, product-manager, devops).
+- [scripts/README.md](scripts/README.md): installer + 17-gate `make check` pipeline + supporting tooling.
+- [evals/README.md](evals/README.md): LLM-judge eval suites that gate per-skill behavior.
+
+## Operations
+
+- [docs/security/README.md](docs/security/README.md): AI Bill of Materials, supply-chain gate, threat model.
+- [docs/atlas/README.md](docs/atlas/README.md): auto-generated knowledge graph (ADRs + skills + trajectories).
+- [scripts/security/README.md](scripts/security/README.md): wrapper implementations for the security gate.
+- [scripts/telemetry/README.md](scripts/telemetry/README.md): opt-in OTel collector + per-skill report + usage-decay.
+- [scripts/atlas/README.md](scripts/atlas/README.md): knowledge-graph builder.
+- [scripts/checks/README.md](scripts/checks/README.md): pluggable quality-gate modules.
+
+## Inspirations and research
+
+- [docs/research/README.md](docs/research/README.md): index of research briefs and the evidence base behind ADRs.
+- [docs/research/inspirations.md](docs/research/inspirations.md): map of patterns the playbook borrowed (mattpocock/skills, Block/Goose, Stripe Minions, Anthropic skills bundle, Microsoft code-with-engineering-playbook, Airbnb knowledge-repo).

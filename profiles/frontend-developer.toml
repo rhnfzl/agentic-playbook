@@ -1,28 +1,24 @@
-# Profile: Frontend Developer
+# Profile: Frontend Developer (portable, public-safe subset)
 name = "frontend-developer"
-description = "Frontend developer working on the team web app. Lighter than backend profile; excludes backend-specific skills (CI/Sonar/k8s-state-sweep) and MCP-first boundary check."
-requires_overlays = ["team"]
+description = "Frontend developer profile. Public-safe subset of the upstream frontend-developer bundle: code-review-graph-first, post-iter-review, productivity skills, and frontend-slides. Workplace-specific MCP bindings are designed in the upstream and intentionally not shipped here."
+owner = "rehan"
+last_reviewed = "2026-05-28"
 
 [skills]
 include = [
-  "engineering/code-review",
+  "engineering/code-review-graph-first",
   "engineering/post-iter-review",
+  "productivity/frontend-slides",
   "productivity/grill-me",
   "productivity/handoff",
-  "productivity/stakeholder-slack-brief",
-  "productivity/slack-inbound-reply",
   "meta/write-a-skill",
 ]
 
 [rules]
 include = [
-  "label-policy",
   "no-em-dashes",
   "no-ticket-ids-in-code",
-  "VCS-not-github",
   "writing-style",
-  "jira-priority-scheme",
-  "full-request-chain",
   "never-push-to-develop",
 ]
 
@@ -30,4 +26,4 @@ include = [
 include = ["lint-guard", "never-push-to-develop", "human-html-autoindex"]
 
 [mcp]
-include = ["atlassian", "slack", "tavily", "VCS"]
+include = ["slack", "tavily"]

@@ -1,8 +1,37 @@
 # agentic-playbook
 
-A tool-agnostic, shareable system for working with coding agents. One canonical repo holds the skills, rules, hooks, MCP server configs, subagents, slash commands, and prompt templates; one `make install` materializes them as native files in whichever coding agent you use (Claude Code, Codex CLI, Cursor IDE + CLI, Windsurf, Pi, plus 20+ more via Tier 3 adapters).
+[![License: MIT](https://img.shields.io/github/license/rhnfzl/agentic-playbook?color=blue)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/rhnfzl/agentic-playbook?style=flat&logo=github)](https://github.com/rhnfzl/agentic-playbook/stargazers)
+[![Forks](https://img.shields.io/github/forks/rhnfzl/agentic-playbook?style=flat&logo=github)](https://github.com/rhnfzl/agentic-playbook/network/members)
+[![Last commit](https://img.shields.io/github/last-commit/rhnfzl/agentic-playbook?logo=git&color=informational)](https://github.com/rhnfzl/agentic-playbook/commits/main)
+[![Contributors](https://img.shields.io/github/contributors/rhnfzl/agentic-playbook)](https://github.com/rhnfzl/agentic-playbook/graphs/contributors)
+[![Top language](https://img.shields.io/github/languages/top/rhnfzl/agentic-playbook?logo=python)](https://github.com/rhnfzl/agentic-playbook)
+[![Issues](https://img.shields.io/github/issues/rhnfzl/agentic-playbook?logo=github)](https://github.com/rhnfzl/agentic-playbook/issues)
+[![Pull requests](https://img.shields.io/github/issues-pr/rhnfzl/agentic-playbook?logo=github)](https://github.com/rhnfzl/agentic-playbook/pulls)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-yellow?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![AI Bill of Materials](https://img.shields.io/badge/AI--BOM-published-brightgreen)](docs/security/ai-bom.json)
+[![Made for Claude Code · Cursor · Codex · Windsurf](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Cursor%20%C2%B7%20Codex%20%C2%B7%20Windsurf%20%2B16-orange)](#what-it-is-8-content-types)
 
-This is also a teaching project. Clone it, study the ADRs, copy the patterns, build your own playbook with whatever conventions fit your team.
+> **agentic-playbook is a tool-agnostic, shareable repository of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and 20+ more coding agents through a single `make install`.**
+
+It is also a deliberately-built teaching project. The 48 Architecture Decision Records under `docs/adr/` explain why each design choice exists; the research under `docs/research/` shows the evidence. Clone it, study the ADRs, copy the patterns, and build your own playbook with whatever conventions fit your team.
+
+## Who this is for
+
+- **Tech leads and engineering managers** who want one canonical, versioned set of agent rules and skills that lands consistently on every teammate's machine, regardless of which coding agent each person prefers.
+- **Individual engineers** running Claude Code, Cursor, Codex CLI, Windsurf, GitHub Copilot, Cline, Aider, or Gemini CLI who want a tested baseline of skills and rules without authoring everything from scratch.
+- **Product managers, researchers, QA engineers, and DevOps engineers** who use the same coding agents as the engineers and want a role-specific bundle (`product-manager`, `research`, `qa`, `devops` profiles) tuned to their workflow.
+- **Open-source maintainers and platform teams** building their own agent playbook who want a worked reference for skill format (SKILL.md), rule shape, hook lifecycle, multi-adapter install, decay tracking, supply-chain security, and per-skill telemetry.
+
+## What you get in 60 seconds
+
+One `git clone` followed by one `make install` gives you:
+
+- **150+ skills, rules, hooks, MCP server configs, subagents, commands, prompts, and trajectories** materialized natively into every coding agent installed on your machine.
+- **Detection-and-preselect**: the installer probes `~/.claude/`, `~/.codex/`, `~/.cursor/`, `~/.codeium/windsurf/`, and others, then pre-selects the agents it found.
+- **Role profiles** that filter the firehose to the 15-30 items that matter for your specific role (`tech-lead`, `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`).
+- **A lockfile that records every materialized path**, so `make remove` cleanly uninstalls without touching anything you authored by hand.
+- **`make check` quality gates** (17 in total) that catch frontmatter drift, decay, em-dashes, AGENTS.md governance violations, content-tier breaches, and 12 other failure modes before you commit.
 
 ## What it is (8 content types)
 
@@ -15,7 +44,7 @@ This is also a teaching project. Clone it, study the ADRs, copy the patterns, bu
 - **Prompt templates** (`base/prompts/`): reusable `/name` expansion templates (Pi-flavored), plus onboarding docs
 - **Trajectories** (`base/trajectories/`): cross-adapter behavior assertions, one per (skill, scenario). Declare input phrasings, DSL assertions over the tool-call trace, and an LLM-judge rubric. Consumed by the trajectory harness (`make trajectory-check`), not materialized to adapters. Per ADR-0044.
 
-Profiles (`profiles/`) compose the 7 content types into per-role bundles: `tech-lead`, `engineering`, `devops`, `qa`, `research`, `product-manager`, `backend-developer`, `frontend-developer`. Each profile's TOML lists which skills, rules, hooks, and MCPs to install.
+Profiles (`profiles/`) compose the 8 content types into per-role bundles: `tech-lead`, `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`. Each profile's TOML lists which skills, rules, hooks, and MCPs to install.
 
 The installer detects which agents are present on your machine, pre-selects them, and lets you toggle. Each agent gets the native files it expects: SKILL.md for Claude Code, .mdc for Cursor, `.windsurf/skills/` for Windsurf, TOML subagents for Codex, `~/.pi/agent/skills/` for Pi, `AGENTS.md` for the 20+ tools that read it natively.
 
@@ -23,7 +52,8 @@ The installer detects which agents are present on your machine, pre-selects them
 
 Most playbooks are utilitarian: they exist to be consumed, not learned from. This one is deliberately built as a teaching project.
 
-- `docs/adr/` explains **why** each decision was made. 40+ ADRs covering content shape, install model, governance, lifecycle, hooks contract, MCP boundary, profile semantics, version policy, content tiering, sync infrastructure.
+- `docs/adr/` explains **why** each decision was made. 48 ADRs covering content shape, install model, governance, lifecycle, hooks contract, MCP boundary, profile semantics, version policy, content tiering, sync infrastructure, supply-chain security gate, telemetry privacy, atlas knowledge graph.
+- `docs/atlas/` is an auto-generated, browseable knowledge graph of every ADR, skill, and trajectory in the repo, plus the cross-references between them. Run `make atlas` to rebuild; open `docs/atlas/index.html` in a browser to explore.
 - `docs/research/` shows the **evidence** behind those decisions.
 - `base/prompts/` contains pre-built scaffolding prompts you can paste into your coding agent to bootstrap a version of this playbook for your own team or project.
 
@@ -62,30 +92,30 @@ The installer detects which coding agents you have on this machine, lets you tog
 ### I want to use the playbook in a specific project
 
 ```bash
-make init TARGET=/path/to/my-project
+make init TARGET=<path-to-your-project>
 ```
 
-Scaffolds the target project with an `AGENTS.md` (pointer back to the playbook plus a fillable 8-section template) and a `.playbook-config.yaml` that records the profile. Pick from any installed profile or compose your own with `--profile a,b,c`.
+Scaffolds the target project with an `AGENTS.md` (pointer back to the playbook plus a fillable 8-section template) and a `.playbook-config.yaml` that records a default profile (`tech-lead`). After `make init`, run `make install PROFILE=<role>` to materialize the right content for the role you actually want, where `<role>` overrides the recorded default. Compose with `make install PROFILE=role1,role2`. Profiles available: `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`, `tech-lead`.
 
 ### I want my coding agent to read this playbook and integrate what fits
 
 You have an existing setup. You don't want to blindly run `make install`; you want a thinking pass that picks the right pieces for your machine or your project, explains the tradeoffs, and proposes a phased rollout you can review before any file lands.
 
-That pass is a prompt you paste into your coding agent of choice (Claude Code, Codex, Cursor, Windsurf) after cloning this playbook. The agent walks the playbook, walks your current setup, and proposes a plan. Two flavors:
+That pass is a prompt you paste into your coding agent of choice (Claude Code, Codex CLI, Cursor, Windsurf) after cloning this playbook. The agent walks the playbook, walks your current setup, and proposes a plan. Two flavors:
 
-**Globally (entire machine)**: audit `~/.claude`, `~/.codex`, `~/.cursor`, `~/.codeium/windsurf/`, etc., and propose what to install for every project you work on. The exact prompt template lives in `base/prompts/global-audit.md`.
+**Globally (entire machine)**: audit `~/.claude/`, `~/.codex/`, `~/.cursor/`, `~/.codeium/windsurf/`, etc., and propose what to install for every project you work on. Paste prompt: [`base/prompts/global-audit.md`](base/prompts/global-audit.md).
 
-**For one specific project**: audit the current working directory and propose project-level files (`AGENTS.md`, `.cursor/rules/`, `.github/copilot-instructions.md`, `.windsurfrules`, project hooks). Prompt template at `base/prompts/project-audit.md`.
+**For one specific project**: audit the current working directory and propose project-level files (`AGENTS.md`, `.cursor/rules/`, `.github/copilot-instructions.md`, `.windsurfrules`, project hooks). Paste prompt: [`base/prompts/project-audit.md`](base/prompts/project-audit.md).
 
 Both share the same shape: read the playbook, read your current setup, propose a phased plan with concrete commands. The agent does the matching; you keep the review and approval.
 
 ### I want to add a new skill
 
 ```bash
-make new SKILL=my-workflow CATEGORY=engineering
+make new SKILL=<skill-slug> CATEGORY=<category>
 ```
 
-Scaffolds `base/skills/engineering/my-workflow/SKILL.md` with the right frontmatter. Edit, then `make check`, commit, PR.
+Where `<category>` is one of `engineering`, `productivity`, `observability`, `research`, `meta`. Scaffolds `base/skills/<category>/<skill-slug>/SKILL.md` with the right frontmatter. Edit, then `make check`, commit, PR.
 
 ### I want to manage what is installed
 
@@ -100,11 +130,15 @@ make doctor         # diagnose setup issues
 ### I want to verify the project is healthy
 
 ```bash
-make check          # full pipeline: frontmatter, AGENTS.md governance, audit, size, decay, em-dash, evals
-make test           # adapter smoke tests
-make audit          # external-skill security audit (block-by-default)
+make check                  # full pipeline: frontmatter, AGENTS.md governance, audit, size, decay, em-dash, content tiering
+make test                   # adapter smoke tests
+make audit                  # external-skill security audit (block-by-default)
+make eval                   # LLM-judge eval suites per skill (slower; split from make check)
+make trajectory-check       # cross-adapter behavior assertions (Claude / Codex / Cursor / Windsurf) per ADR-0044
+make telemetry-report       # per-skill triggers / latency / token usage from opt-in OTel collector (ADR-0048)
+make atlas                  # rebuild the docs/atlas/ knowledge graph (ADR-0049)
 make sync-mattpocock        # pull upstream mattpocock/skills updates
-make sync-curated-skills    # pull curated PM/research skill sets
+make sync-curated-skills    # pull curated PM / research skill sets
 make doctor-verify          # layer-3: lockfile vs native config + MCP runtime initialize handshake
 ```
 
@@ -145,7 +179,7 @@ agentic-playbook/
 │   │   ├── observability/               k8s sweeps, dashboard interpretation
 │   │   ├── research/                    data profiling, lit synthesis, RAG eval
 │   │   ├── meta/                        playbook management (write-a-skill, audits)
-│   │   └── imported/                    curated upstream skills (mattpocock, phuryn, others)
+│   │   └── imported/                    curated upstream skills (mattpocock, pm-curated, layers, impeccable, research-curated, taste-skill)
 │   ├── rules/                           always-on behavioral constraints
 │   ├── hooks/                           shell hooks fired on agent lifecycle events
 │   │   └── templates/                   workspace-specific scaffolds (not installed)
@@ -158,16 +192,21 @@ agentic-playbook/
 │   ├── prompts/                         setup/onboarding + runtime templates
 │   └── trajectories/                    cross-adapter behavior assertions (ADR-0044)
 ├── evals/                               LLM-judge eval suites per skill
-├── profiles/                            per-role install bundles
+├── profiles/                            per-role install bundles (make install)
 ├── scripts/                             installer + lint + decay checks + bulk import
 │   ├── adapters/                        per-agent install adapters (claude, codex, cursor, windsurf, pi, ...)
 │   ├── checks/                          make check gates (frontmatter, decay, em-dash, content tiering, ...)
+│   ├── security/                        supply-chain gate + AI BOM emitter (ADR-0047)
+│   ├── telemetry/                       OTel collector + per-skill report (ADR-0048)
+│   ├── atlas/                           knowledge-graph builder (ADR-0049)
 │   ├── templates/                       new-skill/new-command scaffolds + cron / sync templates
 │   └── sync_distribution.py             manifest-driven content distribution (ADR-0042)
-├── tests/                               lifecycle pytest suite (installer regressions, 200+ tests)
+├── tests/                               lifecycle + atlas + security + telemetry pytest suite (480+ tests)
 ├── docs/
 │   ├── adr/                             design decisions (0001+); start with 0036 (three-layer content contract)
 │   ├── research/                        evidence base + upcoming-adapters tracking
+│   ├── atlas/                           auto-generated knowledge graph (open index.html in a browser)
+│   ├── security/                        AI Bill of Materials, supply-chain audit output
 │   └── tools/                           per-agent integration notes
 ├── AGENTS.md                            project-level rules + writing style
 ├── CONTRIBUTING.md                      contribution guide
@@ -195,6 +234,67 @@ Issues and PRs welcome. The repo's own `AGENTS.md` describes the contribution co
 Each content artifact has an `owner:` field in its frontmatter. The owner is responsible for upkeep, deprecation, and answering questions about the skill / rule / hook.
 
 To add or modify content, see `CONTRIBUTING.md` for the full workflow.
+
+## Frequently asked questions
+
+### What is agentic-playbook in one sentence?
+
+agentic-playbook is an open-source, tool-agnostic library of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install`.
+
+### Who is agentic-playbook for?
+
+It is for engineering tech leads, individual engineers, product managers, researchers, QA engineers, and DevOps engineers who use AI coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, or Gemini CLI) and want a tested, role-specific baseline of skills and rules without authoring everything from scratch. It is also for open-source maintainers and platform teams building their own internal agent playbook who want a worked reference for skill format, multi-adapter install, decay tracking, supply-chain security, and per-skill telemetry.
+
+### Which coding agents does agentic-playbook support?
+
+Tier 1 (full adapter, hook-capable): Claude Code, Cursor IDE + CLI, Codex CLI, Windsurf, Cline, GitHub Copilot. Tier 2 (rules + skills only, no hook surface): Aider, Gemini CLI, Pi. Tier 3 (AGENTS.md-only, declarative TOML): 20 long-tail agents including Goose, Junie, Kiro, Zed, Amp, Augment, OpenCode, Continue, Tabnine, Supermaven, and others. See [`docs/adr/0030-tier3-declarative-toml-registry.md`](docs/adr/0030-tier3-declarative-toml-registry.md) for the full Tier 3 list.
+
+### How is agentic-playbook different from anthropics/skills or awesome-agent-skills?
+
+`anthropics/skills` is a curated bundle of skills from Anthropic. `awesome-agent-skills` (heilcheng, VoltAgent) is a curated index of external skill repositories. agentic-playbook is a **distribution-and-governance system**: it ships seven other content types (rules, hooks, MCP server configs, subagents, slash commands, prompt templates, behavior trajectories) alongside skills, with a multi-adapter installer, a 17-gate `make check` quality pipeline, a supply-chain security gate (`make audit`), opt-in OTel telemetry per skill (`make telemetry-report`), and an auto-generated knowledge graph (`make atlas`). It is a teaching project as much as a content library: 48 Architecture Decision Records explain why each choice was made.
+
+### Is it safe to clone and install on my machine?
+
+The installer writes a lockfile recording every materialized path, so `make remove` can cleanly uninstall without touching anything you authored by hand. External skills imported via `make sync-mattpocock` and `make sync-curated-skills` pass through a block-by-default security audit (`make audit`, ADR-0047) before they land in the playbook. The opt-in OpenTelemetry collector (ADR-0048) is off by default and records metadata only (skill name, latency, token counts); prompt bodies and response bodies are never stored. See `docs/security/ai-bom.json` for the current AI Bill of Materials. Review the proposed materialization before running `make install` on a machine with an established personal agent setup; use the `base/prompts/global-audit.md` flow for a thinking pass before any file lands.
+
+### How do I uninstall agentic-playbook cleanly?
+
+```bash
+make remove                 # remove materialized files per lockfile; skips managed-block + user-edited
+make remove TARGET=<path>   # remove from a specific project the playbook was bound to
+```
+
+The lockfile records every file the installer wrote. `make remove` only deletes files in the lockfile; anything you hand-authored outside the `<!-- coding-agents-playbook BEGIN/END -->` markers is preserved.
+
+### Can I install just one skill or rule without taking the whole playbook?
+
+Two ways. (1) Use a role profile: `make install PROFILE=<role>` filters the install to the 15-30 items that role needs (`backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`, `tech-lead`). (2) Copy the SKILL.md or rule file directly into your own playbook; the format is documented in `base/skills/README.md` and `base/rules/README.md`.
+
+### Does agentic-playbook require GitHub?
+
+No. The installer and the `make` pipeline work against a local checkout regardless of where it came from. GitHub is the public distribution point (`https://github.com/rhnfzl/agentic-playbook`) but you can also clone via HTTPS, mirror to your own forge, or download a tarball.
+
+### Where do my hand-edits go on re-install?
+
+Anywhere outside the `<!-- coding-agents-playbook BEGIN/END -->` managed-block markers is preserved across `make update` and `make install`. The installer rewrites only the content inside the markers and records the file in the lockfile. For SKILL.md and other content materialized as whole files, re-running the installer overwrites the materialized copy with the canonical source from `base/`; treat the canonical source as the place to make changes, and never hand-edit the materialized copy.
+
+### How do I track adoption of the playbook?
+
+GitHub Insights → Traffic (admin-only) shows clones and views in 14-day windows. Stars, forks, contributors, and dependents are public and shown in the badge row at the top of this README. For per-skill usage on your own install, run `make telemetry-report` after enabling the opt-in OTel collector (per ADR-0048). The repo deliberately does not collect or aggregate cross-installation telemetry; that is out of scope for an open-source content library.
+
+## Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=rhnfzl/agentic-playbook&type=Date)](https://star-history.com/#rhnfzl/agentic-playbook&Date)
+
+## Related reading inside this repo
+
+- [`base/skills/README.md`](base/skills/README.md), [`base/rules/README.md`](base/rules/README.md), [`base/hooks/README.md`](base/hooks/README.md), [`base/mcp/README.md`](base/mcp/README.md) for the four core content types.
+- [`base/agents/README.md`](base/agents/README.md), [`base/commands/README.md`](base/commands/README.md), [`base/prompts/README.md`](base/prompts/README.md), [`base/trajectories/README.md`](base/trajectories/README.md) for the four newer content types.
+- [`profiles/README.md`](profiles/README.md) for the per-role install bundles.
+- [`evals/README.md`](evals/README.md) for the per-skill eval suites that gate skill quality.
+- [`scripts/README.md`](scripts/README.md) for the installer + 17-gate `make check` pipeline.
+- [`docs/README.md`](docs/README.md), [`docs/adr/README.md`](docs/adr/README.md), [`docs/research/README.md`](docs/research/README.md), [`docs/atlas/README.md`](docs/atlas/README.md), [`docs/security/README.md`](docs/security/README.md) for the docs hub.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md), [`AGENTS.md`](AGENTS.md), [`CONTEXT.md`](CONTEXT.md), [`CHANGELOG.md`](CHANGELOG.md), [`RELEASING.md`](RELEASING.md), [`TOOLS.md`](TOOLS.md), [`OWNERS.md`](OWNERS.md) for governance and process.
 
 ## License
 

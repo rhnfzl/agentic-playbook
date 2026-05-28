@@ -58,7 +58,6 @@ Current layout:
 | `code-review-graph-update.sh` | `hooks/` | canonical |
 | `memory-curator-postwrite.sh` | `hooks/` | canonical |
 | `agent-memory-session-brief.sh` | `hooks/` | canonical |
-| `sonar-advisory.sh` | `hooks/` | canonical |
 | `anchored-fs-pretool-edit.sh` | `hooks/` | canonical (ADAPTERS: claude-code; wraps Python implementation in `mcp/anchored-fs/`) |
 | `anchored-fs-posttool-read.sh` | `hooks/` | canonical (ADAPTERS: claude-code; wraps Python implementation in `mcp/anchored-fs/`) |
 | `_cascade-translate.sh` | `hooks/` | helper (Windsurf translator wrapper; NOT a hook) |
@@ -69,7 +68,8 @@ Current layout:
 |---|---|---|
 | `never-push-to-develop.sh` | PreToolUse (Bash) | Refuses `git push` to develop/main/master/release-*/hotfix-*. Honors `PLAYBOOK_OVERRIDE_PUSH_GUARD=1` for incident escape hatch. |
 | `lint-guard.sh` | PostToolUse (Edit/Write) | Runs the project's linter on the file just edited. Detects ruff/black/eslint/biome/prettier via config files. |
-| `sonar-advisory.sh` | PostToolUse (Edit/Write) | Advisory check against code-quality quality gate. Hits team code-quality via VPN; warns on drift, does not block. |
+| `anchored-fs-pretool-edit.sh` | PreToolUse (Edit/Write/MultiEdit) | Routes the edit through the anchored-fs MCP bundle's path resolver + stale-read detection (Claude Code only). |
+| `anchored-fs-posttool-read.sh` | PostToolUse (Read) | Records reads through the anchored-fs MCP bundle so subsequent edits know what the agent has seen (Claude Code only). |
 | `human-html-autoindex.sh` | PostToolUse (Edit/Write/Bash) | Regenerates `docs/human-html/index.html` whenever a new artifact lands. Probes Claude/Codex/Cursor/Windsurf skill install paths to find `human_html_artifacts.py`. |
 | `human-html-advisory.sh` | PreToolUse (Edit/Write) | Advisory nudge toward HTML when an HIL-shaped Markdown write is about to land outside the agreed Markdown lanes. Generic across harnesses. |
 | `human-html-advisory-cursor.sh` | PreToolUse (Cursor only) | Cursor wrapper that re-encodes the core advisory's stderr output as `{permission:"allow", agent_message:"..."}` JSON on stdout per Cursor's hook contract. |

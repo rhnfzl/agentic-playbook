@@ -14,7 +14,7 @@ This directory holds the installer, lint scripts, decay checks, and content-mana
 | [install_orphans.py](install_orphans.py) | Per-adapter orphan cleanup with ADR-0023 ownership + edit guard, ADR-0034 symlink-through guard, ADR-0036 copied_dir drift detection. | (used by `install.py`) |
 | [install_verify.py](install_verify.py) | `--verify` command: walks the lockfile, parses each native config, confirms managed hooks + MCP entries match. Per ADR-0036. | `make doctor-verify` |
 | [hook_native_config.py](hook_native_config.py) | Adapter shape registry (Claude / Codex / Cursor / Windsurf / Cline / Copilot native hook config schemas). Single source of truth shared by install_verify + lifecycle tests. | (library) |
-| [hook_registration.py](hook_registration.py) | Hook header parsers + per-adapter shape emitters (Claude-shaped, Codex auto-promote, Cursor camelCase, Windsurf Cascade). Per ADR-0027 + ADR-0034. | (library) |
+| [hook_registration/](hook_registration/) | Hook header parsers + per-adapter shape emitters as a package: `_claude_shape.py`, `_cursor_shape.py`, `_windsurf_shape.py`, plus shared `_common.py`. Codex hook registration is handled inline by the Codex adapter (Codex is Claude-shape-compatible with a PreToolUse auto-promote per ADR-0034). Per ADR-0027 + ADR-0034. | (library) |
 | [mcp_runtime_probe.py](mcp_runtime_probe.py) | JSON-RPC `initialize` handshake against each registered MCP server. Per ADR-0036. Honors `command`/`args`/`env`/`cwd` + 10s timeout; stdio transports only (HTTP/SSE entries skipped cleanly). | (used by `make doctor-verify`) |
 | [target_materializer.py](target_materializer.py) | Writes the per-project `.agents/` tree + per-tool projections + per-target `AGENTS.md` managed block. Per ADR-0028. | (used by `playbook_init.py` + `playbook_update.py`) |
 | [target_registry.py](target_registry.py) | Machine-wide registry at `~/.coding-agents-playbook-targets.json`. Per ADR-0038. | `make targets-list`, `make targets-doctor` |
@@ -25,7 +25,7 @@ This directory holds the installer, lint scripts, decay checks, and content-mana
 
 ### Quality gates
 
-`make check` runs `scripts/check.py`, which iterates the `scripts/checks/` package. 12 gates today:
+`make check` runs `scripts/check.py`, which iterates the `scripts/checks/` package. 17 gates today (see `scripts/checks/__init__.py:CHECKS` for the source of truth):
 
 | Gate | Module | Implementation |
 |---|---|---|
@@ -33,7 +33,7 @@ This directory holds the installer, lint scripts, decay checks, and content-mana
 | agents-md | `checks/agents_md.py` -> `check_agents_md.py` | AGENTS.md governance per ADR-0013. |
 | external-skill-audit | `checks/external_skill_audit.py` -> `audit_external_skill.py` | Block-by-default security audit for imported skills. |
 | size | `checks/size.py` -> `size_check.py` | Skill body size budget (warns >=500, blocks >1000) per ADR-0015. |
-| decay | `checks/decay.py` -> `decay_check.py` | Skill freshness (`last_reviewed` within 60 days). |
+| decay | `checks/decay.py` -> `decay_check.py` | Skill freshness bands: 60-day notice (informational), 90-day warn (`make check` flags), 180-day block (`make check` fails). Trajectory freshness uses the same bands per ADR-0044. |
 | em-dashes | `checks/em_dashes.py` -> `check_em_dashes.py` | Enforces `rules/no-em-dashes.md` against authored prose. |
 | no-versions-in-readmes | `checks/no_versions.py` -> `check_no_versions_in_readmes.py` | Keeps playbook version markers out of README.md / AGENTS.md. |
 | skill-description-length | `checks/skill_description.py` -> `check_skill_description.py` | <=1024-char SKILL.md description (Codex schema limit). |
@@ -55,7 +55,7 @@ Architecture: self-contained checks (the three at the bottom) implement their lo
 | [retrospective.py](retrospective.py) | Backend for `/playbook-retrospective`: walks session transcripts across Claude Code + Codex storage layouts. | (invoked by skill) |
 | [eval_runner.py](eval_runner.py) | LLM-judge-driven evals for skills. Slow; intentionally split out of `make check` into its own `make eval` target. | `make eval` |
 | [sync_mattpocock.sh](sync_mattpocock.sh) | Pulls `mattpocock/skills` upstream updates into `skills/imported/mattpocock/`. | `make sync-mattpocock` |
-| [adapters/](adapters/) | Per-agent adapter modules. See [adapters/AGENTS.md](adapters/AGENTS.md) for the protocol contract. | (invoked by `install.py`) |
+| [adapters/](adapters/) | Per-agent adapter modules. See `scripts/adapters/_protocol.py` for the Adapter Protocol contract (ADR-0024). | (invoked by `install.py`) |
 | [checks/](checks/) | Pluggable quality-gate modules (see table above). | (invoked by `check.py`) |
 | [templates/](templates/) | Python + shell scaffolds the user customizes locally (workspace-status dashboard, upstream-drift report, launchd installer). Not installed by `make install`. | (manual copy) |
 
@@ -78,7 +78,7 @@ class Adapter(Protocol):
 
 Tier 1 (full surface, hook-capable): `claude_code.py`, `codex.py`, `cursor.py`, `windsurf.py`, `cline.py`, `copilot.py`.
 Tier 2 (rules-only): `aider.py`, `gemini_cli.py`, `pi.py`.
-Tier 3 (AGENTS.md-only, declarative): 16 entries in `tier3.toml` produce `TierThreeAdapter` instances via `tier3.py`. Per ADR-0030.
+Tier 3 (AGENTS.md-only, declarative): 20 entries in `tier3.toml` produce `TierThreeAdapter` instances via `tier3.py`. Per ADR-0030.
 
 Shared helpers live in:
 - `adapters/_reader.py`: `load_skills`, `load_rules`, `load_hooks`, `load_mcp_configs`, `load_agents`, `load_commands`, `load_prompts`.
@@ -92,11 +92,11 @@ Shared helpers live in:
 ### First-time install on a fresh machine
 
 ```bash
-git clone <repo>
-cd coding-agents-playbook
-make install                           # detects + prompts
+git clone https://github.com/rhnfzl/agentic-playbook.git
+cd agentic-playbook
+make install                                        # detects + prompts
 # or
-make install AGENTS=auto TARGET=/path  # non-interactive
+make install AGENTS=auto TARGET=<path-to-project>   # non-interactive
 ```
 
 ### Per-project init

@@ -4,13 +4,13 @@ This directory holds shareable Model Context Protocol (MCP) server configuration
 
 ## What MCP is
 
-MCP (Model Context Protocol) is the open standard that lets AI agents call external tools and data sources (Atlassian, Slack, error-tracking, custom HTTP services, databases) without each tool being baked into the agent. One server config works across Claude Code, Cursor, Codex CLI, Windsurf, and any other MCP-compliant client. See modelcontextprotocol.io for the spec.
+MCP (Model Context Protocol) is the open standard that lets AI agents call external tools and data sources (Slack, web search, custom HTTP services, databases, issue trackers, etc.) without each tool being baked into the agent. One server config works across Claude Code, Cursor, Codex CLI, Windsurf, and any other MCP-compliant client. See modelcontextprotocol.io for the spec.
 
 ## Two MCP shapes coexist
 
 The directory holds two distinct entry shapes; both are discovered by `_loader.load_mcp_configs`:
 
-1. **Flat config** at `mcp/<name>.json` for hosted, npx, or uvx MCPs you do not host source for (Atlassian, Tavily, error-tracking, etc.). One JSON file = one server.
+1. **Flat config** at `mcp/<name>.json` for hosted, npx, or uvx MCPs you do not host source for (Tavily, Slack, etc.). One JSON file = one server.
 2. **Bundle dir** at `mcp/<name>/` containing `server.json` + `*.py` source + `README.md` for locally-hosted Python MCPs whose source you want shipped with the playbook (`agent-memory-bridge`). The installer:
    - Symlinks the `*.py` files into `~/.config/agent-shared/mcp_servers/<name>/` via `_loader.materialize_mcp_sources`.
    - Reads `server.json`, expands its `{{AGENT_SHARED_MCP_DIR}}` placeholder to the symlink target, then writes the resolved config into each enabled agent's MCP registry.
@@ -23,15 +23,13 @@ The symlink-from-playbook pattern coexists with the user's `~/.config/agent-shar
 
 | File | What it connects to | Transport | Notes |
 |---|---|---|---|
-| `atlassian.json` | Atlassian Cloud (Jira, Confluence) | Remote SSE via `mcp-remote` | Uses team.atlassian.net |
-| `code-review-host.json` | VCS host | stdio (disabled by default) | No vetted npm package is selected yet; use the host VCS REST API or `code-review` skill |
 | `code-review-graph.json` | Local code-review-graph service | stdio (`uvx code-review-graph serve`) | Disabled by default; enable only when graph tools are needed |
-| `error-tracking.json` | error-tracking (`error-tracker.internal`) | stdio | VPN-only (team internal) |
 | `slack.json` | Slack | stdio (npm `@modelcontextprotocol/server-slack`) | Workspace via SLACK_TEAM_ID |
-| `code-quality.json` | code-quality | Docker stdio | `enabled: false` by default; long startup timeout |
 | `tavily.json` | Tavily web search | Streamable HTTP | API key passed in URL query |
 
-Most entries contain `{{REPLACE_WITH_*}}` placeholders. The installer copies the configs verbatim; you fill in real tokens AFTER installing, per the agent-specific instructions below. Servers marked `enabled: false` are intentionally shipped disabled to avoid startup warnings until a teammate opts into them.
+Each entry contains `{{REPLACE_WITH_*}}` placeholders. The installer copies the configs verbatim; you fill in real tokens AFTER installing, per the agent-specific instructions below. Servers marked `enabled: false` are intentionally shipped disabled to avoid startup warnings until a teammate opts into them.
+
+Additional MCP server configurations (Atlassian, VCS host, error-tracking, code-quality, etc.) are designed in the upstream and intentionally not shipped in this public mirror. The list above reflects only what the downstream portfolio currently distributes.
 
 ### Bundle dirs (Python source distributed with the playbook)
 
@@ -76,11 +74,7 @@ The Tier 3 adapters (Goose, Junie, Zed, Amp, etc.) do not receive MCP configs fr
 1. Run `make install` and select `claude-code` at the agent prompt.
 2. Open `~/.claude.json` in your editor. Find the `mcpServers` block. The playbook wrote new server entries; preserve any existing entries (the adapter's MCP merge does not overwrite by name).
 3. For each server you want to use, replace the `{{REPLACE_WITH_*}}` placeholders with real values:
-   - Atlassian: email + API token (Atlassian Cloud user settings, https://id.atlassian.com)
-   - VCS: disabled by default because this playbook has not selected a vetted MCP package yet; use VCS REST API commands or the `code-review` skill unless you replace the command locally
-   - error-tracking: API token from your error-tracking user settings
    - Slack: Bot token (xoxb-...) + Team ID (Slack workspace settings)
-   - code-quality: token + URL (your code-quality instance)
    - Tavily: API key (tavily.com dashboard)
    - code-review-graph: workspace path, then set `enabled` to `true` only when you need graph-backed review tools
 4. Restart Claude Code (`exit` then `claude` again).
@@ -88,9 +82,7 @@ The Tier 3 adapters (Goose, Junie, Zed, Amp, etc.) do not receive MCP configs fr
 
 CLI alternative (avoids hand-editing JSON):
 ```bash
-claude mcp add atlassian -- npx -y mcp-remote https://mcp.atlassian.com/v1/sse
-claude mcp set-env atlassian ATLASSIAN_USER_EMAIL=you@team.com
-claude mcp set-env atlassian ATLASSIAN_API_TOKEN=...
+claude mcp add tavily --url 'https://mcp.tavily.com/mcp/?tavilyApiKey=...'
 claude mcp list  # verify
 ```
 
@@ -108,7 +100,7 @@ If you have project-specific servers, add them to `.cursor/mcp.json` in the proj
 Cursor caveats:
 - 40-tool limit across all enabled servers (Cursor warns and silently drops tools above the limit; disable individual tools if you go over).
 - Project-level configs require manual approval; user-level configs do not.
-- Remote SSE transport has a known fallback bug (March 2026 forum); if a server fails with HTTP 404 on POST, wrap it in `mcp-remote` as a stdio proxy (Atlassian config in this repo already does this).
+- Remote SSE transport has a known fallback bug (March 2026 forum); if a server fails with HTTP 404 on POST, wrap it in `mcp-remote` as a stdio proxy at the config layer.
 
 ### Codex CLI
 
@@ -119,13 +111,12 @@ Cursor caveats:
 
 CLI alternative:
 ```bash
-codex mcp add atlassian -- npx -y mcp-remote https://mcp.atlassian.com/v1/sse
 codex mcp add tavily --url 'https://mcp.tavily.com/mcp/?tavilyApiKey=...'
 ```
 
 Optional Codex settings you can add per server (see developers.openai.com/codex/config-reference):
 - `enabled = false` to disable without removing
-- `startup_timeout_sec = 30` to allow longer startup (default 10s; code-quality.json sets 180s)
+- `startup_timeout_sec = 30` to allow longer startup (default 10s; raise for slow Docker-stdio servers if any are added locally)
 - `tool_timeout_sec = 120` for slow tools
 - `required = true` to fail Codex startup if the server cannot initialize
 

@@ -1,38 +1,37 @@
 # Evals
 
 Owner: Rehan
-last_reviewed: 2026-05-25
+last_reviewed: 2026-05-28
 
 ## Purpose
 
-LLM-judge eval suites per skill. Each subdirectory tests one skill against a held-out prompt set; the judge model scores the response against a concrete rubric. Different from `tests/` (installer regressions) and `make check` (artifact lint).
+Per-skill eval suites that exercise one skill against deterministic assertions today, with an LLM-judge dynamic mode on the roadmap. Each subdirectory tests one skill. Different from `tests/` (installer regressions) and `make check` (artifact lint).
 
 ## What Lives Here
 
 - `<skill-slug>/` subdirectories, one per skill under eval.
-- `<skill-slug>/prompts.yaml` and `<skill-slug>/criteria.yaml` per suite.
-- Optional `<skill-slug>/fixtures/` directory for static input data the prompts reference.
+- `<skill-slug>/cases.yaml` (structured assertions) and `<skill-slug>/judge.md` (natural-language rubric) per suite.
+- Optional `<skill-slug>/fixtures/` directory for static input data future dynamic-mode cases will reference.
 - `README.md` enumerates the schema and the quality bar.
 
 ## Local Commands
 
 - `make eval` from repo root runs every suite via `scripts/eval_runner.py`.
-- `python3 scripts/eval_runner.py --suite <name>` runs one suite.
-- `python3 scripts/eval_runner.py --suite <name> --prompt <id>` runs one prompt.
+- `python3 scripts/eval_runner.py <suite-name>` runs one suite (positional argument).
 
 ## Edit Rules
 
 - One subdirectory per skill, matching the skill's `install_name`.
-- `prompts.yaml` + `criteria.yaml` are required; `fixtures/` is optional.
-- Criteria are concrete (verifiable in the response text), not aspirational.
-- Every suite has at least 3 prompts: happy path, edge case, anti-pattern.
-- No em dashes in prompts, criteria, or README files (the project-wide rule).
+- `cases.yaml` + `judge.md` are required; `fixtures/` is optional.
+- Cases use concrete assertion types (`section_present`, `body_contains`, `frontmatter_has`); patterns are verifiable regex over the SKILL.md body or frontmatter, not aspirational claims.
+- Every suite has at least 3 cases: happy path, edge case, anti-pattern.
+- No em dashes in cases, judges, or README files (the project-wide rule).
 
 ## Required Checks
 
 - `make eval` exits 0 (all suites pass).
-- Each suite's `criteria.yaml` references the same trigger language as the skill's `## When to use` section.
-- Criteria do not test for hallucinations the skill itself does not warn against.
+- Each suite's `cases.yaml` references assertion patterns that map to the skill's `## When to use` section.
+- Cases do not test for hallucinations the skill itself does not warn against.
 
 ## Required Skills
 
@@ -42,8 +41,8 @@ LLM-judge eval suites per skill. Each subdirectory tests one skill against a hel
 ## Do Not
 
 - Add an eval suite for a skill that does not exist yet. Author the skill first.
-- Use the judge model to score "vibes." Concrete criteria only.
-- Hardcode model IDs in `criteria.yaml`; the runner picks the active model from `scripts/eval_runner.py`.
+- Use the judge model to score "vibes." Concrete cases only.
+- Hardcode model IDs in `judge.md`; the future dynamic-mode runner picks the active model from `scripts/eval_runner.py`.
 - Treat a failing suite as a reason to weaken the rubric. Fix the skill or document why the failure is acceptable.
 
 ## Owner And Freshness

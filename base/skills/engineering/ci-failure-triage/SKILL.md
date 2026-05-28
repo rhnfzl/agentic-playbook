@@ -16,10 +16,12 @@ matching check locally.
 
 ## When NOT to use this skill
 
-- The Sonar PR-mode gate specifically failed after a green local pre-push. Use
-  `sonar-pr-gate` instead for that precise trap.
-- The failure is clearly a VPN connectivity problem. Use `vpn-connectivity-check`
-  first.
+- A code-quality PR-mode gate specifically failed after a green local pre-push.
+  That class of failure has its own discipline (PR-mode vs. local-mode coverage
+  expectations); use a code-quality-PR-gate specialist skill if one is installed.
+- The failure is clearly a network connectivity problem (the agent cannot reach
+  a service it expects to reach). Verify connectivity first before treating it
+  as a regression.
 
 ## Workflow
 

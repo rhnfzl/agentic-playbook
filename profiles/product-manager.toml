@@ -1,34 +1,27 @@
-# Profile: Product Manager (team)
+# Profile: Product Manager (portable)
 name = "product-manager"
-description = "Product manager working across team projects. Bundles 15 curated PM-execution skills (PRD, sprint planning, retro, roadmap, stakeholder mapping, prioritization) alongside 3 playbook-lifecycle skills (agents-md-curator, playbook-promote, playbook-retrospective) and 3 productivity helpers (handoff, stakeholder-slack-brief, grill-me): 21 skills total. Pairs with the research profile via --profile product-manager,research for PMs who also run discovery."
+description = "Product manager profile. Bundles 15 curated PM-execution skills (PRD, sprint planning, retro, roadmap, stakeholder mapping, prioritization) from the vendored pm-curated set, alongside playbook-lifecycle skills (agents-md-curator, playbook-promote, playbook-retrospective) and productivity helpers (handoff, grill-me)."
 owner = "rehan"
-last_reviewed = "2026-05-26"
-
-# v0.11 (ADR-0040): this profile references overlay-only items
-# (jira-priority-scheme, label-policy, atlassian MCP,
-# productivity/stakeholder-slack-brief). Without requires_overlays an
-# install with --scope none would silently drop them and produce a thin
-# PM target. validate_profile_scope catches that.
-requires_overlays = ["team"]
+last_reviewed = "2026-05-28"
 
 [skills]
 include = [
-  # PM execution skills (vendored from phuryn + product-on-purpose)
-  "imported/create-prd",
-  "imported/user-stories",
-  "imported/sprint-plan",
-  "imported/retro",
-  "imported/pre-mortem",
-  "imported/stakeholder-map",
-  "imported/brainstorm-okrs",
-  "imported/release-notes",
-  "imported/summarize-meeting",
-  "imported/job-stories",
-  "imported/outcome-roadmap",
-  "imported/prioritize-features",
-  "imported/opportunity-solution-tree",
-  "imported/utility-pm-critic",
-  "imported/define-problem-statement",
+  # PM execution skills (vendored under imported/pm-curated/)
+  "imported/pm-curated/create-prd",
+  "imported/pm-curated/user-stories",
+  "imported/pm-curated/sprint-plan",
+  "imported/pm-curated/retro",
+  "imported/pm-curated/pre-mortem",
+  "imported/pm-curated/stakeholder-map",
+  "imported/pm-curated/brainstorm-okrs",
+  "imported/pm-curated/release-notes",
+  "imported/pm-curated/summarize-meeting",
+  "imported/pm-curated/job-stories",
+  "imported/pm-curated/outcome-roadmap",
+  "imported/pm-curated/prioritize-features",
+  "imported/pm-curated/opportunity-solution-tree",
+  "imported/pm-curated/utility-pm-critic",
+  "imported/pm-curated/define-problem-statement",
 
   # Onboarding + lifecycle from the playbook
   "meta/agents-md-curator",
@@ -37,7 +30,6 @@ include = [
 
   # PM-relevant productivity
   "productivity/handoff",
-  "productivity/stakeholder-slack-brief",
   "productivity/grill-me",
 ]
 
@@ -45,8 +37,6 @@ include = [
 include = [
   "writing-style",
   "no-em-dashes",
-  "jira-priority-scheme",
-  "label-policy",
   "no-ticket-ids-in-code",
 ]
 
@@ -58,7 +48,6 @@ include = [
 
 [mcp]
 include = [
-  "atlassian",
   "slack",
   "tavily",
 ]

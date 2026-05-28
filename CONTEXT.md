@@ -2,7 +2,7 @@
 
 Canonical vocabulary for this repo. When code, docs, or PRs talk about a term, they use the meaning given here. New terms get added as they're resolved during grill sessions (see `base/skills/productivity/grill-with-docs/`).
 
-## Core terms (the seven content types per ADR-0010)
+## Core terms (the eight content types per ADR-0044)
 
 - **Skill**: a workflow orchestration. A "how to do X" recipe with deterministic steps. Agent-decided invocation: the agent loads the skill when its description matches the user's task. Lives in `base/skills/<category>/<name>/SKILL.md`.
 - **Rule**: a behavioral constraint. An "always / never do X" directive. Lives in `base/rules/<name>.md`. The installer concatenates selected rules into per-project `AGENTS.md`.
@@ -26,7 +26,7 @@ Canonical vocabulary for this repo. When code, docs, or PRs talk about a term, t
 
 ## Tiers
 
-- **Tier 1**: full custom adapter. Currently: Claude Code, Codex, Cursor, Windsurf. Adapter coverage of the seven content types varies; only Claude Code and Cursor materialize the `commands/` surface natively.
+- **Tier 1**: full custom adapter. Currently: Claude Code, Codex, Cursor, Windsurf. Adapter coverage of the seven materialized content types varies (trajectories, the eighth type, are consumed by the harness rather than materialized into any adapter); only Claude Code and Cursor materialize the `commands/` surface natively.
 - **Tier 2**: lighter adapter, surface varies. Currently: GitHub Copilot, Gemini CLI, Aider, Cline, Pi. (Pi materializes skills + rules + prompts to `~/.pi/agent/`; the others materialize skills + rules only via `AGENTS.md`.)
 - **Tier 3**: AGENTS.md only (generated). All other agents that read AGENTS.md natively. 20 named tools currently registered: Kiro, Goose, Junie, Zed, Amp, Augment, OpenCode, Aide, Droid, Jules, Qodo, Q-Developer, SWE-Agent, Devon, Claude-Flow, Kilo, Continue, Tabnine, Cline-CLI, Supermaven.
 
@@ -77,5 +77,5 @@ Notes:
 
 - **ADR**: Architecture Decision Record under `docs/adr/NNNN-title.md`. Short, dated, immutable. New decisions get new ADRs; superseded ADRs are marked, not deleted.
 - **Frontmatter**: the `---` YAML block at the top of a SKILL.md (or any other markdown content type). Required fields are validated by `scripts/frontmatter_lint.py`.
-- **Decay**: a skill / rule / hook is "decaying" when its `last_reviewed` date is older than the threshold (90d default, 180d for docs-like dirs). The `decay_check.py` gate warns or blocks.
+- **Decay**: a skill / rule / hook is "decaying" when its `last_reviewed` date is older than the threshold. The `decay_check.py` gate runs three bands: 60-day notice (informational), 90-day warn (`make check` flags but does not block), 180-day block (`make check` fails). Trajectories use the same bands per ADR-0044.
 - **Vendored**: content imported from upstream with a pinned SHA via `SOURCES.toml`. Lives under `base/skills/imported/` or `base/mcp/anchored-fs/`. Marked `linguist-vendored=true` in `.gitattributes`.

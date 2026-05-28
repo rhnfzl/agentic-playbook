@@ -9,7 +9,7 @@ MCP (Model Context Protocol) server registrations and bundled source. Per ADR-00
 
 ## What Lives Here
 
-- `<name>.json` flat registrations: atlassian, VCS, code-review-graph, error-tracking, slack, code-quality, tavily.
+- `<name>.json` flat registrations that ship in this public mirror: `code-review-graph`, `slack`, `tavily`. Additional flat registrations (Atlassian, VCS host, error-tracking, code-quality, etc.) are designed in the upstream and intentionally not shipped here.
 - `<name>/` directory bundles: `agent-memory-bridge/`, `anchored-fs/`.
 - `README.md` describes the registration vs bundle contract.
 

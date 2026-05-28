@@ -1,19 +1,19 @@
-# Profile: Research (team)
+# Profile: Research (portable)
 name = "research"
-description = "Research role for product, market, and competitive work across team projects. Bundles 7 research-curated skills (interview script, interview synthesis, competitor analysis, user personas, market sizing, sentiment analysis) plus the AGENTS.md curator. Distinct from the product-manager profile per the v0.10 profile-separation principle: a dev who installs --profile research,product-manager gets the union."
+description = "Research role for product, market, and competitive work. Bundles research-curated skills (interview script, interview synthesis, competitor analysis, user personas, market sizing, sentiment analysis) plus the AGENTS.md curator. Distinct from the product-manager profile per the profile-separation principle: a dev who installs --profile research,product-manager gets the union."
 owner = "rehan"
-last_reviewed = "2026-05-26"
+last_reviewed = "2026-05-28"
 
 [skills]
 include = [
-  # Research skills (vendored from phuryn + product-on-purpose)
-  "imported/interview-script",
-  "imported/summarize-interview",
-  "imported/competitor-analysis",
-  "imported/user-personas",
-  "imported/market-sizing",
-  "imported/sentiment-analysis",
-  "imported/discover-interview-synthesis",
+  # Research skills (vendored under imported/research-curated/)
+  "imported/research-curated/interview-script",
+  "imported/research-curated/summarize-interview",
+  "imported/research-curated/competitor-analysis",
+  "imported/research-curated/user-personas",
+  "imported/research-curated/market-sizing",
+  "imported/research-curated/sentiment-analysis",
+  "imported/research-curated/discover-interview-synthesis",
 
   # Onboarding + lifecycle from the playbook
   "meta/agents-md-curator",

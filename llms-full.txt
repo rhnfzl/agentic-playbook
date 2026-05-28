@@ -1,0 +1,119 @@
+# agentic-playbook (full summary)
+
+> A tool-agnostic, shareable repository of skills, rules, hooks, MCP server configs, subagents, slash commands, prompt templates, and behavior trajectories that installs natively into 20+ AI coding agents (Claude Code, Cursor, Windsurf, Codex CLI, GitHub Copilot, Cline, Aider, Pi, Gemini CLI, and more) through a single `make install`. Also a teaching project: 48 Architecture Decision Records explain why each design choice exists.
+
+This is the long-form `llms-full.txt` companion to `llms.txt`. It is a curated **summary** of the playbook's design (not a raw concatenation of source files). Treat it as a single-fetch primer for an AI agent that wants the playbook's shape; fetch the linked source files for verbatim content.
+
+For the curated index of paths, fetch [`llms.txt`](llms.txt) instead. For the file-by-file browse, walk the repo or use `docs/atlas/index.html`.
+
+## What agentic-playbook is
+
+agentic-playbook is an open-source library and distribution system for AI coding agents. It ships eight types of content:
+
+1. **Skills** (`base/skills/`): workflow orchestrations the agent loads when its description matches the user's task. Format: SKILL.md with frontmatter (`name`, `description`, `version`, `owner`, `last_reviewed`, `tags`, `scope`).
+2. **Rules** (`base/rules/`): always-on behavioral constraints distributed as AGENTS.md fragments ("never use em dashes", "feature branch only, never push to default").
+3. **Hooks** (`base/hooks/`): shell scripts that fire on lifecycle events (PreToolUse, PostToolUse, SessionStart, Stop).
+4. **MCP server configs** (`base/mcp/`): shareable Model Context Protocol server definitions for Atlassian, Slack, error trackers, code-review graphs, anchored filesystem, agent-memory bridge.
+5. **Subagents** (`base/agents/`): specialized AI assistants invoked by name, each with its own context window.
+6. **Slash commands** (`base/commands/`): user-triggered actions (`/handoff`, `/playbook-promote`, `/human-html`).
+7. **Prompt templates** (`base/prompts/`): paste-into-chat templates for bootstrap-your-playbook, global-audit, project-audit, onboard-a-new-teammate, and others.
+8. **Behavior trajectories** (`base/trajectories/`): cross-adapter behavior assertions, one per (skill, scenario) pair, consumed by `make trajectory-check`. Per ADR-0044.
+
+The installer (`scripts/install.py`) detects which coding agents are present, pre-selects them, and materializes the right native files for each: SKILL.md for Claude Code, `.mdc` for Cursor, `.windsurf/skills/` for Windsurf, TOML subagents for Codex, `~/.pi/agent/skills/` for Pi, AGENTS.md for the 20+ Tier 3 tools that read it natively.
+
+## Who this is for
+
+- **Tech leads and engineering managers** who want one canonical, versioned set of agent rules and skills that lands consistently on every teammate's machine, regardless of which coding agent each person prefers.
+- **Individual engineers** running Claude Code, Cursor, Codex CLI, Windsurf, GitHub Copilot, Cline, Aider, or Gemini CLI who want a tested baseline of skills and rules without authoring everything from scratch.
+- **Product managers, researchers, QA engineers, and DevOps engineers** who use the same coding agents as the engineers and want a role-specific bundle (`product-manager`, `research`, `qa`, `devops` profiles) tuned to their workflow.
+- **Open-source maintainers and platform teams** building their own agent playbook who want a worked reference for skill format, multi-adapter install, decay tracking, supply-chain security, and per-skill telemetry.
+
+## What you get in 60 seconds
+
+One `git clone` followed by one `make install` gives you:
+
+- 150+ skills, rules, hooks, MCP server configs, subagents, commands, prompts, and trajectories materialized natively into every coding agent installed on your machine.
+- **Detection-and-preselect**: the installer probes `~/.claude/`, `~/.codex/`, `~/.cursor/`, `~/.codeium/windsurf/`, and others, then pre-selects the agents it found.
+- **Role profiles** that filter the firehose to the 15-30 items that matter for your specific role (`tech-lead`, `backend-developer`, `frontend-developer`, `qa`, `research`, `product-manager`, `devops`).
+- **A lockfile that records every materialized path**, so `make remove` cleanly uninstalls without touching anything you authored by hand.
+- **`make check` quality gates** that catch frontmatter drift, decay, em-dashes, AGENTS.md governance violations, content-tier breaches, and 7 other failure modes before you commit.
+
+## How is this different from other agent skill libraries
+
+`anthropics/skills` is a curated bundle of skills from Anthropic. `awesome-agent-skills` (heilcheng, VoltAgent) is a curated index of external skill repositories. agentic-playbook is a **distribution-and-governance system**: it ships seven other content types (rules, hooks, MCP server configs, subagents, slash commands, prompt templates, behavior trajectories) alongside skills, with a multi-adapter installer, a 17-gate `make check` quality pipeline, a supply-chain security gate (`make audit`), opt-in OTel telemetry per skill (`make telemetry-report`), and an auto-generated knowledge graph (`make atlas`). It is a teaching project as much as a content library: 48 Architecture Decision Records explain why each choice was made.
+
+## Supported coding agents
+
+**Tier 1** (full adapter, hook-capable): Claude Code, Cursor IDE + CLI, Codex CLI, Windsurf, Cline, GitHub Copilot.
+
+**Tier 2** (rules + skills only, no hook surface): Aider, Gemini CLI, Pi.
+
+**Tier 3** (AGENTS.md-only, declarative TOML): 20 long-tail agents — Kiro, Goose, Junie, Zed, Amp, Augment, OpenCode, Aide, Droid, Jules, Qodo, Q-Developer, SWE-Agent, Devon, Claude-Flow, Kilo, Continue, Tabnine, Cline-CLI, Supermaven (per `scripts/adapters/tier3.toml`).
+
+## The three-layer content contract (ADR-0036)
+
+Every content type in the playbook lives across three layers. The contract guarantees that "I edited a skill / rule / hook" only matters once the agent actually loads the new version. The three layers:
+
+1. **Canonical source**: the maintainer's edit. `base/skills/<cat>/<name>/SKILL.md`, `base/rules/<name>.md`, etc.
+2. **Materialization**: what the installer writes. Per adapter, the right native file lands in the right path. The lockfile records every path.
+3. **Runtime discovery**: the adapter's native config entry that makes the agent actually load the content. `~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.cursor/hooks.json`.
+
+A change is not "done" until layer 3 is verified. `make doctor-verify` walks layers 2 + 3 automatically and prints the exact `cat <path>` command for any drift it finds.
+
+## Supply-chain security (ADR-0047)
+
+External skills are imported through a block-by-default audit. Three wrappers + a Document-Driven Implicit Payload Execution detector run against every net-new content addition; `STRICT_SECURITY=1` escalates to hard-fail. The audit emits an AI Bill of Materials (`docs/security/ai-bom.json`) with one entry per imported skill, MCP bundle, or other external component (source URL, version, vetted-as-of date).
+
+## Telemetry privacy (ADR-0048)
+
+The opt-in OpenTelemetry collector records metadata only: skill name, adapter, model, fired_at, latency_ms, input_tokens, output_tokens. No prompt bodies, no response bodies. The privacy contract is enforced by a boundary test that reads the docker collector config YAML and asserts every banned-prefix in Python has a corresponding YAML pattern. The default is OFF; explicit `TELEMETRY=on` is required to enable.
+
+## Auto-generated knowledge graph (ADR-0049)
+
+`make atlas` walks the 48 ADRs + 109 skills + 1 trajectory + the AI BOM and emits a static HTML site at `docs/atlas/` with per-node pages and cross-links. The graph view is in `graph.json`. Privacy: telemetry signals (trigger count, p95 latency) are baked into the atlas pages only when `TELEMETRY=on` is set explicitly at build time.
+
+## Quality gates that fire on `make check`
+
+17 gates (source of truth: `scripts/checks/__init__.py:CHECKS`): frontmatter validation, AGENTS.md governance, external-skill audit, supply-chain skill security, skill body size budget, decay (60-day notice / 90-day warn / 180-day block), em-dash policy, no-versions-in-readmes, skill-description length, hook metadata presence, hook source unification, pyright zero, human-html allowlist, ADR-number uniqueness, ignored-containment, playbook-version shape, trajectory shape. Each gate is a pluggable module under `scripts/checks/`.
+
+## How content stays current (ADR-0008)
+
+The three-layer capture system handles drift:
+
+1. **At session end**, `/playbook-retrospective` reads the session log, searches the playbook for existing coverage, and drafts proposals into `~/.playbook-proposals/` (gitignored, user-level).
+2. **The next day**, the maintainer reviews drafts. Many "useful patterns" don't survive a second look.
+3. **When ready**, `/playbook-promote <slug>` runs a grill-me-style interview, scaffolds via `scripts/new_skill.py`, creates a feature branch, runs `make check`, and stops. Final commit + push + PR are the maintainer's.
+
+## Distribution paths
+
+Today the canonical install path is `make install` from a local clone (with optional `PROFILE=<role>` filter). A future marketplace-based distribution per ADR-0043 is designed but not shipped in this public mirror.
+
+## Inspirations
+
+- **Microsoft code-with-engineering-playbook**: rationale IS the value.
+- **Airbnb knowledge-repo**: methodology shipped alongside content.
+- **Block / Goose**: rules-vs-recipes separation at company scale.
+- **Stripe Minions**: directory-scoped rules architecture.
+- **mattpocock/skills**: SKILL.md format and skill-bucket organization.
+- **Spotify Golden Path**: blessed-path-per-discipline framing.
+- **Anthropic skills bundle**: skill packaging conventions.
+
+## Project status and license
+
+Initial public release v0.1.0 (2026-05-27). MIT licensed. Maintained by Rehan Fazal. Contributions welcome via PR; expect a turn-around within a few days.
+
+The repo is the downstream mirror of a maintainer's working copy; daily upstream sync via `scripts/sync_distribution.py` (ADR-0042) applies a scrub-and-copy transform that strips workspace-internal references before publishing.
+
+## Where to start reading
+
+For a first read after this `llms-full.txt`:
+
+1. [`README.md`](README.md) for the elevator pitch and FAQ.
+2. [`docs/adr/0036-three-layer-content-contract.md`](docs/adr/0036-three-layer-content-contract.md) for the contract every other piece rests on.
+3. [`docs/adr/0024-adapter-protocol-and-install-manifest.md`](docs/adr/0024-adapter-protocol-and-install-manifest.md) for the per-tool extension model.
+4. [`docs/adr/0044-trajectories-as-eighth-content-type.md`](docs/adr/0044-trajectories-as-eighth-content-type.md) for the cross-adapter behavior testing story.
+5. `make atlas` then open `docs/atlas/index.html` for the visual corpus map.
+
+For the security and operations story: ADR-0047 → 0048 → 0049 in order.
+
+For the marketplace plugin story (designed in the upstream, not shipped in this public mirror): ADR-0043.

@@ -4,7 +4,7 @@
 
 A prompt is a self-contained instruction block you paste into your coding agent's chat surface (Claude Code, Cursor, Windsurf, Codex) to drive a specific multi-step workflow. Different from a skill (which the agent invokes when it recognizes a trigger), a rule (always-on constraint), or a command (slash-invokable from the palette). Prompts are user-initiated, explicit, and intentionally portable across agents.
 
-The prompts here encode the *pattern*, not the content. Your team's skills, rules, and conventions will differ from team's; these prompts help the agent build them with your team's specifics, or audit your current setup against this playbook and propose changes.
+The prompts here encode the *pattern*, not the content. Your team's skills, rules, and conventions will differ from this playbook's; these prompts help the agent build them with your team's specifics, or audit your current setup against this playbook and propose changes.
 
 ## Where prompts fit in
 
@@ -26,18 +26,18 @@ Prompts are the lowest-ceremony content type. No frontmatter is required, no ins
 
 ## The prompts
 
-- `bootstrap-your-playbook.md`, paste into your coding agent to scaffold this entire structure for your project
-- `add-a-new-skill.md`, walk through adding your workflow as a skill following the pattern (planned, week 3)
-- `extract-rules-from-codebase.md`, mine your codebase plus existing agent memory for rules worth lifting (planned, week 3)
-- `migrate-personal-skills.md`, convert solo `~/.agents/skills/` into team-shared (planned, week 3)
-- `onboard-a-new-teammate.md`, get a new joiner agent-ready in one session (planned, week 3)
+- `bootstrap-your-playbook.md`, paste into your coding agent to scaffold this entire structure for your project.
+- `global-audit.md`, audit your user-level setup (`~/.claude/`, `~/.codex/`, `~/.cursor/`, etc.) and propose a phased rollout of playbook content. The "I want my coding agent to read this playbook and integrate what fits" entry point in the root [README.md](../../README.md) links here.
+- `project-audit.md`, audit the current working directory and propose project-level files (`AGENTS.md`, `.cursor/rules/`, `.github/copilot-instructions.md`, `.windsurfrules`, project hooks, project MCP).
+- `onboard-a-new-teammate.md`, get a new joiner agent-ready in one ~20-minute session: install the playbook, verify one skill / rule / hook fires, bookmark the locations they need.
+- `add-a-new-skill.md`, walk through adding your workflow as a skill following the SKILL.md pattern.
+- `extract-rules-from-codebase.md`, mine your codebase plus existing agent memory for rules worth lifting.
+- `migrate-personal-skills.md`, convert solo `~/.agents/skills/` content into team-shared playbook artifacts.
 - `discover-repeatable-workflows.md`, audit your recent work (last 90 days) across all coding agents to surface candidates for new skills, subagents, and automations. Tool-agnostic: works with whatever evidence each agent can introspect (Claude sessions, Codex history, Chronicle, etc.).
 - `clarify-then-deliver.md`, paste before any non-trivial spec / design / presentation / report / estimate. Forces the agent to interview you on the non-obvious decisions first, then produce the artifact. Includes 7 example variants (spec write/update, presentation, CV, hours, research, agent memory).
-- `implement-with-running-notes.md`, paste when implementing a spec or plan AND you want a `implementation-notes.html` paper trail of design decisions, deviations, tradeoffs, and open questions captured in real time, not just buried in commit messages.
-- `explain-unfamiliar-codebase.md`, paste when you've lost the plot on a codebase and need a single HTML explainer (diagrams, data flow, annotated snippets, gotchas) optimized for "read once and have it all." Uses /human-html for the artifact, /grill-me for non-obvious clarifying questions.
+- `implement-with-running-notes.md`, paste when implementing a spec or plan AND you want an `implementation-notes.html` paper trail of design decisions, deviations, tradeoffs, and open questions captured in real time, not just buried in commit messages.
+- `explain-unfamiliar-codebase.md`, paste when you've lost the plot on a codebase and need a single HTML explainer (diagrams, data flow, annotated snippets, gotchas) optimized for "read once and have it all." Uses `/human-html` for the artifact, `/grill-me` for non-obvious clarifying questions.
 - `prioritize-tickets-with-velocity.md`, paste when you have a backlog that needs sequencing and want estimates grounded in MEASURED velocity (commits, PRs, Jira) rather than gut-feel. Produces an HTML flow + sortable table for stakeholder consumption.
-
-The "I want my coding agent to read this playbook and integrate what fits" Quick Start in the root [README.md](../README.md) bundles two ready-to-paste audit prompts (global + project) that you can grab without opening any file here.
 
 ## Design philosophy
 

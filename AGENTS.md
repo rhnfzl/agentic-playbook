@@ -3,7 +3,23 @@
 This file is the per-repo `AGENTS.md` for the playbook itself. Any coding agent working in this repo reads it on entry and follows the conventions below. The same conventions land in projects that install the playbook via `make install` (the installer concatenates rules from `base/rules/` into the project's own `AGENTS.md`).
 
 Owner: rehan
-Last reviewed: 2026-05-27
+Last reviewed: 2026-05-28
+
+## Scope: this is a personal portfolio project
+
+This repo is the maintainer's personal portfolio project. It is a downstream mirror of the maintainer's own upstream playbook (per `README.md`'s "How it stays current" section), which means content here is synced from the maintainer's personal working copy after a scrub-and-copy transform strips workspace-internal references.
+
+It is NOT a fork or mirror of any employer's codebase. Skills, rules, and hooks here may have been informed by patterns the maintainer encountered in work settings, but the public content has been scrubbed of work-internal identifiers (employer name, internal hostnames, ticket-tracker prefixes, vendor names used as concrete examples, colleague names) before publishing.
+
+Work-related rules that ship in `~/AGENTS.md` (employer-specific ticket trackers, internal services, request-chain architectures, vendor inventories, branch policies, etc.) DO NOT apply here. Do not import work-context assumptions when reasoning about this repo:
+
+- Do not assume a specific issue tracker, ticket prefix, or label policy.
+- Do not assume a specific VCS host beyond what this repo's `.git/config` and CI files state.
+- Do not assume a specific internal API, gateway, or backend exists.
+- Do not propose work-internal-tool integrations unless the user explicitly asks for them.
+- Do not pull patterns from work memory or work code into this repo "by analogy" without an explicit request.
+
+If a rule, pattern, or piece of context only makes sense in a work setting, treat it as out-of-scope here. Surface the boundary explicitly to the user instead of silently applying it.
 
 ## Repo purpose
 

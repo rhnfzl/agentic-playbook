@@ -52,7 +52,8 @@ class CheckResult(NamedTuple):
 class CheckContext:
     """Shared by every check. `repo_root` is the playbook checkout; `content`
     is the pre-loaded PlaybookContent (per ADR-0024) so checks that walk the
-    seven content types don't re-load them.
+    eight content types (skills, rules, hooks, mcp, agents, commands, prompts,
+    trajectories) don't re-load them.
     """
 
     repo_root: Path

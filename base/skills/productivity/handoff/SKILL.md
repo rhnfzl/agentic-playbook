@@ -15,8 +15,9 @@ continue the work.
 
 ## When NOT to use this skill
 
-- The user wants a status update for a human stakeholder. Use `stakeholder-slack-brief`
-  or create a human HTML artifact instead.
+- The user wants a status update for a human stakeholder. Create a human HTML
+  artifact (via the `human-html` skill) or a Slack-flavored summary instead;
+  the handoff format is tuned for the next agent, not for a human reader.
 - The work is complete. A handoff is only useful when work continues.
 
 ## Workflow

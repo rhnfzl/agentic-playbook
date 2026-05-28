@@ -1,35 +1,27 @@
-# Profile: QA
+# Profile: QA (portable, public-safe subset)
 name = "qa"
-description = "Quality Assurance engineer. Focused on chat transcript debugging, scenario triage, and CI failure triage. Light on architecture rules; heavy on debugging workflows."
-requires_overlays = ["team"]
+description = "Quality Assurance engineer. Public-safe subset of the upstream QA bundle: ci-failure-triage + productivity skills, focused on debugging workflows. Workplace-specific scenario-triage and chat-transcript-debug skills are designed in the upstream and intentionally not shipped here."
+owner = "rehan"
+last_reviewed = "2026-05-28"
 
 [skills]
 include = [
-  "engineering/chat-transcript-debug",
-  "engineering/agentic-scenario-triage",
   "engineering/ci-failure-triage",
-  "engineering/match-ticket-grounding",
+  "engineering/triage",
   "productivity/grill-me",
   "productivity/handoff",
-  "productivity/stakeholder-slack-brief",
-  "observability/k8s-state-sweep",
-  "observability/vpn-connectivity-check",
+  "productivity/grill-with-docs",
 ]
 
 [rules]
 include = [
-  "label-policy",
   "no-em-dashes",
   "no-ticket-ids-in-code",
-  "VCS-not-github",
   "writing-style",
-  "jira-priority-scheme",
-  "full-request-chain",
-  "direct-acc-first",
 ]
 
 [hooks]
-include = ["sonar-advisory", "human-html-autoindex"]
+include = ["human-html-autoindex"]
 
 [mcp]
-include = ["atlassian", "slack", "error-tracking", "tavily", "code-quality"]
+include = ["slack", "tavily"]
