@@ -49,6 +49,3 @@ plugins/
 .agents/plugins/
 gemini-extension.json
 
-# Sync / prep working area outside the portfolio tree should never land
-# inside it under any naming variation.
-_agentic-playbook-prep/

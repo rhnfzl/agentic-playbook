@@ -7,7 +7,9 @@ Last reviewed: 2026-05-28
 
 ## Scope: this is a personal portfolio project
 
-This repo is an independent personal project. It exists for portfolio + experimentation purposes. It is NOT a fork, mirror, or downstream of any work-related codebase, and any incidental similarities to work patterns are coincidental.
+This repo is the maintainer's personal portfolio project. It is a downstream mirror of the maintainer's own upstream playbook (per `README.md`'s "How it stays current" section), which means content here is synced from the maintainer's personal working copy after a scrub-and-copy transform strips workspace-internal references.
+
+It is NOT a fork or mirror of any employer's codebase. Skills, rules, and hooks here may have been informed by patterns the maintainer encountered in work settings, but the public content has been scrubbed of work-internal identifiers (employer name, internal hostnames, ticket-tracker prefixes, vendor names used as concrete examples, colleague names) before publishing.
 
 Work-related rules that ship in `~/AGENTS.md` (employer-specific ticket trackers, internal services, request-chain architectures, vendor inventories, branch policies, etc.) DO NOT apply here. Do not import work-context assumptions when reasoning about this repo:
 

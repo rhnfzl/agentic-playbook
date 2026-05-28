@@ -239,12 +239,16 @@ def probe_launchd_agents() -> dict[str, Any]:
     rc, out, err = run_capture(["launchctl", "list"])
     if rc != 0:
         return {"status": STATUS_UNKNOWN, "detail": f"launchctl exit {rc}: {err.strip()[:120]}"}
+    # Replace `com.<your-org>.` with the launchd label prefix you use
+    # to namespace your local agents (e.g. `com.acme.` or `com.<your-handle>.`).
+    # This template ships generic; customize at copy-time.
+    org_prefix = "com.<your-org>."
     loaded = set()
     for line in out.splitlines():
         parts = line.split("\t")
         if len(parts) >= 3:
             label = parts[2]
-            if label.startswith("com.8vance."):
+            if label.startswith(org_prefix):
                 loaded.add(label)
     missing = [name for name in EXPECTED_LAUNCHD if name not in loaded]
     if not missing:
