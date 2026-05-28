@@ -468,6 +468,55 @@ def test_harness_strict_mode_runs_when_judge_is_wired(tmp_path: Path) -> None:
     assert matrix.passed == 1
 
 
+def test_judge_client_is_skipped_when_trajectory_has_no_llm_judge(tmp_path: Path) -> None:
+    """Codex review-fold finding: when judge_client is wired but a
+    trajectory does NOT have an llm_judge block, the cell must skip
+    the judge entirely. Without the trajectory.llm_judge truthiness
+    gate, evaluate_judge ran with an empty rubric, the LLM emitted
+    garbage, and the cell spuriously failed at the default threshold."""
+    from trajectory_harness import HarnessConfig, run_harness
+    from trajectory_judge import JudgeResult
+
+    judge_calls = {"n": 0}
+
+    class _ShouldNotBeCalled:
+        def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+            judge_calls["n"] += 1
+            return JudgeResult(score=0.0, reasoning="", raw_response="", model="x")
+
+    # Build a trajectory without an llm_judge block.
+    skill_dir = tmp_path / "base" / "skills" / "engineering" / "demo3"
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: demo3\ndescription: x\nversion: 0.1.0\n"
+        "owner: test\nlast_reviewed: 2026-05-28\n---\n\n# x\n",
+        encoding="utf-8",
+    )
+    traj_dir = tmp_path / "base" / "trajectories" / "demo3"
+    traj_dir.mkdir(parents=True, exist_ok=True)
+    (traj_dir / "happy-path.yaml").write_text(
+        "---\nname: demo3/happy-path\ndescription: x\nskill: demo3\n"
+        "scenario: happy-path\nversion: 0.1.0\nowner: test\n"
+        "last_reviewed: 2026-05-28\nadapter_scope: [claude-code]\n"
+        "model_pinned: claude-opus-4-7\n---\n\n"
+        "input:\n  phrasings:\n"
+        '    - "one"\n    - "two"\n    - "three"\n'
+        '    - "four"\n    - "five"\n\n'
+        "assertions:\n  - first_skill_loaded: demo3\n"
+        "  - must_invoke_tool: Write\n",
+        encoding="utf-8",
+    )
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(skill="demo3"),
+        judge_client=_ShouldNotBeCalled(),
+    )
+    matrix = run_harness(cfg)
+    # DSL-only trajectory passes; judge_client was never called.
+    assert matrix.passed == 1
+    assert judge_calls["n"] == 0
+
+
 def test_harness_strict_mode_inert_when_no_llm_judge(tmp_path: Path) -> None:
     """When no candidate trajectory has llm_judge, --strict is a no-op
     and does not require a judge_client."""

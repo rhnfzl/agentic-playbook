@@ -72,10 +72,18 @@ def _attr_value(attr: dict) -> str | int | None:
     return None
 
 
-def _attrs_to_dict(attrs: list[dict]) -> dict:
-    """Convert OTLP `attributes` (list of {key, value}) into a flat dict."""
+def _attrs_to_dict(attrs: list[dict] | None) -> dict:
+    """Convert OTLP `attributes` (list of {key, value}) into a flat dict.
+
+    Non-dict entries are skipped (rather than raising) so a malformed
+    span row does not crash the whole parse. The provider's previous
+    local helper had this guard; the OTel unification dropped it and
+    Codex review-fold flagged it as a latent crash path.
+    """
     out: dict = {}
-    for attr in attrs:
+    for attr in attrs or []:
+        if not isinstance(attr, dict):
+            continue
         key = attr.get("key")
         if key is None:
             continue

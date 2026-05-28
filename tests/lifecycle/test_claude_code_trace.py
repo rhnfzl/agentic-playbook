@@ -318,6 +318,32 @@ def test_events_from_text_sorts_spans_by_start_time() -> None:
     assert events[1].name == "Write"
 
 
+def test_events_from_text_skips_non_dict_attribute_entries() -> None:
+    """Codex review-fold finding: the unified `_attrs_to_dict` lost the
+    isinstance(attr, dict) guard the provider's local copy had. A
+    malformed span row with a non-dict in `attributes` would raise
+    AttributeError on the `.get()` call. The fix restores the guard so
+    one broken span does not poison the trace."""
+    from adapters.claude_code_trace import events_from_text
+
+    malformed_span = {
+        "name": "Write",
+        "startTimeUnixNano": "1717000000000000000",
+        "endTimeUnixNano":   "1717000000010000000",
+        "attributes": [
+            "this should be a dict, not a string",
+            {"key": "gen_ai.operation.name", "value": {"stringValue": "tool_call"}},
+            {"key": "tool.name", "value": {"stringValue": "Write"}},
+            None,  # also tolerated
+        ],
+    }
+    events = events_from_text(json.dumps(malformed_span))
+    # The valid entries still produce a clean tool_call event.
+    assert len(events) == 1
+    assert events[0].kind == "tool_call"
+    assert events[0].name == "Write"
+
+
 def test_events_from_text_preserves_unknown_ops_as_model_response() -> None:
     """Review-fold thermo-nuclear #1 follow-up: the provider's old
     `_span_to_event` silently dropped unknown ops; the fixture path

@@ -132,21 +132,31 @@ def calibrate_trajectory(
             continue
         scores.append(result.score)
 
-    usable_signal = len(scores) >= 2
-    if usable_signal:
-        score_range = max(scores) - min(scores)
+    # Distribution snapshot uses whatever scores landed (even a single
+    # surviving run carries information the operator wants to see).
+    # `score_range` and `is_noisy` only get a verdict when we have >= 2
+    # scores, because one score has no range signal. Codex review-fold
+    # finding: a previous version zeroed min/max/median when
+    # `usable_signal` was False, hiding the one real score behind 0.0
+    # and confusing the JSON output.
+    if scores:
         min_score = min(scores)
         max_score = max(scores)
         median_score = statistics.median(scores)
-        is_noisy = score_range > noise_threshold
     else:
-        # No (or one) successful run. Range is undefined; defer to the
-        # operator. is_noisy=False so the report does not blame the
-        # rubric for what is really a transport problem.
-        score_range = 0.0
         min_score = 0.0
         max_score = 0.0
         median_score = 0.0
+
+    usable_signal = len(scores) >= 2
+    if usable_signal:
+        score_range = max_score - min_score
+        is_noisy = score_range > noise_threshold
+    else:
+        # One or zero successful runs. Range is undefined; defer to the
+        # operator. is_noisy=False so the report does not blame the
+        # rubric for what is really a transport problem.
+        score_range = 0.0
         is_noisy = False
 
     return CalibrationReport(

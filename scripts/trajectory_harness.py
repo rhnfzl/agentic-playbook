@@ -360,7 +360,15 @@ def _evaluate_cell(
     # the judge score clears the threshold. Judge-budget exhaustion is
     # a CELL FAILURE (review-fold P2): the contract is "DSL pass AND
     # judge pass", so an unavailable judge cannot satisfy it.
-    if not (passed and cfg.judge_client is not None):
+    #
+    # The `trajectory.llm_judge` truthiness check is essential: a
+    # trajectory that ships only DSL assertions (no `llm_judge:` block)
+    # must skip the judge even when a judge_client is wired. Otherwise
+    # we would call `evaluate_judge` with an empty rubric, the LLM
+    # would emit garbage, and a stable DSL-only trajectory would
+    # spuriously fail because the empty-rubric score landed below the
+    # default threshold (Codex review-fold finding).
+    if not (passed and cfg.judge_client is not None and trajectory.llm_judge):
         return _cell(passed, failures)
 
     if not _consume_judge_budget(cfg, counters):

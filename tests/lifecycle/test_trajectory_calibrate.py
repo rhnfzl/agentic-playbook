@@ -278,6 +278,53 @@ def test_calibrate_excludes_infra_errors_from_range(tmp_path: Path) -> None:
     assert report.usable_signal is True
 
 
+def test_calibrate_preserves_single_score_in_distribution_fields(tmp_path: Path) -> None:
+    """Codex review-fold finding: when only one run succeeds out of N,
+    `usable_signal=False` (correct, no range signal) but min/max/median
+    should still report the surviving score so the human report does
+    not show 0.0 in place of the real value."""
+    from trajectory_calibrate import calibrate_trajectory
+    from adapters._loader import PlaybookContent
+
+    _make_trajectory(tmp_path)
+    traj = PlaybookContent.load(tmp_path).trajectories[0]
+    # 4 of 5 runs are infra errors; the 1 surviving run returns 0.5.
+    runs_total = 5
+    survivor_score = 0.5
+
+    class _OneSurvivor:
+        def __init__(self):
+            self._idx = 0
+
+        def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+            from trajectory_judge import JudgeResult
+
+            self._idx += 1
+            if self._idx == 3:  # the surviving run.
+                return JudgeResult(
+                    score=survivor_score, reasoning="ok", raw_response="",
+                    model=model,
+                )
+            return JudgeResult(
+                score=0.0, reasoning="HTTP 429", raw_response="",
+                model=model, is_infra_error=True,
+            )
+
+    report = calibrate_trajectory(
+        trajectory=traj, trace=_fixture_trace(),
+        client=_OneSurvivor(), runs=runs_total,
+    )
+    assert report.successful_runs == 1
+    assert report.infra_errors == 4
+    assert report.usable_signal is False
+    # Single score still surfaces in min/max/median; no longer zeroed.
+    assert report.min_score == survivor_score
+    assert report.max_score == survivor_score
+    assert report.median_score == survivor_score
+    # score_range stays 0.0 since one score has no range.
+    assert report.score_range == 0.0
+
+
 def test_calibrate_main_exits_nonzero_on_infra_errors(tmp_path: Path) -> None:
     """Even when the rubric is within threshold, infra errors return a
     non-zero exit so the operator retries."""
