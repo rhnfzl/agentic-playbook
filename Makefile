@@ -1,4 +1,4 @@
-.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio trajectory-calibrate record-trajectory
+.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit audit-security targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio trajectory-calibrate record-trajectory ai-bom telemetry-init telemetry-stop telemetry-report telemetry-collector-py atlas atlas-serve
 
 PYTHON ?= python3
 
@@ -16,6 +16,16 @@ help:
 	@echo "  make update                        Re-materialize playbook content into current adapters"
 	@echo "  make remove                        Remove materialized playbook content per adapter"
 	@echo "  make audit                         Run external-skill security audit (block-by-default)"
+	@echo "  make audit-security                Run supply-chain gate: Snyk scanner + skill-evaluator + DDIPE + AI-BOM"
+	@echo "                                     STRICT_SECURITY=1 escalates skipped wrappers to errors"
+	@echo "  make ai-bom                        Regenerate docs/security/ai-bom.json without other checks"
+	@echo "  make telemetry-init                Bring up the OTLP collector (docker-compose, opt-in)"
+	@echo "  make telemetry-stop                Stop the OTLP collector"
+	@echo "  make telemetry-collector-py        Run the pure-Python OTLP collector (no docker)"
+	@echo "  make telemetry-report              Per-skill 30d trigger count + latency + tokens"
+	@echo "                                     Set TELEMETRY=off to disable every telemetry path"
+	@echo "  make atlas                         Build the navigable Why Atlas under docs/atlas/"
+	@echo "  make atlas-serve                   Run a local HTTP server in docs/atlas/ on port 8083"
 	@echo "  make sync-mattpocock               Pull mattpocock/skills updates into skills/imported/mattpocock/"
 	@echo "  make sync-distribution MANIFEST=/path/to/manifest.toml"
 	@echo "                                     Sync base/ to external destination per ADR-0042 (manifest-driven)"
@@ -64,6 +74,42 @@ remove:
 
 audit:
 	@$(PYTHON) scripts/audit_external_skill.py
+
+audit-security:
+	@$(PYTHON) scripts/audit_security.py
+
+ai-bom:
+	@$(PYTHON) scripts/security/ai_bom.py
+
+telemetry-init:
+	@$(PYTHON) -c "import sys; sys.path.insert(0, 'scripts'); from telemetry import is_enabled; sys.exit(0 if is_enabled() else 99)"; \
+		rc=$$?; \
+		if [ $$rc -eq 99 ]; then \
+			echo "  .  telemetry disabled; refusing to start collector"; \
+			exit 0; \
+		elif [ $$rc -ne 0 ]; then \
+			exit $$rc; \
+		fi; \
+		if ! command -v docker >/dev/null 2>&1; then \
+			echo "  x  docker not on PATH; use 'make telemetry-collector-py' instead"; \
+			exit 1; \
+		fi; \
+		cd scripts/telemetry/otel_collector && docker compose up -d
+
+telemetry-stop:
+	@cd scripts/telemetry/otel_collector && docker compose down 2>/dev/null || true
+
+telemetry-collector-py:
+	@$(PYTHON) scripts/telemetry/pyotel_collector.py
+
+telemetry-report:
+	@$(PYTHON) scripts/skill_telemetry_report.py $(if $(DAYS),--days $(DAYS)) $(if $(JSON),--json)
+
+atlas:
+	@$(PYTHON) scripts/build_atlas.py
+
+atlas-serve:
+	@cd docs/atlas && $(PYTHON) -m http.server 8083
 
 sync-mattpocock:
 	@bash scripts/sync_mattpocock.sh

@@ -1,0 +1,50 @@
+# otelcol-contrib pipeline for the playbook.
+# Accepts OTLP traces from Claude Code (and any other gen_ai.*-emitting
+# adapter), strips prompt/response bodies, and writes JSONL to
+# /var/log/playbook/skills.jsonl on the container (bind-mounted to
+# ~/.coding-agents-playbook/telemetry/ on the host).
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Privacy guard: strip any attribute whose key starts with one of
+  # the body prefixes. Uses regex (not exact-key match) so indexed
+  # variants like gen_ai.input.messages.0.content and
+  # gen_ai.completion.text are also dropped. The pattern matches the
+  # BANNED_PREFIXES list in scripts/telemetry/pyotel_collector.py so
+  # both collector paths enforce the same privacy contract.
+  attributes/strip_bodies:
+    actions:
+      - pattern: ^gen_ai\.prompt($|\.)
+        action: delete
+      - pattern: ^gen_ai\.choice($|\.)
+        action: delete
+      - pattern: ^gen_ai\.input\.message($|s($|\.))
+        action: delete
+      - pattern: ^gen_ai\.output\.message($|s($|\.))
+        action: delete
+      - pattern: ^gen_ai\.completion($|\.)
+        action: delete
+  batch:
+    timeout: 5s
+
+exporters:
+  file:
+    path: /var/log/playbook/skills.jsonl
+    format: json
+    rotation:
+      max_megabytes: 50
+      max_backups: 5
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [attributes/strip_bodies, batch]
+      exporters: [file]

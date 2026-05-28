@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ADR-0038: ADR-0038: Multi-target registry at ~/.coding-agents-playbook-targets.json</title>
+  <link rel="stylesheet" href="../static/atlas.css">
+</head>
+<body><nav class="atlas-nav">
+  <a href="../index.html">Atlas</a>
+  <a href="../index.html#adrs">ADRs</a>
+  <a href="../index.html#skills">Skills</a>
+  <a href="../index.html#trajectories">Trajectories</a>
+</nav>
+<main><h1>ADR-0038: ADR-0038: Multi-target registry at ~/.coding-agents-playbook-targets.json</h1><p class="muted">Source: <code>docs/adr/0038-multi-target-registry.md</code></p><pre>---
+status: accepted
+date: 2026-05-25
+amends: [&quot;0022&quot;, &quot;0025&quot;]
+related: [&quot;0028&quot;, &quot;0036&quot;]
+---
+
+# ADR-0038: Multi-target registry at ~/.coding-agents-playbook-targets.json
+
+## Status
+
+Accepted. Implemented in v0.8.
+
+## Context
+
+Through v0.7 the playbook had a clean answer for one-project installs
+(`.playbook-config.yaml` lives in the target; `make doctor-verify
+--target=&lt;path&gt;` covers it) and a clean answer for global installs
+(home-level adapters). It had no answer for the very common case of
+&quot;one Mac, three projects, each on a different profile.&quot;
+
+The architecture review (May 2026) flagged this as the clearest
+remaining product gap. The cross-check pass from a separate Codex
+session called out the same item: &quot;the repo still has per-target
+lockfiles, but no global registry like
+`~/.coding-agents-playbook-targets.json`.&quot;
+
+Adding a machine-wide registry unblocks:
+
+- `make targets-list`: tell me which projects have the playbook.
+- `make targets-doctor`: prune missing project dirs; surface registry
+  drift.
+- A future `make targets-update`: iterate every recorded target and
+  re-run update with the project&#x27;s recorded profile, with no manual
+  bookkeeping.
+
+## Decision
+
+A machine-wide JSON file at `~/.coding-agents-playbook-targets.json`
+records every target the playbook has been bound to.
+
+Schema (versioned for future widen):
+
+```json
+{
+  &quot;version&quot;: 1,
+  &quot;targets&quot;: {
+    &quot;&lt;absolute target path&gt;&quot;: {
+      &quot;profile&quot;: &quot;&lt;role-slug&gt;&quot;,
+      &quot;install_mode&quot;: &quot;pointer|symlink|copy&quot;,
+      &quot;registered_at&quot;: &quot;ISO8601 UTC&quot;,
+      &quot;last_updated_at&quot;: &quot;ISO8601 UTC&quot;
+    }
+  }
+}
+```
+
+Path keys are absolute and resolved. `registered_at` is set on the first
+write and never changes; `last_updated_at` is refreshed every time
+`playbook_init.py` or `playbook_update.py` writes a successful run.
+
+The registry is best-effort: a load failure returns an empty registry,
+a write failure logs a warning and does not block init/update. This
+keeps existing single-target workflows zero-cost and zero-risk.
+
+Locking is intentionally not implemented for v0.8. Concurrent installs
+against different targets on the same machine are rare; if they
+become load-bearing, file locking via the existing `fcntl`/`msvcrt`
+scaffolding in `install.py` is the natural follow-up.
+
+New Make targets:
+
+- `make targets-list` prints the registry as a table.
+- `make targets-doctor` prunes missing directories, then prints the
+  registry with a &quot;MISSING&quot; / &quot;ok&quot; marker and the presence of
+  `.playbook-config.yaml` per target.
+
+A future `make targets-update` (deferred; not in v0.8) would iterate
+the registry and run `playbook_update.py --target=&lt;each&gt;` so a single
+command refreshes every bound project.
+
+## Consequences
+
+Positive:
+
+- One-line answer to &quot;where is the playbook installed on this Mac?&quot;
+- `make targets-doctor` surfaces deleted projects so the registry does
+  not silently grow stale.
+- Future cross-target automations (bulk updates, profile audits, time-
+  since-last-update warnings) have a stable data source.
+
+Negative:
+
+- A new file in `$HOME` the user has to know about. The registry is
+  documented in the README and `make help` lists the new targets, so
+  the file is discoverable.
+- Path-keyed storage means a `git mv` of the project root produces a
+  stale entry. `prune_missing_targets()` catches the obvious case (the
+  old dir is gone); a smarter rename detection (inode + content-hash
+  matching) is not in v0.8.
+
+Risk:
+
+- The registry sits at `$HOME` and is **not** synced via dotfiles by
+  default. Users who clone their dotfiles across machines should add
+  this file to their sync list or expect a per-machine registry. The
+  README documents this trade-off.
+
+## Implementation
+
+- `scripts/target_registry.py`: registry I/O (`load_registry`,
+  `save_registry`, `record_target`, `forget_target`, `list_targets`,
+  `prune_missing_targets`) + the two `cmd_targets_*` entry points.
+- `scripts/playbook_init.py`: calls `record_target` on success.
+- `scripts/playbook_update.py`: refreshes via `record_target` on every
+  successful update.
+- `Makefile`: `targets-list` + `targets-doctor` targets.
+- 5 regression tests in `tests/lifecycle/test_lifecycle.py` covering
+  record/list/prune/dedup-by-path/atomic-write paths against a
+  tmpdir-redirected registry.
+
+## Related
+
+- ADR-0022 (per-project init customization): the registry is the
+  machine-wide counterpart; each entry references a project that
+  produced one `.playbook-config.yaml`.
+- ADR-0025 (Profile end-to-end): the registry stores the per-target
+  profile so a `make targets-update` can re-apply the right profile
+  without rediscovery.
+- ADR-0028 (target materializer): unchanged; the registry sits above
+  the materializer, not inside it.
+- ADR-0036 (three-layer content contract): future `make targets-doctor`
+  variants can fan layer-3 verification across every registered target.
+</pre><section><h2>Mentioned by</h2><ul><li><em>none</em></li></ul></section></main><footer class="atlas-footer">Generated by <code>make atlas</code> (ADR-0049). Do not hand-edit; the next build will overwrite.</footer></body></html>

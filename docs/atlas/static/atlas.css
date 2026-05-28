@@ -1,0 +1,50 @@
+:root {
+  --bg: #fafafa;
+  --fg: #1c1c1c;
+  --muted: #6c6c6c;
+  --accent: #2a4d8d;
+  --border: #d8d8d8;
+  --code-bg: #f0f0f0;
+}
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.5;
+}
+nav.atlas-nav {
+  background: var(--accent);
+  color: white;
+  padding: 0.75rem 2rem;
+}
+nav.atlas-nav a { color: white; margin-right: 1rem; text-decoration: none; font-weight: 600; }
+nav.atlas-nav a:hover { text-decoration: underline; }
+main { max-width: 1024px; margin: 0 auto; padding: 2rem; }
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.2rem; margin-top: 2rem; }
+ul { padding-left: 1.5rem; }
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  margin-right: 0.4rem;
+  background: var(--code-bg);
+  color: var(--fg);
+}
+.badge-ok { background: #d4edda; color: #155724; }
+.badge-warn { background: #fff3cd; color: #856404; }
+.badge-fail { background: #f8d7da; color: #721c24; }
+.badge-info { background: #d1ecf1; color: #0c5460; }
+.muted { color: var(--muted); }
+code, pre { background: var(--code-bg); padding: 0.1rem 0.3rem; border-radius: 0.2rem; }
+pre { padding: 1rem; overflow-x: auto; }
+.atlas-footer {
+  max-width: 1024px;
+  margin: 2rem auto;
+  padding: 1rem 2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+}

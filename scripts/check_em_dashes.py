@@ -36,6 +36,9 @@ ALLOWLIST = {
     # MEMORY.md entry rows where the user used an em-dash separator. Functional,
     # not authored prose.
     "base/mcp/agent-memory-bridge/memory_curator.py",
+    # The writer keeps em-dash and en-dash as string literals so the auto-
+    # writer can detect and replace them (used by AGENTS.md round-tripping).
+    "scripts/adapters/_writer.py",
 }
 
 # Vendored content (per ADR-0018, ADR-0019) ships verbatim from upstream and is
@@ -72,8 +75,10 @@ PATTERNS = [
     "overlays/team/hooks/*.sh",
     "overlays/team/mcp/**/*.json",
     # Scripts (Codex P3 #5: rules/no-em-dashes.md bans em dashes in
-    # code comments and docstrings too, not just docs)
-    "scripts/*.py",
+    # code comments and docstrings too, not just docs). v0.14 expanded
+    # from scripts/*.py to scripts/**/*.py so security/, telemetry/,
+    # atlas/ are also covered (ADR-0049 added the third subpackage).
+    "scripts/**/*.py",
     # Profile bundle config + the per-profile README/AGENTS docs
     # (devops.README.md, profiles/README.md, profiles/AGENTS.md, etc.).
     # The TOML scan was the original gate; READMEs were a gap until v0.10

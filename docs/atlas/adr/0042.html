@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ADR-0042: Playbook content distribution via manifest-driven sync</title>
+  <link rel="stylesheet" href="../static/atlas.css">
+</head>
+<body><nav class="atlas-nav">
+  <a href="../index.html">Atlas</a>
+  <a href="../index.html#adrs">ADRs</a>
+  <a href="../index.html#skills">Skills</a>
+  <a href="../index.html#trajectories">Trajectories</a>
+</nav>
+<main><h1>ADR-0042: Playbook content distribution via manifest-driven sync</h1><p class="muted">Source: <code>docs/adr/0042-playbook-content-distribution.md</code></p><pre># 0042. Playbook content distribution via manifest-driven sync
+
+## Status
+
+Accepted (2026-05-27); shipped in v0.13.
+
+## Context
+
+A maintainer who runs this playbook locally accumulates a year&#x27;s worth of skills, rules, hooks, and other agentic content. Some of that content is workspace-specific (ticket-tracker IDs, internal hostnames, vendor-specific examples) and rightly stays private; the generic portion is valuable to anyone running coding agents and deserves a path to a public destination repo so other teams and the open-source community can pick it up.
+
+ADR-0040 already split the playbook into `base/` (generic, portable) and `overlays/team/` (workspace-specific). The split makes `base/` a clean candidate for distribution: a downstream destination can receive the portable subtree without the team-specific layer. What&#x27;s missing is the mechanism that moves the content there, scrubs the periphery uniformly, records what was synced, and never auto-publishes without the operator&#x27;s review.
+
+Three reasons a maintainer might want to publish `base/` to an external destination:
+
+- **Open-source release:** the playbook&#x27;s portable patterns (skills, rules, hooks, agents, MCPs, commands, prompts) are valuable to anyone running coding agents, not just the team that authored them.
+- **Per-team distribution:** another team inside the same org or a partner team can install only `base/` and add their own overlay alongside.
+- **Backup or mirror:** an off-site mirror at a different VCS provider acts as durable archive in case the primary repo loses availability.
+
+The mechanism must satisfy four constraints:
+
+### Constraint 1: scrub layer, not raw copy
+
+Even after the base + overlay split, `base/` still has peripheral references that are appropriate inside the playbook&#x27;s home repo but inappropriate at the destination. Examples include ticket-tracker IDs in example URL forms, internal hostnames in example configurations, and team-specific examples used to illustrate generic rules. A raw copy ships these references through. A scrub layer of regex substitutions cleans the periphery uniformly without per-file edits.
+
+### Constraint 2: destination-only content must survive
+
+The destination repo has its own additions that do not exist in this repo: license file, destination-specific README, optional `overlays/&lt;other&gt;/` content, CI configuration matching the destination&#x27;s host. The sync must not delete those on each run.
+
+### Constraint 3: audit trail
+
+Re-running sync three months later, a reviewer needs to know which source commit produced the destination&#x27;s current state, and which scrub-rules version applied. Without a recorded audit trail, divergence is invisible until something breaks.
+
+### Constraint 4: scheduled execution
+
+The sync runs on a schedule (cron / launchd), unattended. Failure must surface (notification, log file) rather than fail silently. Overlap must abort cleanly when two scheduled runs collide. The script must be idempotent so a re-run on the same source commit is a no-op.
+
+## Decision
+
+### Script: `scripts/sync_distribution.py`
+
+A standalone Python script (stdlib + `tomllib` only) that reads a manifest, computes the destination delta, applies scrub rules, and writes the result. The script never auto-commits and never auto-pushes; the destination&#x27;s working tree is updated, the user reviews via `git diff`, then commits and pushes manually.
+
+### Manifest schema
+
+```toml
+[destination]
+path = &quot;/absolute/path/to/destination/repo&quot;
+require_clean_git = true
+
+[sources]
+allowlist = [
+  &quot;base/&quot;,
+  &quot;scripts/&quot;,
+  &quot;tests/&quot;,
+  &quot;docs/adr/&quot;,
+  &quot;Makefile&quot;,
+  &quot;VERSION&quot;,
+  &quot;.gitattributes&quot;,
+  &quot;CONTEXT.md&quot;,
+  &quot;CHANGELOG.md&quot;,
+  &quot;TOOLS.md&quot;,
+  &quot;AGENTS.md&quot;,
+]
+denylist = [
+  # Specific files in allowlisted dirs that should NOT flow. The walker
+  # already prunes __pycache__ + .git + cache dirs by default; entries
+  # here are for content the operator wants to keep workspace-private
+  # even though it lives under an allowlisted path.
+]
+
+[scrubs]
+patterns = [
+  # Order matters: compound forms (CI config, code-review)
+  # must come BEFORE the bare-token form (CI, VCS) so the
+  # compound match wins.
+
+  # Ticket-tracker IDs.
+  { match = &quot;(R8|MATCH|JIRA|TICKET)-\\d+&quot;, replace = &quot;[ticket]&quot; },
+
+  # Team identifiers. No word boundary so compound forms like
+  # team_repo or team-cli also scrub. Default is case-insensitive,
+  # so team in shouty-case fixtures is also caught.
+  { match = &quot;team&quot;, replace = &quot;team&quot; },
+  { match = &quot;internal-host&quot;, replace = &quot;internal-host&quot; },
+
+  # Compound CI / vendor forms (must precede bare-token patterns).
+  { match = &quot;CI config&quot;, replace = &quot;CI config&quot; },
+
+  # VCS / CI / observability vendor mentions used as examples.
+  { match = &quot;\\bBitbucket\\b&quot;, replace = &quot;VCS&quot; },
+  { match = &quot;\\bJenkins\\b&quot;, replace = &quot;CI&quot; },
+  { match = &quot;\\bSonarQube\\b&quot;, replace = &quot;code-quality&quot; },
+  { match = &quot;\\bSentry\\b&quot;, replace = &quot;error-tracking&quot; },
+  # internal hostnames + customer-specific example domains
+  # (extended per-workspace; defaults shown here are starting point)
+]
+
+# Optional. Reserves the schema slot for the future direction-flip;
+# v1 does not read this table.
+[reverse_direction]
+# placeholder for when sync from destination back to source is implemented
+```
+
+Keys are TOML strings; values are documented inline. The manifest lives OUTSIDE the playbook repo (in the operator&#x27;s own workspace) so each downstream maintains their own destination + scrub set. The playbook ships an example manifest at `scripts/templates/distribution-manifest.example.toml` for reference.
+
+### Idempotent three-phase execution
+
+1. **Validate:** destination is a clean git working tree (override via `--allow-dirty`), manifest parses, lock file is not already held. The source&#x27;s HEAD SHA + branch are recorded for the audit trail; v1 does not gate on a specific branch (the operator&#x27;s wrapper script can do that if needed).
+2. **Copy with scrub:** each source file is read, run through every applicable scrub pattern in order, written to destination at the same relative path. Byte-for-byte equality on the destination&#x27;s existing file short-circuits the write. Files in destination not in the prior `synced_files` set are preserved (this is how destination-only content survives). Files in the prior `synced_files` but not in the current set are DELETED (stale-file removal); operator intent on tightening the allowlist or expanding the denylist propagates to the destination&#x27;s working tree.
+3. **Audit:** read the destination&#x27;s existing `.sync-manifest.json` (if any), compare every load-bearing field (`source_commit`, `source_repo`, `source_branch`, `scrub_rules_hash`, `allowlist_hash`, `synced_files`), and skip the write when nothing changed. When manifest hashes differ from the prior sync, surface a stderr warning so the operator knows the destination is about to be rewritten under different rules.
+
+### Audit file schema
+
+```json
+{
+  &quot;source_repo&quot;: &quot;git@&lt;vcs-host&gt;:&lt;org&gt;/&lt;repo&gt;.git&quot;,
+  &quot;source_commit&quot;: &quot;abc123...&quot;,
+  &quot;source_branch&quot;: &quot;develop&quot;,
+  &quot;synced_at&quot;: &quot;2026-05-27T09:00:00Z&quot;,
+  &quot;scrub_rules_hash&quot;: &quot;sha256:...&quot;,
+  &quot;allowlist_hash&quot;: &quot;sha256:...&quot;,
+  &quot;tool_version&quot;: &quot;sync_distribution.py v1.1&quot;,
+  &quot;synced_files&quot;: [&quot;base/rules/no-em-dashes.md&quot;, &quot;...&quot;]
+}
+```
+
+`synced_files` is the canonical list of files this sync wrote (under managed paths). The next sync diffs its current set against this list to detect stale files at the destination.
+
+### Lock file + overlap prevention
+
+The script writes `/tmp/playbook-distribution-sync.lock` on start, removes on exit. A second invocation while the first is running aborts cleanly with exit code 2 and a clear message. Stale locks (older than 1 hour) auto-clear so a crash does not leave the system in a permanent locked state.
+
+### Path-traversal safety
+
+Every allowlist entry is resolved and checked against `source_root` before walking. An entry like `../notes.md` that escapes `source_root` is rejected with a stderr warning rather than silently writing outside the destination. A belt-and-suspenders check at write time also verifies each destination path stays within `destination_path`.
+
+### Default exclusions
+
+The walker prunes `__pycache__`, `.git`, `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, `node_modules`, `.venv`, `venv`, `.DS_Store` at the directory level. Without this, allowlisting `scripts/` or `tests/` whole would ship `.pyc` bytes to a public destination.
+
+### Failure surface
+
+The wrapper script (`scripts/templates/distribution-cron.example.sh`) captures the Python script&#x27;s exit code via `PIPESTATUS[0]` after a `tee` to the log file, then fires a macOS `osascript` notification on non-zero exit. The script itself logs validation traceback to `~/Library/Logs/playbook-distribution-sync.log` (or `$PLAYBOOK_SYNC_LOG` if set) on uncaught exceptions; validation-failure exits (1/3) print to stderr and the wrapper captures stderr via `tee`. Exit codes: 0 success, 1 validation error, 2 lock held, 3 IO error, 4 reverse direction (stub).
+
+### Memory transfer sub-command
+
+`python3 scripts/sync_distribution.py memory --manifest &lt;path&gt;` reads a separate `[memory]` table in the manifest:
+
+```toml
+[memory]
+source_dir = &quot;/Users/.../memory/&quot;
+destination_dir = &quot;/Users/.../memory/&quot;
+allowlist = [
+  # entry slugs to port; everything else stays put
+  &quot;feedback_writing_style&quot;,
+  &quot;feedback_no_em_dashes&quot;,
+  # ...
+]
+denylist = [
+  # entry slugs to explicitly exclude even if allowlist would include
+]
+```
+
+The same scrub engine applies to memory entries. The destination&#x27;s `MEMORY.md` index is regenerated from the ported entries.
+
+### Cron / launchd installation
+
+The playbook ships `scripts/templates/distribution-cron.example.sh`, a wrapper that runs the Python script, tees output to the log, captures the exit code via `PIPESTATUS[0]` (so the inverted-status bug with `if ! cmd | tee` is avoided), and fires a macOS notification on non-zero. The user installs it via `crontab -e` (or a `launchd` plist for wake-from-sleep catch-up behavior). Full install / verify / failure-mode procedure is in `docs/runbooks/distribution-sync-cron.md`.
+
+### Direction-flip preserved via flag stub
+
+The script accepts `--direction reverse` that initially exits with code 4 (&quot;not implemented&quot;). The argument parser and help text exist from day one; the example manifest carries a commented `[reverse_direction]` placeholder table so the schema doesn&#x27;t break when the implementation lands. When a downstream becomes canonical, the implementation fills in; no re-architecture, no manifest schema break.
+
+## Consequences
+
+### Good
+
+- Auditable: manifest is explicit, destination&#x27;s `.sync-manifest.json` records source SHA + scrub-rules hash + sync timestamp.
+- Idempotent: re-running on the same source commit with the same manifest is a no-op (assuming no destination drift).
+- Destination-only content survives: only allowlisted paths are written; everything else is left alone.
+- Scrub layer handles peripheral references uniformly, without per-file edits, and the regex list is centralized in one manifest file.
+- Direction-flip future state is preserved cheaply.
+- Stdlib-only: installs unchanged across both the source playbook and any destination.
+- Scheduled-friendly: lock file, exit codes, notifications, log file all in place from the start.
+
+### Bad
+
+- Operator must run sync explicitly via cron / manual invocation. A pre-push prompt in the source repo is out of scope; manual discipline carries.
+- Scrub rules need ongoing maintenance. New peripheral references emerging in future content require manifest updates. Stale scrub rules leak.
+- Destination path is hardcoded in the manifest; moving the destination on disk requires editing the manifest.
+- Memory port is a sub-command, not bundled. Operator runs `sync_distribution.py` then `sync_distribution.py memory` separately.
+- macOS notification is platform-specific; on Linux the wrapper would call `notify-send` instead. The script logs identically on both; the wrapper script handles the platform branch.
+
+### Trade-offs considered and rejected
+
+- **`git subtree push`:** cleaner history but no content filter. The destination would receive source-specific paths. Also conflates &quot;history sync&quot; with &quot;content selection&quot; which are different operations.
+- **CI cron in the source repo:** more automatic but couples source CI to destination VCS credentials, adds operational complexity, and obscures the audit trail. Reverses the &quot;deliberate operation&quot; framing.
+- **No automation; hand-curated copies:** lowest tooling cost, highest discipline cost. Recipe for drift within weeks.
+- **Auto-commit + auto-push from the script:** removes the human review checkpoint. A scrub-rule gap then ships to the destination immediately. The cost of a manual `git commit &amp;&amp; git push` per sync is small; the cost of an accidental leak to a public destination is large.
+
+### Risks
+
+- **Conservative scrubs miss patterns.** First-day scrub list is best-effort; new patterns surface on the first sync&#x27;s diff review. The script&#x27;s idempotency makes iteration cheap (run, review, edit manifest, re-run).
+- **Manifest is operator-owned and lives outside the repo.** If the operator loses their manifest, the audit trail in the destination&#x27;s `.sync-manifest.json` carries the rule hashes but not the rules themselves. Backup discipline is the operator&#x27;s responsibility.
+- **Cron skip on laptop sleep.** macOS cron does not catch up on missed runs. The operator can switch to `launchd` `StartCalendarInterval` with `RunAtLoad` if catch-up matters.
+
+## References
+
+- ADR-0040 (base + overlay subtree split): this ADR depends on the `base/` subtree existing as a clean portable boundary.
+- ADR-0014 (external source policy): the inverse direction (pulling vendored content INTO the playbook). The same discipline (pinned source, explicit transformation, audit trail) applies in reverse here.
+- ADR-0019 (mattpocock frontend imports and sync): the `SOURCES.toml` + pinned-SHA + PROVENANCE pattern from skill imports has the same shape as the manifest here.
+- ADR-0041 (content tiering guardrails): the `scope_boundary` and `ignored_containment` checks reduce the surface area the scrub layer must clean (cleaner `base/` means fewer scrub patterns needed).
+</pre><section><h2>Mentioned by</h2><ul><li><em>none</em></li></ul></section></main><footer class="atlas-footer">Generated by <code>make atlas</code> (ADR-0049). Do not hand-edit; the next build will overwrite.</footer></body></html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ADR-0030: Tier 3 declarative TOML registry</title>
+  <link rel="stylesheet" href="../static/atlas.css">
+</head>
+<body><nav class="atlas-nav">
+  <a href="../index.html">Atlas</a>
+  <a href="../index.html#adrs">ADRs</a>
+  <a href="../index.html#skills">Skills</a>
+  <a href="../index.html#trajectories">Trajectories</a>
+</nav>
+<main><h1>ADR-0030: Tier 3 declarative TOML registry</h1><p class="muted">Source: <code>docs/adr/0030-tier3-declarative-toml-registry.md</code></p><pre># 0030. Tier 3 declarative TOML registry
+
+## Status
+
+Accepted (2026-05-25); landed in v0.5.
+
+## Context
+
+Tier 3 adapters (per ADR-0005) cover coding agents that read AGENTS.md natively at the project root and need no per-tool storage beyond that single file. The list grew from a handful in v0.2 to 20 in v0.4, and the grilling for v0.5 surfaced six more candidates on the watchlist.
+
+Through v0.4, every Tier 3 entry was a Python literal in `scripts/adapters/agents_md.py` (renamed to `tier3.py` in v0.5 for naming-collision reasons):
+
+```python
+ADAPTERS: list[Adapter] = [
+    TierThreeAdapter(&quot;kiro&quot;, lambda: (Path.home() / &quot;.kiro&quot;).is_dir()),
+    TierThreeAdapter(&quot;goose&quot;, lambda: _loader.which(&quot;goose&quot;) is not None),
+    TierThreeAdapter(
+        &quot;junie&quot;, lambda: _loader.vscode_extension_present(&quot;jetbrains.junie&quot;)
+    ),
+    # ... 17 more ...
+]
+```
+
+Two observations from the grilling:
+
+1. **The detection rules cluster into five idioms.** All 20 lambdas use one of: `is_dir(~/.X)`, `which(&quot;X&quot;)`, `vscode_extension_present(&quot;vendor.X&quot;)`, `Path(&quot;/Applications/X.app&quot;).exists()`, or `any` of the first four. No exotic logic, no per-tool branching, no escape hatches.
+
+2. **Adding a new Tier 3 tool requires a Python edit.** That is fine for a contributor familiar with the codebase, but it means a non-Python-fluent teammate cannot add the tool they actually use without going through a code-review cycle on a lambda they did not need to write.
+
+The deletion test from the grilling: if we move all 20 to TOML, what changes? Adapter behavior is identical. Adding a new tool is now a data edit instead of a code edit. The cost is one parser function (`_build_detector`) and one TOML file. The win is that Tier 3 stops being a code surface that grows on every new tool added.
+
+## Decision
+
+The 20 Tier 3 entries move into `scripts/adapters/tier3.toml`. Schema:
+
+```toml
+[[tier3]]
+name = &quot;kiro&quot;
+detect.home_dir = &quot;.kiro&quot;
+
+[[tier3]]
+name = &quot;goose&quot;
+detect.cli = &quot;goose&quot;
+
+[[tier3]]
+name = &quot;junie&quot;
+detect.vscode_extension = &quot;jetbrains.junie&quot;
+
+[[tier3]]
+name = &quot;zed&quot;
+detect.app_bundle = &quot;/Applications/Zed.app&quot;
+
+[[tier3]]
+name = &quot;aide&quot;
+detect.any_of = [
+    { home_dir = &quot;.aide&quot; },
+    { cli = &quot;aide&quot; },
+]
+```
+
+`scripts/adapters/tier3.py` becomes a thin loader:
+
+```python
+def _build_detector(detect: dict) -&gt; Callable[[], bool]:
+    if &quot;home_dir&quot; in detect:
+        ...
+    if &quot;cli&quot; in detect:
+        ...
+    if &quot;vscode_extension&quot; in detect:
+        ...
+    if &quot;app_bundle&quot; in detect:
+        ...
+    if &quot;any_of&quot; in detect:
+        sub_detectors = [_build_detector(sub) for sub in detect[&quot;any_of&quot;]]
+        return lambda: any(d() for d in sub_detectors)
+    raise ValueError(...)
+
+def _load_tier3_adapters() -&gt; list[Adapter]:
+    with TIER3_TOML.open(&quot;rb&quot;) as f:
+        data = tomllib.load(f)
+    return [
+        TierThreeAdapter(
+            name=entry[&quot;name&quot;],
+            detector=_build_detector(entry[&quot;detect&quot;]),
+        )
+        for entry in data.get(&quot;tier3&quot;, [])
+    ]
+
+ADAPTERS = _load_tier3_adapters()
+```
+
+TOML over JSON or YAML:
+
+- **JSON** was considered for consistency with `mcp/&lt;name&gt;.json` bundles. Rejected because inline composite detection (`any_of`) reads worse in JSON than TOML, and because the rest of the playbook (`profiles/*.toml`, `pyproject.toml`) is already TOML-leaning.
+- **YAML** was considered for AGENTS.md-style frontmatter consistency. Rejected because adding a YAML dependency is heavier than using `tomllib` from Py 3.11 stdlib, and because YAML&#x27;s whitespace sensitivity has caused more bugs than it has prevented in the playbook&#x27;s history.
+
+tomllib is Python 3.11+ stdlib; no new third-party dependency.
+
+## Consequences
+
+### Good
+
+- Adding a new Tier 3 tool with one of the five idioms is a data-only edit. No Python knowledge needed.
+- The five-idiom schema documents the shape of &quot;Tier 3 detection&quot; explicitly, instead of implicitly through 20 lambdas.
+- `tier3.py` shrinks; the install body is the only behavior surface.
+- A future check (`scripts/checks/tier3_registry.py`) can validate that every entry is reachable through the five idioms without running Python.
+
+### Bad
+
+- Adding a new detection idiom (e.g. &quot;true if homebrew formula is installed&quot;) requires touching both `tier3.py` (new branch in `_build_detector`) and the TOML schema definition in the file header. Two-place change instead of one-place, but the schema additions should be rare.
+- Errors that previously were Python NameError (&quot;which is not defined&quot;) are now ValueError from `_build_detector` at import time. The error path moved; the failure mode is still fail-fast.
+- TOML inline tables for `any_of` are visually heavier than the Python `or` expression they replace. Acceptable tradeoff for the data-edit win.
+
+## Implementation note
+
+`tier3.toml` lives alongside `tier3.py` so the directory is self-contained. The loader runs at module import time (the file is read once per Python session); the parsed result populates `ADAPTERS` exactly as before.
+
+`_build_detector` raises `ValueError` on an unknown detection idiom so a typo in `tier3.toml` fails at install time rather than at detect time (where the symptom would be &quot;the tool silently never matches&quot;).
+
+Future Tier 3 entries that need detection rules outside the five idioms remain possible: extend `_build_detector` with a new branch, document the new idiom in the schema comment block, and the rest of the system stays unchanged.
+</pre><section><h2>Mentioned by</h2><ul><li><em>none</em></li></ul></section></main><footer class="atlas-footer">Generated by <code>make atlas</code> (ADR-0049). Do not hand-edit; the next build will overwrite.</footer></body></html>

@@ -75,6 +75,7 @@ from . import (  # noqa: E402
     pyright_zero,
     size,
     skill_description,
+    skill_security,
     trajectory,
 )
 
@@ -89,6 +90,7 @@ CHECKS: list[_Check] = [
     _Check("frontmatter", frontmatter.run),
     _Check("agents-md", agents_md.run),
     _Check("external-skill-audit", external_skill_audit.run),
+    _Check("skill-security", skill_security.run),
     _Check("size", size.run),
     _Check("decay", decay.run),
     _Check("em-dashes", em_dashes.run),
