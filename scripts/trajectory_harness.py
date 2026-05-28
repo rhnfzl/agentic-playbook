@@ -38,6 +38,7 @@ sys.path.insert(0, str(REPO_ROOT_DEFAULT / "scripts"))
 
 from adapters._loader import PlaybookContent, Trajectory  # noqa: E402
 from adapters.trace_record import KNOWN_TRACE_ADAPTERS, TraceRecord  # noqa: E402
+from trajectory_judge import JudgeClient, evaluate_judge, get_threshold  # noqa: E402
 from trajectory_matcher import evaluate_assertions  # noqa: E402
 
 
@@ -57,6 +58,10 @@ class HarnessConfig:
     trace, and returning a TraceRecord. Errors raised by the provider
     propagate so the harness can mark the cell as infra_fail.
 
+    `judge_client` is the Phase 2A addition. When set, the harness runs
+    the LLM judge after the DSL matcher passes; both must clear for the
+    cell to pass. When None (Phase 1 default), only the DSL runs.
+
     `skill_filter` narrows the run to one skill (or None for all).
     `adapter_filter` narrows to one adapter (or None for all).
     `strict` flips adapter_unavailable into a hard failure.
@@ -64,6 +69,7 @@ class HarnessConfig:
 
     repo_root: Path
     trace_provider: TraceProvider
+    judge_client: JudgeClient | None = None
     skill_filter: str | None = None
     adapter_filter: str | None = None
     strict: bool = False
@@ -210,14 +216,40 @@ def run_harness(cfg: HarnessConfig) -> Matrix:
                     continue
 
                 result = evaluate_assertions(traj.assertions, trace)
+                failures = list(result.failures)
+                passed = result.passed
+
+                # Phase 2A: if DSL passed AND a judge_client is wired,
+                # run the LLM judge and gate on the trajectory threshold.
+                # DSL failures short-circuit the judge to save cost.
+                if passed and cfg.judge_client is not None:
+                    judge_result = evaluate_judge(traj, trace, cfg.judge_client)
+                    threshold = get_threshold(traj)
+                    if judge_result.score < threshold:
+                        passed = False
+                        # Distinguish infra failures from quality failures
+                        # so operators reading the matrix can route a 429
+                        # to "retry overnight" and a quality miss to
+                        # "regression to investigate."
+                        prefix = (
+                            "judge_infra_fail"
+                            if judge_result.is_infra_error
+                            else "llm_judge"
+                        )
+                        failures.append(
+                            f"{prefix}: score {judge_result.score:.2f} "
+                            f"below threshold {threshold} "
+                            f"(reasoning: {judge_result.reasoning})"
+                        )
+
                 matrix.cells.append(
                     MatrixCell(
                         skill=traj.skill,
                         scenario=traj.scenario,
                         phrasing=phrasing,
                         adapter=adapter,
-                        passed=result.passed,
-                        failures=list(result.failures),
+                        passed=passed,
+                        failures=failures,
                     )
                 )
 

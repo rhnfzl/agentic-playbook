@@ -249,6 +249,158 @@ def test_harness_rejects_skill_filter_with_no_matches(tmp_path: Path) -> None:
         run_harness(cfg)
 
 
+class _StubJudgeClient:
+    """Test fixture for JudgeClient: returns a canned score."""
+
+    def __init__(self, score: float, reasoning: str = "stub"):
+        from trajectory_judge import JudgeResult
+
+        self._result = JudgeResult(
+            score=score,
+            reasoning=reasoning,
+            raw_response="",
+            model="claude-sonnet-4-6",
+        )
+        self.calls: int = 0
+
+    def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+        self.calls += 1
+        return self._result
+
+
+def test_harness_runs_judge_after_dsl_passes(tmp_path: Path) -> None:
+    """Phase 2A: when judge_client is wired, the judge runs after DSL.
+    Both must clear the threshold for the cell to pass."""
+    from trajectory_harness import HarnessConfig, run_harness
+
+    _make_trajectory(tmp_path)
+    judge = _StubJudgeClient(score=0.9)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        judge_client=judge,
+    )
+    matrix = run_harness(cfg)
+    assert matrix.passed == 1
+    assert matrix.failed == 0
+    assert judge.calls == 5  # 5 phrasings -> 5 judge calls
+
+
+def test_harness_fails_cell_when_judge_below_threshold(tmp_path: Path) -> None:
+    """Score below the trajectory's threshold (default 0.7) fails the cell."""
+    from trajectory_harness import HarnessConfig, run_harness
+
+    _make_trajectory(tmp_path)
+    judge = _StubJudgeClient(score=0.4, reasoning="too sparse")
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        judge_client=judge,
+    )
+    matrix = run_harness(cfg)
+    assert matrix.failed == 1
+    joined = "\n".join(f for cell in matrix.cells for f in cell.failures)
+    assert "llm_judge" in joined
+    assert "0.40" in joined or "0.4" in joined
+
+
+def test_harness_skips_judge_when_dsl_fails(tmp_path: Path) -> None:
+    """DSL failures must short-circuit the judge so we do not spend
+    money grading runs that the deterministic gate already rejected."""
+    from trajectory_harness import HarnessConfig, run_harness
+
+    _make_trajectory(
+        tmp_path,
+        assertions_block=(
+            "  - first_skill_loaded: demo\n"
+            "  - must_not_invoke_tool: Bash\n"
+        ),
+    )
+    judge = _StubJudgeClient(score=1.0)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(include_bash=True),
+        judge_client=judge,
+    )
+    matrix = run_harness(cfg)
+    assert matrix.failed == 1
+    # Judge must NOT have been invoked because DSL failed.
+    assert judge.calls == 0
+
+
+def test_harness_marks_judge_infra_error_with_distinct_prefix(tmp_path: Path) -> None:
+    """Adversarial review-round-5 verdict-blocker: an HTTP 429 or
+    network timeout must NOT look the same as a quality regression.
+    Infra failures get the `judge_infra_fail:` prefix; quality failures
+    get `llm_judge:`."""
+    from trajectory_harness import HarnessConfig, run_harness
+    from trajectory_judge import JudgeResult
+
+    class _InfraFailClient:
+        def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+            return JudgeResult(
+                score=0.0,
+                reasoning="HTTP 429 from Anthropic: Too Many Requests",
+                raw_response="",
+                model="claude-sonnet-4-6",
+                is_infra_error=True,
+            )
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        judge_client=_InfraFailClient(),
+    )
+    matrix = run_harness(cfg)
+    joined = "\n".join(f for cell in matrix.cells for f in cell.failures)
+    assert "judge_infra_fail" in joined
+    assert "llm_judge:" not in joined  # quality failures get the other prefix
+
+
+def test_harness_threshold_boundary_passes_at_exact_match(tmp_path: Path) -> None:
+    """Adversarial review-round-5 #3: nail down the threshold boundary.
+    `score < threshold` means a score EQUAL to threshold passes. This
+    test pins the semantic so a future operator change to <= is caught."""
+    from trajectory_harness import HarnessConfig, run_harness
+    from trajectory_judge import JudgeResult
+
+    class _ExactMatchClient:
+        def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
+            return JudgeResult(
+                score=0.7,  # equals trajectory's threshold of 0.7
+                reasoning="exactly at threshold",
+                raw_response="",
+                model="claude-sonnet-4-6",
+            )
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        judge_client=_ExactMatchClient(),
+    )
+    matrix = run_harness(cfg)
+    assert matrix.passed == 1
+    assert matrix.failed == 0
+
+
+def test_harness_default_no_judge_means_dsl_only(tmp_path: Path) -> None:
+    """Pre-Phase-2 callers (judge_client=None) get DSL-only behavior;
+    the matrix passes/fails purely on the matcher."""
+    from trajectory_harness import HarnessConfig, run_harness
+
+    _make_trajectory(tmp_path)
+    cfg = HarnessConfig(
+        repo_root=tmp_path,
+        trace_provider=lambda _t, _p, _a: _fixture_trace(),
+        # judge_client omitted -> defaults to None
+    )
+    matrix = run_harness(cfg)
+    assert matrix.passed == 1
+    assert matrix.failed == 0
+
+
 def test_harness_failure_details_route_to_stderr(tmp_path: Path, capsys) -> None:
     """Codex review-round-4: when matrix.failed > 0, the Failures: detail
     block must print to stderr (not stdout) so the stdout/stderr contract
