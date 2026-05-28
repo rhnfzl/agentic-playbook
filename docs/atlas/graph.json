@@ -1,0 +1,1269 @@
+{
+  "nodes": [
+    {
+      "id": "adr-0001",
+      "kind": "adr",
+      "label": "ADR-0001: SKILL.md as the canonical source format",
+      "href": "adr/0001.html"
+    },
+    {
+      "id": "adr-0002",
+      "kind": "adr",
+      "label": "ADR-0002: Per-subproject AGENTS.md (directory-scoped rules)",
+      "href": "adr/0002.html"
+    },
+    {
+      "id": "adr-0003",
+      "kind": "adr",
+      "label": "ADR-0003: Custom installer over Ruler CLI",
+      "href": "adr/0003.html"
+    },
+    {
+      "id": "adr-0004",
+      "kind": "adr",
+      "label": "ADR-0004: Drop the team prefix from file names",
+      "href": "adr/0004.html"
+    },
+    {
+      "id": "adr-0005",
+      "kind": "adr",
+      "label": "ADR-0005: Tier 1 / Tier 2 / Tier 3 agent support",
+      "href": "adr/0005.html"
+    },
+    {
+      "id": "adr-0006",
+      "kind": "adr",
+      "label": "ADR-0006: Open PR contribution model with owner per skill",
+      "href": "adr/0006.html"
+    },
+    {
+      "id": "adr-0007",
+      "kind": "adr",
+      "label": "ADR-0007: CLAUDE.md vs AGENTS.md vs SKILL.md (three separate formats)",
+      "href": "adr/0007.html"
+    },
+    {
+      "id": "adr-0008",
+      "kind": "adr",
+      "label": "ADR-0008: Three-layer capture system for keeping the playbook updated",
+      "href": "adr/0008.html"
+    },
+    {
+      "id": "adr-0009",
+      "kind": "adr",
+      "label": "ADR-0009: Unified agents/ directory with per-tool format transformation",
+      "href": "adr/0009.html"
+    },
+    {
+      "id": "adr-0010",
+      "kind": "adr",
+      "label": "ADR-0010: commands/ and prompts/ as 5th and 6th content types",
+      "href": "adr/0010.html"
+    },
+    {
+      "id": "adr-0011",
+      "kind": "adr",
+      "label": "ADR-0011: Tier 2 -> Tier 1 adapter promotion criteria",
+      "href": "adr/0011.html"
+    },
+    {
+      "id": "adr-0012",
+      "kind": "adr",
+      "label": "ADR-0012: mcp/ bundle directory for locally-hosted Python MCPs",
+      "href": "adr/0012.html"
+    },
+    {
+      "id": "adr-0013",
+      "kind": "adr",
+      "label": "ADR-0013: AGENTS.md governance harness",
+      "href": "adr/0013.html"
+    },
+    {
+      "id": "adr-0014",
+      "kind": "adr",
+      "label": "ADR-0014: External-source policy: catalog + audit + status semantics",
+      "href": "adr/0014.html"
+    },
+    {
+      "id": "adr-0015",
+      "kind": "adr",
+      "label": "ADR-0015: Skill size policy (warn 500, block 1000) + progressive disclosure",
+      "href": "adr/0015.html"
+    },
+    {
+      "id": "adr-0016",
+      "kind": "adr",
+      "label": "ADR-0016: Installer lifecycle: list / status / update / remove / drift + lockfile",
+      "href": "adr/0016.html"
+    },
+    {
+      "id": "adr-0017",
+      "kind": "adr",
+      "label": "ADR-0017: Eval harness pattern for high-risk skills",
+      "href": "adr/0017.html"
+    },
+    {
+      "id": "adr-0018",
+      "kind": "adr",
+      "label": "ADR-0018: Vendor anchored-fs as a playbook MCP bundle (playbook-as-upstream)",
+      "href": "adr/0018.html"
+    },
+    {
+      "id": "adr-0019",
+      "kind": "adr",
+      "label": "ADR-0019: Mattpocock + frontend imports + sync mechanism",
+      "href": "adr/0019.html"
+    },
+    {
+      "id": "adr-0020",
+      "kind": "adr",
+      "label": "ADR-0020: Refer-only justifications for evaluated sources",
+      "href": "adr/0020.html"
+    },
+    {
+      "id": "adr-0021",
+      "kind": "adr",
+      "label": "ADR-0021: Contribute back to agentsmd/agents.md upstream",
+      "href": "adr/0021.html"
+    },
+    {
+      "id": "adr-0022",
+      "kind": "adr",
+      "label": "ADR-0022: Per-project init + customization (hybrid pointer + selective install)",
+      "href": "adr/0022.html"
+    },
+    {
+      "id": "adr-0023",
+      "kind": "adr",
+      "label": "ADR-0023: Lifecycle ownership model + anchored-fs default scope",
+      "href": "adr/0023.html"
+    },
+    {
+      "id": "adr-0024",
+      "kind": "adr",
+      "label": "ADR-0024: Adapter Protocol + InstallManifest (single-source-of-truth lockfile)",
+      "href": "adr/0024.html"
+    },
+    {
+      "id": "adr-0025",
+      "kind": "adr",
+      "label": "ADR-0025: Profile end-to-end (TOML role bundles wired through install + init)",
+      "href": "adr/0025.html"
+    },
+    {
+      "id": "adr-0026",
+      "kind": "adr",
+      "label": "ADR-0026: MCP bundle lifecycle: bundle = content provider, playbook = orchestrator",
+      "href": "adr/0026.html"
+    },
+    {
+      "id": "adr-0027",
+      "kind": "adr",
+      "label": "ADR-0027: AgentsMd document type + canonical Hook source with explicit event metadata",
+      "href": "adr/0027.html"
+    },
+    {
+      "id": "adr-0028",
+      "kind": "adr",
+      "label": "ADR-0028: TargetMaterializer + unified target layout",
+      "href": "adr/0028.html"
+    },
+    {
+      "id": "adr-0029",
+      "kind": "adr",
+      "label": "ADR-0029: Hook reconciliation + PLAYBOOK-HOOK-MATCHER convention",
+      "href": "adr/0029.html"
+    },
+    {
+      "id": "adr-0030",
+      "kind": "adr",
+      "label": "ADR-0030: Tier 3 declarative TOML registry",
+      "href": "adr/0030.html"
+    },
+    {
+      "id": "adr-0031",
+      "kind": "adr",
+      "label": "ADR-0031: _loader.py four-file split",
+      "href": "adr/0031.html"
+    },
+    {
+      "id": "adr-0032",
+      "kind": "adr",
+      "label": "ADR-0032: anchored-fs bundle conformance via wrapper layer (supersedes parts of ADR-0026)",
+      "href": "adr/0032.html"
+    },
+    {
+      "id": "adr-0033",
+      "kind": "adr",
+      "label": "ADR-0033: AgentsMd as canonical write API + materialize_rules deprecation (supersedes parts of ADR-0027)",
+      "href": "adr/0033.html"
+    },
+    {
+      "id": "adr-0034",
+      "kind": "adr",
+      "label": "ADR-0034: ADR-0034: Cross-agent hook contract",
+      "href": "adr/0034.html"
+    },
+    {
+      "id": "adr-0035",
+      "kind": "adr",
+      "label": "ADR-0035: ADR-0035: Canonical hook source unification (skill-owned vs root)",
+      "href": "adr/0035.html"
+    },
+    {
+      "id": "adr-0036",
+      "kind": "adr",
+      "label": "ADR-0036: ADR-0036: Three-layer content contract (canonical / materialization / runtime)",
+      "href": "adr/0036.html"
+    },
+    {
+      "id": "adr-0037",
+      "kind": "adr",
+      "label": "ADR-0037: ADR-0037: Generalized hook adapter scoping + anchored-fs hook migration",
+      "href": "adr/0037.html"
+    },
+    {
+      "id": "adr-0038",
+      "kind": "adr",
+      "label": "ADR-0038: ADR-0038: Multi-target registry at ~/.coding-agents-playbook-targets.json",
+      "href": "adr/0038.html"
+    },
+    {
+      "id": "adr-0039",
+      "kind": "adr",
+      "label": "ADR-0039: ADR-0039: Per-(adapter, config_path) managed_keys with ownership metadata (v0.9 hard schema cut)",
+      "href": "adr/0039.html"
+    },
+    {
+      "id": "adr-0040",
+      "kind": "adr",
+      "label": "ADR-0040: Base + overlay subtree split for content tiering",
+      "href": "adr/0040.html"
+    },
+    {
+      "id": "adr-0041",
+      "kind": "adr",
+      "label": "ADR-0041: Content tiering guardrails",
+      "href": "adr/0041.html"
+    },
+    {
+      "id": "adr-0042",
+      "kind": "adr",
+      "label": "ADR-0042: Playbook content distribution via manifest-driven sync",
+      "href": "adr/0042.html"
+    },
+    {
+      "id": "adr-0043",
+      "kind": "adr",
+      "label": "ADR-0043: Marketplace distribution for selective skill install",
+      "href": "adr/0043.html"
+    },
+    {
+      "id": "adr-0044",
+      "kind": "adr",
+      "label": "ADR-0044: trajectories/ as 8th content type",
+      "href": "adr/0044.html"
+    },
+    {
+      "id": "adr-0045",
+      "kind": "adr",
+      "label": "ADR-0045: Cross-adapter trace contract",
+      "href": "adr/0045.html"
+    },
+    {
+      "id": "adr-0046",
+      "kind": "adr",
+      "label": "ADR-0046: Trajectory DSL surface + hybrid DSL/LLM-judge match semantics",
+      "href": "adr/0046.html"
+    },
+    {
+      "id": "adr-0047",
+      "kind": "adr",
+      "label": "ADR-0047: Supply-chain security gate for vendored skills",
+      "href": "adr/0047.html"
+    },
+    {
+      "id": "adr-0048",
+      "kind": "adr",
+      "label": "ADR-0048: Skill telemetry via OTel gen_ai conventions",
+      "href": "adr/0048.html"
+    },
+    {
+      "id": "skill-base-engineering-ci-failure-triage",
+      "kind": "skill",
+      "label": "engineering/ci-failure-triage",
+      "href": "skill/base-engineering-ci-failure-triage.html"
+    },
+    {
+      "id": "skill-base-engineering-code-review-graph-first",
+      "kind": "skill",
+      "label": "engineering/code-review-graph-first",
+      "href": "skill/base-engineering-code-review-graph-first.html"
+    },
+    {
+      "id": "skill-base-engineering-diagnose",
+      "kind": "skill",
+      "label": "engineering/diagnose",
+      "href": "skill/base-engineering-diagnose.html"
+    },
+    {
+      "id": "skill-base-engineering-improve-codebase-architecture",
+      "kind": "skill",
+      "label": "engineering/improve-codebase-architecture",
+      "href": "skill/base-engineering-improve-codebase-architecture.html"
+    },
+    {
+      "id": "skill-base-engineering-lint-guard",
+      "kind": "skill",
+      "label": "engineering/lint-guard",
+      "href": "skill/base-engineering-lint-guard.html"
+    },
+    {
+      "id": "skill-base-engineering-post-iter-review",
+      "kind": "skill",
+      "label": "engineering/post-iter-review",
+      "href": "skill/base-engineering-post-iter-review.html"
+    },
+    {
+      "id": "skill-base-engineering-prototype",
+      "kind": "skill",
+      "label": "engineering/prototype",
+      "href": "skill/base-engineering-prototype.html"
+    },
+    {
+      "id": "skill-base-engineering-supacode-cli",
+      "kind": "skill",
+      "label": "engineering/supacode-cli",
+      "href": "skill/base-engineering-supacode-cli.html"
+    },
+    {
+      "id": "skill-base-engineering-tdd",
+      "kind": "skill",
+      "label": "engineering/tdd",
+      "href": "skill/base-engineering-tdd.html"
+    },
+    {
+      "id": "skill-base-engineering-to-issues",
+      "kind": "skill",
+      "label": "engineering/to-issues",
+      "href": "skill/base-engineering-to-issues.html"
+    },
+    {
+      "id": "skill-base-engineering-to-prd",
+      "kind": "skill",
+      "label": "engineering/to-prd",
+      "href": "skill/base-engineering-to-prd.html"
+    },
+    {
+      "id": "skill-base-engineering-triage",
+      "kind": "skill",
+      "label": "engineering/triage",
+      "href": "skill/base-engineering-triage.html"
+    },
+    {
+      "id": "skill-base-imported-impeccable",
+      "kind": "skill",
+      "label": "imported/impeccable",
+      "href": "skill/base-imported-impeccable.html"
+    },
+    {
+      "id": "skill-base-imported-layers-conceptual-model",
+      "kind": "skill",
+      "label": "imported/layers-conceptual-model",
+      "href": "skill/base-imported-layers-conceptual-model.html"
+    },
+    {
+      "id": "skill-base-imported-layers-domain",
+      "kind": "skill",
+      "label": "imported/layers-domain",
+      "href": "skill/base-imported-layers-domain.html"
+    },
+    {
+      "id": "skill-base-imported-layers-interaction-flow",
+      "kind": "skill",
+      "label": "imported/layers-interaction-flow",
+      "href": "skill/base-imported-layers-interaction-flow.html"
+    },
+    {
+      "id": "skill-base-imported-layers-intro",
+      "kind": "skill",
+      "label": "imported/layers-intro",
+      "href": "skill/base-imported-layers-intro.html"
+    },
+    {
+      "id": "skill-base-imported-layers-observed-behaviour",
+      "kind": "skill",
+      "label": "imported/layers-observed-behaviour",
+      "href": "skill/base-imported-layers-observed-behaviour.html"
+    },
+    {
+      "id": "skill-base-imported-layers-orient",
+      "kind": "skill",
+      "label": "imported/layers-orient",
+      "href": "skill/base-imported-layers-orient.html"
+    },
+    {
+      "id": "skill-base-imported-layers-product-strategy",
+      "kind": "skill",
+      "label": "imported/layers-product-strategy",
+      "href": "skill/base-imported-layers-product-strategy.html"
+    },
+    {
+      "id": "skill-base-imported-layers-surface",
+      "kind": "skill",
+      "label": "imported/layers-surface",
+      "href": "skill/base-imported-layers-surface.html"
+    },
+    {
+      "id": "skill-base-imported-layers-user-needs",
+      "kind": "skill",
+      "label": "imported/layers-user-needs",
+      "href": "skill/base-imported-layers-user-needs.html"
+    },
+    {
+      "id": "skill-base-imported-diagnose",
+      "kind": "skill",
+      "label": "imported/diagnose",
+      "href": "skill/base-imported-diagnose.html"
+    },
+    {
+      "id": "skill-base-imported-grill-with-docs",
+      "kind": "skill",
+      "label": "imported/grill-with-docs",
+      "href": "skill/base-imported-grill-with-docs.html"
+    },
+    {
+      "id": "skill-base-imported-improve-codebase-architecture",
+      "kind": "skill",
+      "label": "imported/improve-codebase-architecture",
+      "href": "skill/base-imported-improve-codebase-architecture.html"
+    },
+    {
+      "id": "skill-base-imported-prototype",
+      "kind": "skill",
+      "label": "imported/prototype",
+      "href": "skill/base-imported-prototype.html"
+    },
+    {
+      "id": "skill-base-imported-setup-matt-pocock-skills",
+      "kind": "skill",
+      "label": "imported/setup-matt-pocock-skills",
+      "href": "skill/base-imported-setup-matt-pocock-skills.html"
+    },
+    {
+      "id": "skill-base-imported-tdd",
+      "kind": "skill",
+      "label": "imported/tdd",
+      "href": "skill/base-imported-tdd.html"
+    },
+    {
+      "id": "skill-base-imported-to-issues",
+      "kind": "skill",
+      "label": "imported/to-issues",
+      "href": "skill/base-imported-to-issues.html"
+    },
+    {
+      "id": "skill-base-imported-to-prd",
+      "kind": "skill",
+      "label": "imported/to-prd",
+      "href": "skill/base-imported-to-prd.html"
+    },
+    {
+      "id": "skill-base-imported-triage",
+      "kind": "skill",
+      "label": "imported/triage",
+      "href": "skill/base-imported-triage.html"
+    },
+    {
+      "id": "skill-base-imported-zoom-out",
+      "kind": "skill",
+      "label": "imported/zoom-out",
+      "href": "skill/base-imported-zoom-out.html"
+    },
+    {
+      "id": "skill-base-imported-git-guardrails-claude-code",
+      "kind": "skill",
+      "label": "imported/git-guardrails-claude-code",
+      "href": "skill/base-imported-git-guardrails-claude-code.html"
+    },
+    {
+      "id": "skill-base-imported-migrate-to-shoehorn",
+      "kind": "skill",
+      "label": "imported/migrate-to-shoehorn",
+      "href": "skill/base-imported-migrate-to-shoehorn.html"
+    },
+    {
+      "id": "skill-base-imported-scaffold-exercises",
+      "kind": "skill",
+      "label": "imported/scaffold-exercises",
+      "href": "skill/base-imported-scaffold-exercises.html"
+    },
+    {
+      "id": "skill-base-imported-setup-pre-commit",
+      "kind": "skill",
+      "label": "imported/setup-pre-commit",
+      "href": "skill/base-imported-setup-pre-commit.html"
+    },
+    {
+      "id": "skill-base-imported-caveman",
+      "kind": "skill",
+      "label": "imported/caveman",
+      "href": "skill/base-imported-caveman.html"
+    },
+    {
+      "id": "skill-base-imported-grill-me",
+      "kind": "skill",
+      "label": "imported/grill-me",
+      "href": "skill/base-imported-grill-me.html"
+    },
+    {
+      "id": "skill-base-imported-handoff",
+      "kind": "skill",
+      "label": "imported/handoff",
+      "href": "skill/base-imported-handoff.html"
+    },
+    {
+      "id": "skill-base-imported-write-a-skill",
+      "kind": "skill",
+      "label": "imported/write-a-skill",
+      "href": "skill/base-imported-write-a-skill.html"
+    },
+    {
+      "id": "skill-base-imported-brainstorm-okrs",
+      "kind": "skill",
+      "label": "imported/brainstorm-okrs",
+      "href": "skill/base-imported-brainstorm-okrs.html"
+    },
+    {
+      "id": "skill-base-imported-create-prd",
+      "kind": "skill",
+      "label": "imported/create-prd",
+      "href": "skill/base-imported-create-prd.html"
+    },
+    {
+      "id": "skill-base-imported-define-problem-statement",
+      "kind": "skill",
+      "label": "imported/define-problem-statement",
+      "href": "skill/base-imported-define-problem-statement.html"
+    },
+    {
+      "id": "skill-base-imported-job-stories",
+      "kind": "skill",
+      "label": "imported/job-stories",
+      "href": "skill/base-imported-job-stories.html"
+    },
+    {
+      "id": "skill-base-imported-opportunity-solution-tree",
+      "kind": "skill",
+      "label": "imported/opportunity-solution-tree",
+      "href": "skill/base-imported-opportunity-solution-tree.html"
+    },
+    {
+      "id": "skill-base-imported-outcome-roadmap",
+      "kind": "skill",
+      "label": "imported/outcome-roadmap",
+      "href": "skill/base-imported-outcome-roadmap.html"
+    },
+    {
+      "id": "skill-base-imported-pre-mortem",
+      "kind": "skill",
+      "label": "imported/pre-mortem",
+      "href": "skill/base-imported-pre-mortem.html"
+    },
+    {
+      "id": "skill-base-imported-prioritize-features",
+      "kind": "skill",
+      "label": "imported/prioritize-features",
+      "href": "skill/base-imported-prioritize-features.html"
+    },
+    {
+      "id": "skill-base-imported-release-notes",
+      "kind": "skill",
+      "label": "imported/release-notes",
+      "href": "skill/base-imported-release-notes.html"
+    },
+    {
+      "id": "skill-base-imported-retro",
+      "kind": "skill",
+      "label": "imported/retro",
+      "href": "skill/base-imported-retro.html"
+    },
+    {
+      "id": "skill-base-imported-sprint-plan",
+      "kind": "skill",
+      "label": "imported/sprint-plan",
+      "href": "skill/base-imported-sprint-plan.html"
+    },
+    {
+      "id": "skill-base-imported-stakeholder-map",
+      "kind": "skill",
+      "label": "imported/stakeholder-map",
+      "href": "skill/base-imported-stakeholder-map.html"
+    },
+    {
+      "id": "skill-base-imported-summarize-meeting",
+      "kind": "skill",
+      "label": "imported/summarize-meeting",
+      "href": "skill/base-imported-summarize-meeting.html"
+    },
+    {
+      "id": "skill-base-imported-user-stories",
+      "kind": "skill",
+      "label": "imported/user-stories",
+      "href": "skill/base-imported-user-stories.html"
+    },
+    {
+      "id": "skill-base-imported-utility-pm-critic",
+      "kind": "skill",
+      "label": "imported/utility-pm-critic",
+      "href": "skill/base-imported-utility-pm-critic.html"
+    },
+    {
+      "id": "skill-base-imported-competitor-analysis",
+      "kind": "skill",
+      "label": "imported/competitor-analysis",
+      "href": "skill/base-imported-competitor-analysis.html"
+    },
+    {
+      "id": "skill-base-imported-discover-interview-synthesis",
+      "kind": "skill",
+      "label": "imported/discover-interview-synthesis",
+      "href": "skill/base-imported-discover-interview-synthesis.html"
+    },
+    {
+      "id": "skill-base-imported-interview-script",
+      "kind": "skill",
+      "label": "imported/interview-script",
+      "href": "skill/base-imported-interview-script.html"
+    },
+    {
+      "id": "skill-base-imported-market-sizing",
+      "kind": "skill",
+      "label": "imported/market-sizing",
+      "href": "skill/base-imported-market-sizing.html"
+    },
+    {
+      "id": "skill-base-imported-sentiment-analysis",
+      "kind": "skill",
+      "label": "imported/sentiment-analysis",
+      "href": "skill/base-imported-sentiment-analysis.html"
+    },
+    {
+      "id": "skill-base-imported-summarize-interview",
+      "kind": "skill",
+      "label": "imported/summarize-interview",
+      "href": "skill/base-imported-summarize-interview.html"
+    },
+    {
+      "id": "skill-base-imported-user-personas",
+      "kind": "skill",
+      "label": "imported/user-personas",
+      "href": "skill/base-imported-user-personas.html"
+    },
+    {
+      "id": "skill-base-imported-brandkit",
+      "kind": "skill",
+      "label": "imported/brandkit",
+      "href": "skill/base-imported-brandkit.html"
+    },
+    {
+      "id": "skill-base-imported-brutalist-skill",
+      "kind": "skill",
+      "label": "imported/brutalist-skill",
+      "href": "skill/base-imported-brutalist-skill.html"
+    },
+    {
+      "id": "skill-base-imported-gpt-tasteskill",
+      "kind": "skill",
+      "label": "imported/gpt-tasteskill",
+      "href": "skill/base-imported-gpt-tasteskill.html"
+    },
+    {
+      "id": "skill-base-imported-image-to-code-skill",
+      "kind": "skill",
+      "label": "imported/image-to-code-skill",
+      "href": "skill/base-imported-image-to-code-skill.html"
+    },
+    {
+      "id": "skill-base-imported-imagegen-frontend-mobile",
+      "kind": "skill",
+      "label": "imported/imagegen-frontend-mobile",
+      "href": "skill/base-imported-imagegen-frontend-mobile.html"
+    },
+    {
+      "id": "skill-base-imported-imagegen-frontend-web",
+      "kind": "skill",
+      "label": "imported/imagegen-frontend-web",
+      "href": "skill/base-imported-imagegen-frontend-web.html"
+    },
+    {
+      "id": "skill-base-imported-minimalist-skill",
+      "kind": "skill",
+      "label": "imported/minimalist-skill",
+      "href": "skill/base-imported-minimalist-skill.html"
+    },
+    {
+      "id": "skill-base-imported-output-skill",
+      "kind": "skill",
+      "label": "imported/output-skill",
+      "href": "skill/base-imported-output-skill.html"
+    },
+    {
+      "id": "skill-base-imported-redesign-skill",
+      "kind": "skill",
+      "label": "imported/redesign-skill",
+      "href": "skill/base-imported-redesign-skill.html"
+    },
+    {
+      "id": "skill-base-imported-soft-skill",
+      "kind": "skill",
+      "label": "imported/soft-skill",
+      "href": "skill/base-imported-soft-skill.html"
+    },
+    {
+      "id": "skill-base-imported-stitch-skill",
+      "kind": "skill",
+      "label": "imported/stitch-skill",
+      "href": "skill/base-imported-stitch-skill.html"
+    },
+    {
+      "id": "skill-base-imported-taste-skill",
+      "kind": "skill",
+      "label": "imported/taste-skill",
+      "href": "skill/base-imported-taste-skill.html"
+    },
+    {
+      "id": "skill-base-meta-agents-md-curator",
+      "kind": "skill",
+      "label": "meta/agents-md-curator",
+      "href": "skill/base-meta-agents-md-curator.html"
+    },
+    {
+      "id": "skill-base-meta-anchored-edit",
+      "kind": "skill",
+      "label": "meta/anchored-edit",
+      "href": "skill/base-meta-anchored-edit.html"
+    },
+    {
+      "id": "skill-base-meta-audit-docs",
+      "kind": "skill",
+      "label": "meta/audit-docs",
+      "href": "skill/base-meta-audit-docs.html"
+    },
+    {
+      "id": "skill-base-meta-docs-drift",
+      "kind": "skill",
+      "label": "meta/docs-drift",
+      "href": "skill/base-meta-docs-drift.html"
+    },
+    {
+      "id": "skill-base-meta-docs-index",
+      "kind": "skill",
+      "label": "meta/docs-index",
+      "href": "skill/base-meta-docs-index.html"
+    },
+    {
+      "id": "skill-base-meta-find-skills",
+      "kind": "skill",
+      "label": "meta/find-skills",
+      "href": "skill/base-meta-find-skills.html"
+    },
+    {
+      "id": "skill-base-meta-graphify",
+      "kind": "skill",
+      "label": "meta/graphify",
+      "href": "skill/base-meta-graphify.html"
+    },
+    {
+      "id": "skill-base-meta-human-html",
+      "kind": "skill",
+      "label": "meta/human-html",
+      "href": "skill/base-meta-human-html.html"
+    },
+    {
+      "id": "skill-base-meta-playbook-promote",
+      "kind": "skill",
+      "label": "meta/playbook-promote",
+      "href": "skill/base-meta-playbook-promote.html"
+    },
+    {
+      "id": "skill-base-meta-playbook-retrospective",
+      "kind": "skill",
+      "label": "meta/playbook-retrospective",
+      "href": "skill/base-meta-playbook-retrospective.html"
+    },
+    {
+      "id": "skill-base-meta-setup-matt-pocock-skills",
+      "kind": "skill",
+      "label": "meta/setup-matt-pocock-skills",
+      "href": "skill/base-meta-setup-matt-pocock-skills.html"
+    },
+    {
+      "id": "skill-base-meta-skill-cleaner",
+      "kind": "skill",
+      "label": "meta/skill-cleaner",
+      "href": "skill/base-meta-skill-cleaner.html"
+    },
+    {
+      "id": "skill-base-meta-trajectory-canary",
+      "kind": "skill",
+      "label": "meta/trajectory-canary",
+      "href": "skill/base-meta-trajectory-canary.html"
+    },
+    {
+      "id": "skill-base-meta-trajectory-summarizer",
+      "kind": "skill",
+      "label": "meta/trajectory-summarizer",
+      "href": "skill/base-meta-trajectory-summarizer.html"
+    },
+    {
+      "id": "skill-base-meta-write-a-skill",
+      "kind": "skill",
+      "label": "meta/write-a-skill",
+      "href": "skill/base-meta-write-a-skill.html"
+    },
+    {
+      "id": "skill-base-meta-zoom-out",
+      "kind": "skill",
+      "label": "meta/zoom-out",
+      "href": "skill/base-meta-zoom-out.html"
+    },
+    {
+      "id": "skill-base-observability-ha-alert-triage",
+      "kind": "skill",
+      "label": "observability/ha-alert-triage",
+      "href": "skill/base-observability-ha-alert-triage.html"
+    },
+    {
+      "id": "skill-base-observability-market-audit-deployed-stack",
+      "kind": "skill",
+      "label": "observability/market-audit-deployed-stack",
+      "href": "skill/base-observability-market-audit-deployed-stack.html"
+    },
+    {
+      "id": "skill-base-productivity-ask-colleague",
+      "kind": "skill",
+      "label": "productivity/ask-colleague",
+      "href": "skill/base-productivity-ask-colleague.html"
+    },
+    {
+      "id": "skill-base-productivity-ask-team",
+      "kind": "skill",
+      "label": "productivity/ask-team",
+      "href": "skill/base-productivity-ask-team.html"
+    },
+    {
+      "id": "skill-base-productivity-caveman",
+      "kind": "skill",
+      "label": "productivity/caveman",
+      "href": "skill/base-productivity-caveman.html"
+    },
+    {
+      "id": "skill-base-productivity-distill-slack-persona",
+      "kind": "skill",
+      "label": "productivity/distill-slack-persona",
+      "href": "skill/base-productivity-distill-slack-persona.html"
+    },
+    {
+      "id": "skill-base-productivity-frontend-slides",
+      "kind": "skill",
+      "label": "productivity/frontend-slides",
+      "href": "skill/base-productivity-frontend-slides.html"
+    },
+    {
+      "id": "skill-base-productivity-grill-me",
+      "kind": "skill",
+      "label": "productivity/grill-me",
+      "href": "skill/base-productivity-grill-me.html"
+    },
+    {
+      "id": "skill-base-productivity-grill-with-docs",
+      "kind": "skill",
+      "label": "productivity/grill-with-docs",
+      "href": "skill/base-productivity-grill-with-docs.html"
+    },
+    {
+      "id": "skill-base-productivity-handoff",
+      "kind": "skill",
+      "label": "productivity/handoff",
+      "href": "skill/base-productivity-handoff.html"
+    },
+    {
+      "id": "skill-base-productivity-promote-ticket",
+      "kind": "skill",
+      "label": "productivity/promote-ticket",
+      "href": "skill/base-productivity-promote-ticket.html"
+    },
+    {
+      "id": "skill-base-productivity-spreadsheet",
+      "kind": "skill",
+      "label": "productivity/spreadsheet",
+      "href": "skill/base-productivity-spreadsheet.html"
+    },
+    {
+      "id": "skill-base-research-agent-repo-briefing",
+      "kind": "skill",
+      "label": "research/agent-repo-briefing",
+      "href": "skill/base-research-agent-repo-briefing.html"
+    },
+    {
+      "id": "skill-base-research-data-profiling",
+      "kind": "skill",
+      "label": "research/data-profiling",
+      "href": "skill/base-research-data-profiling.html"
+    },
+    {
+      "id": "skill-base-research-hypothesis-design",
+      "kind": "skill",
+      "label": "research/hypothesis-design",
+      "href": "skill/base-research-hypothesis-design.html"
+    },
+    {
+      "id": "skill-base-research-literature-synthesis",
+      "kind": "skill",
+      "label": "research/literature-synthesis",
+      "href": "skill/base-research-literature-synthesis.html"
+    },
+    {
+      "id": "skill-base-research-notebook-to-production",
+      "kind": "skill",
+      "label": "research/notebook-to-production",
+      "href": "skill/base-research-notebook-to-production.html"
+    },
+    {
+      "id": "skill-base-research-rag-eval-method",
+      "kind": "skill",
+      "label": "research/rag-eval-method",
+      "href": "skill/base-research-rag-eval-method.html"
+    },
+    {
+      "id": "skill-base-research-statistical-analysis",
+      "kind": "skill",
+      "label": "research/statistical-analysis",
+      "href": "skill/base-research-statistical-analysis.html"
+    },
+    {
+      "id": "trajectory-trajectory-canary-canary",
+      "kind": "trajectory",
+      "label": "trajectory-canary/canary",
+      "href": "trajectory/trajectory-canary-canary.html"
+    }
+  ],
+  "edges": [
+    {
+      "source": "adr-0004",
+      "target": "skill-base-imported-diagnose",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0004",
+      "target": "skill-base-engineering-post-iter-review",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0004",
+      "target": "skill-base-imported-tdd",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0004",
+      "target": "skill-base-imported-triage",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0004",
+      "target": "skill-base-productivity-grill-me",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0008",
+      "target": "skill-base-productivity-grill-me",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0008",
+      "target": "skill-base-meta-playbook-promote",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0008",
+      "target": "skill-base-meta-playbook-retrospective",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0013",
+      "target": "skill-base-engineering-supacode-cli",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0013",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0015",
+      "target": "skill-base-imported-image-to-code-skill",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0015",
+      "target": "skill-base-imported-imagegen-frontend-mobile",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0015",
+      "target": "skill-base-meta-graphify",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0015",
+      "target": "skill-base-research-agent-repo-briefing",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0015",
+      "target": "skill-base-research-data-profiling",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0015",
+      "target": "skill-base-research-hypothesis-design",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0015",
+      "target": "skill-base-research-literature-synthesis",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0015",
+      "target": "skill-base-research-notebook-to-production",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0015",
+      "target": "skill-base-research-rag-eval-method",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0015",
+      "target": "skill-base-research-statistical-analysis",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0017",
+      "target": "skill-base-engineering-ci-failure-triage",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0017",
+      "target": "skill-base-imported-triage",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0018",
+      "target": "skill-base-meta-anchored-edit",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0019",
+      "target": "skill-base-imported-impeccable",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0019",
+      "target": "skill-base-imported-taste-skill",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-imported-diagnose",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-imported-improve-codebase-architecture",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-imported-tdd",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-imported-triage",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-imported-impeccable",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-imported-layers-intro",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-imported-layers-product-strategy",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-productivity-handoff",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-meta-audit-docs",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-research-data-profiling",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-research-hypothesis-design",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-research-notebook-to-production",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0022",
+      "target": "skill-base-research-statistical-analysis",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0024",
+      "target": "skill-base-productivity-grill-with-docs",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0024",
+      "target": "skill-base-productivity-handoff",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0024",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0025",
+      "target": "skill-base-imported-diagnose",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0025",
+      "target": "skill-base-productivity-grill-with-docs",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0025",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0026",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0027",
+      "target": "skill-base-engineering-lint-guard",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0027",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0029",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0033",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0034",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0035",
+      "target": "skill-base-engineering-lint-guard",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0035",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0036",
+      "target": "skill-base-productivity-handoff",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0036",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0040",
+      "target": "skill-base-imported-triage",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0040",
+      "target": "skill-base-meta-agents-md-curator",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0040",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0041",
+      "target": "skill-base-productivity-handoff",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0041",
+      "target": "skill-base-meta-human-html",
+      "kind": "mentions"
+    },
+    {
+      "source": "adr-0043",
+      "target": "skill-base-productivity-handoff",
+      "kind": "mentions"
+    },
+    {
+      "source": "trajectory-trajectory-canary-canary",
+      "target": "skill-base-meta-trajectory-canary",
+      "kind": "belongs_to"
+    },
+    {
+      "source": "adr-0032",
+      "target": "adr-0026",
+      "kind": "supersedes"
+    },
+    {
+      "source": "adr-0033",
+      "target": "adr-0027",
+      "kind": "supersedes"
+    }
+  ]
+}

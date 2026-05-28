@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ADR-0048: Skill telemetry via OTel gen_ai conventions</title>
+  <link rel="stylesheet" href="../static/atlas.css">
+</head>
+<body><nav class="atlas-nav">
+  <a href="../index.html">Atlas</a>
+  <a href="../index.html#adrs">ADRs</a>
+  <a href="../index.html#skills">Skills</a>
+  <a href="../index.html#trajectories">Trajectories</a>
+</nav>
+<main><h1>ADR-0048: Skill telemetry via OTel gen_ai conventions</h1><p class="muted">Source: <code>docs/adr/0048-skill-telemetry-privacy.md</code></p><pre># 0048. Skill telemetry via OTel gen_ai conventions
+
+## Status
+Accepted (2026-05-28). Ships the collector recipes (docker +
+pure-Python), JSONL ingest, per-skill report CLI, and a usage-based
+decay layer on top of the existing date-based decay. Telemetry is
+opt-in: the collector only runs when explicitly started, and every
+consumer can be disabled via env var.
+
+## Context
+
+Today the playbook ships zero production telemetry. `decay_check.py`
+warns by `last_reviewed` date, not by actual usage. A skill can
+have a fresh review date and zero triggers; the date-based check
+misses it. Vercel&#x27;s agent eval (Aug 2025) showed AGENTS.md changes
+moved pass rate from 53% to 79%, exactly the kind of signal a usage
+layer would surface for the playbook&#x27;s own skills.
+
+Claude Code already emits OpenTelemetry `gen_ai.*` traces when
+`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is set. The data path is one
+env var away from working; what&#x27;s missing is a collector that
+respects the playbook&#x27;s privacy posture and an aggregation surface
+that&#x27;s not someone else&#x27;s hosted dashboard.
+
+The trajectory harness arc (ADR-0044 through ADR-0046) already
+landed an OTel parser for the `gen_ai.*` shape. Reusing the same
+`TraceEvent`-adjacent record shape for production telemetry keeps
+the two surfaces on one contract.
+
+## Decision
+
+### Layered architecture
+
+```
+Claude Code  -- gen_ai.* OTLP --&gt;  collector  --  JSONL  --&gt;  consumers
+                                  (docker OR                  (report CLI,
+                                   pure-python)               decay check,
+                                                              atlas badges)
+```
+
+Three independent pieces:
+
+1. **Collector** (`scripts/telemetry/`): docker-compose recipe with
+   `otel/opentelemetry-collector-contrib`, OR a stdlib-only
+   pure-Python receiver at `scripts/telemetry/pyotel_collector.py`.
+   Both write the same JSONL shape to
+   `~/.coding-agents-playbook/telemetry/skills.jsonl`.
+2. **Ingest** (`scripts/telemetry/ingest.py`): reads JSONL,
+   normalizes to `TelemetryRecord`, computes per-skill aggregates.
+   Tolerant of two row shapes: the canonical TelemetryRecord and
+   the raw OTLP span shape otelcol writes by default.
+3. **Consumers**: `scripts/skill_telemetry_report.py` CLI prints a
+   per-skill table; `scripts/decay_check.py` adds a usage-based
+   layer that flags skills with no triggers in 60+ days.
+
+### Privacy bounds
+
+`TelemetryRecord` is a privacy-bounded NamedTuple: only metadata
+(skill name, adapter, model, timestamp, latency, token counts).
+Prompt content (`gen_ai.prompt`, `gen_ai.input.messages`) and
+response content (`gen_ai.choice`, `gen_ai.output.messages`,
+`gen_ai.completion`) are dropped at the collector before write.
+
+The pure-Python collector enforces this via the `BANNED_PREFIXES`
+constant. The docker collector enforces it via the
+`attributes/strip_bodies` processor in `collector-config.yaml`.
+
+Storage is local-first under `~/.coding-agents-playbook/telemetry/`.
+No upstream submission. No remote endpoints. No analytics SDKs.
+
+### Off switch (added on user request)
+
+Any of these env vars set to `off`, `0`, `false`, `no`, or `disabled`
+turns the entire telemetry layer off:
+
+- `TELEMETRY`
+- `TELEMETRY_ENABLED`
+- `PLAYBOOK_TELEMETRY`
+
+When off:
+
+- `make telemetry-init` refuses to start the collector
+- `make telemetry-collector-py` refuses to start the receiver
+- `make telemetry-report` exits 0 with a notice
+- `scripts/decay_check.py` skips the usage layer entirely
+- Atlas (per ADR-0049) renders skill cards without telemetry badges
+
+The off switch is checked in `scripts/telemetry/__init__.py`
+`is_enabled()`; every consumer calls it. Disabling does not delete
+prior data, only stops new writes and new reads.
+
+### Why two collector recipes
+
+- **docker-compose** is the industry-standard path. Most agent
+  observability docs (Dash0, Coralogix, Sentry) assume otelcol-
+  contrib in a container. Strong upstream support, well-known
+  pipeline DSL.
+- **pure-Python** removes the docker dependency. The playbook
+  already has zero runtime daemons; forcing docker on every
+  contributor who wants per-skill telemetry would be a regression.
+
+The pure-Python collector only accepts OTLP/HTTP JSON envelopes
+(`OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/json`). Protobuf is left
+to the docker path; we are not vendoring protobuf for this.
+
+### Usage-based decay
+
+`USAGE_DECAY_DAYS = 60`. A skill with no recorded triggers in 60
+days produces a notice, regardless of `last_reviewed`. Skills with
+NO telemetry events at all also produce a notice (&quot;no usage
+signal&quot;). Both are advisory (notice band), not blocking; the
+date-based decay remains the single source of truth for build
+pass/fail because telemetry coverage is incomplete by design (not
+every adapter emits OTel, not every user has telemetry on).
+
+When the playbook reaches a state where every supported adapter
+emits OTel and the team operates with telemetry on, a future ADR
+can promote usage-decay to a warn or block band.
+
+## Consequences
+
+### Positive
+
+- &quot;Skills decay&quot; claim becomes data-backed instead of date-vibes.
+- Per-skill p50/p95 latency is visible without paying for a hosted
+  agent-observability tool.
+- Atlas (ADR-0049) can render trigger badges, which makes the
+  skill catalog scannable by usage instead of by alphabetical
+  directory order.
+- Privacy-by-construction: the banned-prefix list is one place to
+  audit. Reviewers do not need to chase &quot;did this leak prompt
+  content&quot; across multiple consumers.
+
+### Negative
+
+- Two collectors to maintain. They share the JSONL output shape so
+  a consumer is collector-agnostic, but pipeline bugs can land in
+  either place.
+- Telemetry-off means the usage-decay layer is silent. If a user
+  expects usage-decay to gate their build, they must turn
+  telemetry on.
+- otelcol-contrib pipes through docker which can be a privacy
+  fingerprint of its own (container metadata). The privacy
+  posture is &quot;local-first,&quot; not &quot;hidden.&quot;
+
+### Reject if
+
+- Collector adds material runtime overhead (target: under 5% on
+  agent latency)
+- A prompt-body leak reaches the JSONL file (privacy-critical bug)
+- `make telemetry-report` takes longer than 1s on a typical month
+  of data
+
+## References
+
+- Claude Code monitoring: https://code.claude.com/docs/en/monitoring-usage
+- OTel `gen_ai.*` conventions: https://opentelemetry.io/docs/specs/semconv/gen-ai/
+- Vercel agent eval (AGENTS.md 53% -&gt; 79%): https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals
+- `docs/research/2026-05-28-tavily-enhancement-backlog.md` Idea 4
+</pre><section><h2>Mentioned by</h2><ul><li><em>none</em></li></ul></section></main><footer class="atlas-footer">Generated by <code>make atlas</code> (ADR-0049). Do not hand-edit; the next build will overwrite.</footer></body></html>
