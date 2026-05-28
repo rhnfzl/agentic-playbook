@@ -1,4 +1,4 @@
-.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio trajectory-calibrate
+.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio trajectory-calibrate record-trajectory
 
 PYTHON ?= python3
 
@@ -135,6 +135,13 @@ trajectory-calibrate:
 		--skill "$(SKILL)" --scenario "$(SCENARIO)" \
 		$(if $(RUNS),--runs $(RUNS)) \
 		$(if $(JSON),--json)
+
+record-trajectory:
+	@if [ -z "$(SKILL)" ] || [ -z "$(SCENARIO)" ] || [ -z "$(PROMPT)" ]; then \
+		echo "Usage: make record-trajectory SKILL=<name> SCENARIO=<name> PROMPT=\"<user prompt>\""; exit 1; \
+	fi
+	@$(PYTHON) scripts/trajectory_record.py \
+		--skill "$(SKILL)" --scenario "$(SCENARIO)" --prompt "$(PROMPT)"
 
 doctor:
 	@$(PYTHON) scripts/install.py --diagnose
