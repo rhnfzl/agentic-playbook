@@ -23,8 +23,11 @@ Constraints before you start:
      (b) the agent surface it would land on (~/.claude/skills/, ~/.codex/hooks/,
      ~/.cursor/rules/, ~/.codeium/windsurf/, ~/.pi/agent/, etc.), and (c) one sentence
      on why it fits MY setup, not the generic case.
-  4. Never propose something that would overwrite a hand-authored file. Detect existing
-     content via mtime + content hash before proposing.
+  4. Never propose something that would overwrite a hand-authored file. The installer
+     materializes content under managed-block markers and the lockfile records every
+     materialized path; before proposing, walk the lockfile (if present at the target)
+     and check whether the path is already managed or hand-authored. Anything outside
+     the managed-block markers is operator-owned and must not be overwritten.
 
 Walk in this order:
 
