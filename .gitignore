@@ -34,3 +34,6 @@ venv/
 
 # Human-in-loop review artifacts (always per-workspace, never committed)
 docs/human-html/
+
+# Brainstorming spec drafts (kept local until promoted to an ADR or merged feature)
+docs/superpowers/

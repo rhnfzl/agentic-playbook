@@ -23,6 +23,7 @@ from ._protocol import (
     Prompt,
     Rule,
     Skill,
+    Trajectory,
 )
 
 
@@ -262,6 +263,202 @@ def load_commands(content_paths: ContentPaths) -> list[Command]:
             path=cmd_md, name=cmd_md.stem, frontmatter=fm, body=body
         )
     return sorted(by_name.values(), key=lambda c: c.name)
+
+
+def _parse_inline_list(raw: str) -> list[str]:
+    """Parse YAML inline list `[a, b, c]` (or bare string) into list[str]."""
+    s = raw.strip()
+    if not s:
+        return []
+    if s.startswith("[") and s.endswith("]"):
+        inner = s[1:-1].strip()
+        if not inner:
+            return []
+        return [
+            tok.strip().strip('"').strip("'")
+            for tok in inner.split(",")
+            if tok.strip()
+        ]
+    return [s.strip('"').strip("'")]
+
+
+def _parse_trajectory_body(body: str) -> tuple[list[str], list[dict], dict]:
+    """Parse trajectory YAML body into (phrasings, assertions, llm_judge).
+
+    Naive parser tuned to the documented trajectory shape (ADR-0043).
+    Out-of-shape content (deeply nested assertion values, etc.) is left for
+    the trajectory linter (scripts/checks/trajectory.py) to surface; we
+    return what we can read so the linter has an attribution path.
+
+    Shape we understand:
+
+      input:
+        phrasings:
+          - "first phrasing"
+          - "second phrasing"
+        variant_strategy: parallel        # captured under llm_judge meta? no
+                                          # variant_strategy is reader-ignored
+
+      assertions:
+        - simple_key: value
+        - another_key: value
+
+      llm_judge:
+        threshold: 0.7
+        rubric: |
+          multi
+          line
+        model: claude-sonnet-4-6
+    """
+    phrasings: list[str] = []
+    assertions: list[dict] = []
+    llm_judge: dict = {}
+
+    section: str | None = None
+    in_phrasings = False
+    in_rubric_block = False
+    rubric_indent: int | None = None
+    rubric_lines: list[str] = []
+
+    for raw in body.splitlines():
+        if in_rubric_block:
+            # Block-scalar collection. End when we hit a less-indented line.
+            stripped = raw.rstrip()
+            if not stripped.strip():
+                rubric_lines.append("")
+                continue
+            indent = len(raw) - len(raw.lstrip())
+            if rubric_indent is None:
+                rubric_indent = indent
+            if indent < rubric_indent:
+                # End of block scalar; close it and re-process this line.
+                llm_judge["rubric"] = "\n".join(rubric_lines).rstrip()
+                in_rubric_block = False
+                rubric_lines = []
+                rubric_indent = None
+                # Fall through to normal handling for this line.
+            else:
+                rubric_lines.append(raw[rubric_indent:])
+                continue
+
+        line_stripped = raw.lstrip()
+        if line_stripped.startswith("#") or not line_stripped:
+            continue
+        line = raw.rstrip()
+
+        # Top-level section detection (zero indent + `name:` form).
+        if line and not line.startswith(" "):
+            head = line.split(":", 1)[0].strip()
+            if head == "input":
+                section = "input"
+                in_phrasings = False
+                continue
+            if head == "assertions":
+                section = "assertions"
+                in_phrasings = False
+                continue
+            if head == "llm_judge":
+                section = "llm_judge"
+                in_phrasings = False
+                continue
+            section = None
+            in_phrasings = False
+            continue
+
+        if section == "input":
+            # `  phrasings:` opens a list of strings.
+            if line.lstrip().startswith("phrasings:"):
+                in_phrasings = True
+                continue
+            if in_phrasings and line.lstrip().startswith("- "):
+                phrasings.append(
+                    line.split("- ", 1)[1].strip().strip('"').strip("'")
+                )
+                continue
+            # Any non-list-item under input ends the phrasings sub-section.
+            if in_phrasings and not line.lstrip().startswith("- "):
+                in_phrasings = False
+
+        elif section == "assertions":
+            # Each list item is `  - key: value` (single-pair dict).
+            if line.lstrip().startswith("- "):
+                payload = line.split("- ", 1)[1]
+                if ":" in payload:
+                    k, v = payload.split(":", 1)
+                    key = k.strip()
+                    value: str | list[str] = v.strip().strip('"').strip("'")
+                    if isinstance(value, str) and value.startswith("[") and value.endswith("]"):
+                        value = _parse_inline_list(value)
+                    assertions.append({key: value})
+
+        elif section == "llm_judge":
+            payload = line.strip()
+            if ":" in payload:
+                k, v = payload.split(":", 1)
+                key = k.strip()
+                value_str = v.strip()
+                if value_str == "|":
+                    # Open a block scalar; collect indented lines below.
+                    in_rubric_block = True
+                    rubric_lines = []
+                    rubric_indent = None
+                    continue
+                # Coerce numeric values.
+                cleaned = value_str.strip('"').strip("'")
+                if key == "threshold":
+                    try:
+                        llm_judge[key] = float(cleaned)
+                    except ValueError:
+                        llm_judge[key] = cleaned
+                else:
+                    llm_judge[key] = cleaned
+
+    # Close any unterminated block scalar at EOF.
+    if in_rubric_block:
+        llm_judge["rubric"] = "\n".join(rubric_lines).rstrip()
+
+    return phrasings, assertions, llm_judge
+
+
+def load_trajectories(content_paths: ContentPaths) -> list[Trajectory]:
+    """Load trajectory YAML files across content roots with overlay-wins merge.
+
+    v0.2 (ADR-0043): the 8th content type. Trajectory files live at
+    `<root>/trajectories/<skill>/<scenario>.yaml`. The reader is permissive:
+    files without frontmatter come back with empty frontmatter so the
+    trajectory linter (scripts/checks/trajectory.py) can attribute failures
+    to a specific path. Files outside the documented shape (extra keys,
+    deeply nested values) are read best-effort; the linter is the gate.
+
+    Key for overlay merge is `(skill, scenario)`; later roots win.
+    """
+    by_key: dict[tuple[str, str], Trajectory] = {}
+    for root in content_paths.roots:
+        trajectories_dir = root / "trajectories"
+        if not trajectories_dir.is_dir():
+            continue
+        for skill_dir in sorted(p for p in trajectories_dir.iterdir() if p.is_dir()):
+            skill_name = skill_dir.name
+            for traj_yaml in sorted(skill_dir.glob("*.yaml")):
+                scenario = traj_yaml.stem
+                text = traj_yaml.read_text(encoding="utf-8")
+                fm, body = _parse_frontmatter(text)
+                phrasings, assertions, llm_judge = _parse_trajectory_body(body)
+                adapter_scope_raw = fm.get("adapter_scope", "")
+                adapter_scope = _parse_inline_list(adapter_scope_raw)
+                by_key[(skill_name, scenario)] = Trajectory(
+                    path=traj_yaml,
+                    skill=skill_name,
+                    scenario=scenario,
+                    frontmatter=fm,
+                    body=body,
+                    input_phrasings=phrasings,
+                    assertions=assertions,
+                    llm_judge=llm_judge,
+                    adapter_scope=adapter_scope,
+                    model_pinned=fm.get("model_pinned", "").strip(),
+                )
+    return sorted(by_key.values(), key=lambda t: (t.skill, t.scenario))
 
 
 def load_prompts(content_paths: ContentPaths) -> list[Prompt]:

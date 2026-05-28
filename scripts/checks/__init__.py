@@ -75,6 +75,7 @@ from . import (  # noqa: E402
     pyright_zero,
     size,
     skill_description,
+    trajectory,
 )
 
 
@@ -100,4 +101,5 @@ CHECKS: list[_Check] = [
     _Check("adr-number-unique", adr_number_unique.run),
     _Check("ignored-containment", ignored_containment.run),
     _Check("playbook-version", playbook_version.run),
+    _Check("trajectory", trajectory.run),
 ]

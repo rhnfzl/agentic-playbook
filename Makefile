@@ -27,6 +27,8 @@ help:
 	@echo "  make test                          Adapter smoke tests + pytest lifecycle scenarios"
 	@echo "  make new SKILL=<name>              Scaffold a new skill (in skills/<category>/<name>/)"
 	@echo "                                     Optional: CATEGORY=engineering|productivity|observability|meta"
+	@echo "  make new TRAJECTORY=<skill>:<scenario>"
+	@echo "                                     Scaffold a new trajectory under base/trajectories/<skill>/"
 	@echo "  make doctor                        Diagnose setup: which agents detected, which not, why"
 	@echo "  make doctor-verify                 Layer-3 verify: lockfile vs native config vs on-disk (ADR-0036)"
 	@echo "  make targets-list                  Multi-project: list every target where init has been run"
@@ -89,8 +91,20 @@ test:
 	@$(PYTHON) -m pytest tests/ -q
 
 new:
-	@if [ -z "$(SKILL)" ]; then echo "Usage: make new SKILL=<name> [CATEGORY=<cat>] [SCOPE=base|team]"; exit 1; fi
-	@$(PYTHON) scripts/new_skill.py --name "$(SKILL)" --category "$(if $(CATEGORY),$(CATEGORY),engineering)" --scope "$(if $(SCOPE),$(SCOPE),base)"
+	@if [ -n "$(TRAJECTORY)" ]; then \
+		skill=$$(echo "$(TRAJECTORY)" | cut -d: -f1); \
+		scenario=$$(echo "$(TRAJECTORY)" | cut -d: -f2); \
+		if [ -z "$$skill" ] || [ -z "$$scenario" ] || [ "$$skill" = "$$scenario" ]; then \
+			echo "Usage: make new TRAJECTORY=<skill>:<scenario>"; exit 1; \
+		fi; \
+		$(PYTHON) scripts/new_trajectory.py --skill "$$skill" --scenario "$$scenario"; \
+	elif [ -n "$(SKILL)" ]; then \
+		$(PYTHON) scripts/new_skill.py --name "$(SKILL)" --category "$(if $(CATEGORY),$(CATEGORY),engineering)" --scope "$(if $(SCOPE),$(SCOPE),base)"; \
+	else \
+		echo "Usage: make new SKILL=<name> [CATEGORY=<cat>] [SCOPE=base|team]"; \
+		echo "   or: make new TRAJECTORY=<skill>:<scenario>"; \
+		exit 1; \
+	fi
 
 doctor:
 	@$(PYTHON) scripts/install.py --diagnose

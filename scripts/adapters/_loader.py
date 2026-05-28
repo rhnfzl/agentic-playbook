@@ -45,6 +45,7 @@ from ._protocol import (
     Prompt,
     Rule,
     Skill,
+    Trajectory,
     reconcile_managed_hook_commands,
     reconcile_managed_json_mcp,
     resolve_content_paths,
@@ -58,6 +59,7 @@ from ._reader import (
     load_prompts,
     load_rules,
     load_skills,
+    load_trajectories,
 )
 from ._writer import (
     _EM_DASH_CHARS,
@@ -109,6 +111,7 @@ __all__ = [
     "Prompt",
     "Rule",
     "Skill",
+    "Trajectory",
     "agent_to_toml",
     "compose_agents_md",
     "copy_skill_payload",
@@ -125,6 +128,7 @@ __all__ = [
     "load_prompts",
     "load_rules",
     "load_skills",
+    "load_trajectories",
     "materialize_mcp_sources",
     "merge_managed_mcp_into_json",
     "reconcile_managed_hook_commands",
