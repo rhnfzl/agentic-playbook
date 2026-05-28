@@ -1,4 +1,4 @@
-.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio
+.PHONY: install check eval test new doctor doctor-verify help list status update remove sync-mattpocock sync-curated-skills sync-distribution sync-distribution-memory init audit targets-list targets-doctor trajectory-check verify-trajectory trajectory-coverage-ratio trajectory-calibrate
 
 PYTHON ?= python3
 
@@ -126,6 +126,15 @@ verify-trajectory:
 
 trajectory-coverage-ratio:
 	@$(PYTHON) scripts/trajectory_coverage.py $(if $(JSON),--json)
+
+trajectory-calibrate:
+	@if [ -z "$(SKILL)" ] || [ -z "$(SCENARIO)" ]; then \
+		echo "Usage: make trajectory-calibrate SKILL=<name> SCENARIO=<name> [RUNS=N] [JSON=1]"; exit 1; \
+	fi
+	@$(PYTHON) scripts/trajectory_calibrate.py \
+		--skill "$(SKILL)" --scenario "$(SCENARIO)" \
+		$(if $(RUNS),--runs $(RUNS)) \
+		$(if $(JSON),--json)
 
 doctor:
 	@$(PYTHON) scripts/install.py --diagnose
