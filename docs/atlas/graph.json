@@ -289,6 +289,12 @@
       "href": "adr/0048.html"
     },
     {
+      "id": "adr-0049",
+      "kind": "adr",
+      "label": "ADR-0049: Why Atlas: auto-generated rationale graph",
+      "href": "adr/0049.html"
+    },
+    {
       "id": "skill-base-engineering-ci-failure-triage",
       "kind": "skill",
       "label": "engineering/ci-failure-triage",

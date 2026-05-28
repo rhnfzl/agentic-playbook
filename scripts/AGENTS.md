@@ -29,6 +29,17 @@ Python scripts that power the installer, linters, checks, and lifecycle commands
 - `playbook_init.py`, `playbook_update.py` for per-project init.
 - `sync_distribution.py` for distributing `base/` to an external destination per ADR-0042. Scheduled via the wrapper in `templates/distribution-cron.example.sh`; runbook at `docs/runbooks/distribution-sync-cron.md`. Calls `marketplace_emitter.emit()` after content sync when `[marketplace]` is configured in the manifest.
 - `marketplace_emitter.py` for emitting per-agent marketplace catalogs + per-profile plugin manifests at the destination per ADR-0043. Idempotent. Symlinks plugin content back into `base/` (never copies). Exits with code 5 on reserved-name collision or symlink escape.
+- Supply-chain security (ADR-0047):
+  - `audit_security.py` is the standalone CLI; wraps three sources (Snyk `snyk-agent-scan`, `agent-skill-evaluator`, in-house DDIPE detector) plus emits the AI-BOM. Soft-by-default; `STRICT_SECURITY=1` escalates skipped wrappers to errors.
+  - `security/mcp_scan_wrapper.py`, `security/agent_skill_evaluator_wrapper.py`, `security/ddipe_detector.py`, `security/ai_bom.py` are the wrappers and BOM emitter.
+- Skill telemetry (ADR-0048):
+  - `skill_telemetry_report.py` is the per-skill CLI (30d trigger count, p50/p95 latency, last fired, total tokens).
+  - `telemetry/pyotel_collector.py` is the stdlib OTLP/HTTP receiver; `telemetry/ingest.py` is the JSONL aggregator. `telemetry/__init__.py` exposes `is_enabled()` so every consumer respects `TELEMETRY=off`.
+  - `telemetry/otel_collector/` ships the docker-compose recipe + `otelcol-contrib` config for users who prefer the industry-standard container path.
+  - `decay_check.py` adds a usage-based decay layer that is silent when telemetry is off.
+- Why Atlas (ADR-0049):
+  - `build_atlas.py` walks ADRs + skills + trajectories and renders `docs/atlas/`. Reads AI-BOM + telemetry aggregates at render time; missing signals degrade silently.
+  - `atlas/graph_builder.py` produces the JSON adjacency; `atlas/template_engine.py` is the f-string + html.escape helper (no Jinja, no PyYAML).
 - `templates/` Python script scaffolds + the distribution wrapper / manifest example.
 
 ## Local Commands
