@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-from .content_ops import ResolvedRef
+from .content_ops import ResolvedRef, _resolves_within_repo
 from .types import EmitterConfig, Profile
 
 
@@ -35,8 +35,17 @@ def _build_mcp_json(
         source_json = (
             entry.source / "server.json" if entry.source.is_dir() else entry.source
         )
+        # SECURITY (TOCTOU): this merges the read JSON into the public
+        # .mcp.json, so re-validate the realpath at read time -- a symlink
+        # swapped after _resolve_source must not inject out-of-repo content.
+        if not _resolves_within_repo(source_json, config.repo_root):
+            _stderr(
+                f"WARN: profile '{profile.name}' mcp '{entry.ref}' at {source_json} "
+                "resolves outside the repo; dropping the ref"
+            )
+            continue
         try:
-            data = json.loads(source_json.read_text(encoding="utf-8"))
+            data = json.loads(source_json.resolve().read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             _stderr(
                 f"WARN: profile '{profile.name}' mcp '{entry.ref}' at {source_json} "

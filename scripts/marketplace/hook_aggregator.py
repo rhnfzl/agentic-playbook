@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-from .content_ops import ResolvedRef
+from .content_ops import ResolvedRef, _resolves_within_repo
 from .types import EmitterConfig, Profile
 
 
@@ -42,8 +42,17 @@ def _build_hooks_json(
     hooks_by_event: dict[str, list[dict[str, str]]] = {}
     for entry in hook_entries:
         source = entry.source
+        # SECURITY (TOCTOU): re-validate the realpath at read time so a
+        # symlink swapped after _resolve_source cannot feed out-of-repo
+        # content into the hook header parse (event / matcher).
+        if not _resolves_within_repo(source, config.repo_root):
+            _stderr(
+                f"WARN: profile '{profile.name}' hook '{entry.ref}' at {source} "
+                "resolves outside the repo; drop the ref"
+            )
+            continue
         try:
-            content = source.read_text(encoding="utf-8", errors="replace")
+            content = source.resolve().read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
             _stderr(
                 f"WARN: profile '{profile.name}' hook '{entry.ref}' unreadable at "

@@ -224,6 +224,26 @@ class TestMcpAggregator:
         # Last entry wins.
         assert data["mcpServers"]["shared"]["command"] == "second"
 
+    def test_out_of_repo_symlink_source_is_not_merged(self, tmp_path):
+        """SECURITY (TOCTOU): an MCP source that resolves outside the repo
+        must be dropped, not merged into the public .mcp.json."""
+        repo = tmp_path / "repo"
+        (repo / "base" / "mcp").mkdir(parents=True)
+        cfg = _make_config(repo, tmp_path / "dest")
+        outside = tmp_path / "outside.json"
+        outside.write_text(json.dumps({"leak": {"command": "exfil"}}), encoding="utf-8")
+        link = repo / "base" / "mcp" / "evil.json"
+        link.symlink_to(outside)
+        spec = ComponentSpec("mcp", Path("base/mcp"), "mcp_either", "mcp")
+        ref = ResolvedRef(
+            spec=spec, ref="evil", source=link, plugin_rel=Path("mcp/evil.json")
+        )
+        p = _make_role_profile(mcp=("evil",))
+        plugin_dir = tmp_path / "dest" / p.name
+        written = _build_mcp_json(p, (ref,), cfg, plugin_dir)
+        assert written == 0  # nothing merged
+        assert not (plugin_dir / ".mcp.json").exists()
+
 
 # ===================================================================
 # Shared helpers

@@ -306,7 +306,7 @@ class TestGeminiBuilders:
             ),
         )
         p = _make_role_profile(mcp=("broken",))
-        _mcp_servers_block(p, resolved)
+        _mcp_servers_block(p, resolved, tmp_path)
         err = capsys.readouterr().err
         assert "unparseable" in err
 
@@ -318,7 +318,7 @@ class TestGeminiBuilders:
             ResolvedRef(spec=spec, ref="x", source=f, plugin_rel=Path("mcp/x.json")),
         )
         p = _make_role_profile(mcp=("x",))
-        servers = _mcp_servers_block(p, resolved)
+        servers = _mcp_servers_block(p, resolved, tmp_path)
         assert list(servers.keys()) == ["alpha", "zebra"]
 
 
