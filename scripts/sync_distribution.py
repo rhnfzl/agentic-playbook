@@ -17,6 +17,10 @@ Exit codes:
   2  another sync run is active (lock file present and fresh)
   3  source / destination IO error
   4  user-rejected direction (--direction reverse not implemented)
+  5  marketplace emit safety failure (reserved catalog name, slug,
+     path-safety, or materialize failure; per ADR-0043). Raised by the
+     [marketplace] integration so the cron wrapper can distinguish a
+     safety failure from a generic IO error (3).
 """
 
 from __future__ import annotations
@@ -271,6 +275,23 @@ def _load_manifest(manifest_path: Path) -> Manifest:
     ):
         raise SystemExit(
             "manifest: [marketplace].default_profile_version must be a string"
+        )
+    # All-or-none: a partial [marketplace] block must fail loud at load time
+    # rather than silently skipping the emit step at run time. The three
+    # required keys are catalog_name + author_name + profiles_dir.
+    _required_marketplace = {
+        "catalog_name": marketplace_catalog_name,
+        "author_name": marketplace_author_name,
+        "profiles_dir": marketplace_profiles_dir,
+    }
+    _present = [k for k, v in _required_marketplace.items() if v]
+    if _present and len(_present) != len(_required_marketplace):
+        _missing = sorted(set(_required_marketplace) - set(_present))
+        raise SystemExit(
+            "manifest: [marketplace] is partially configured; it requires "
+            f"all of catalog_name + author_name + profiles_dir (missing: "
+            f"{', '.join(_missing)}). Remove the block to disable marketplace "
+            "emit, or fill in every required key."
         )
 
     return Manifest(
@@ -930,7 +951,7 @@ def run_distribution(args: argparse.Namespace) -> int:
 def _maybe_run_marketplace_emit(manifest: Manifest, dry_run: bool) -> int | None:
     """If the manifest declares a [marketplace] block, invoke the emitter
     facade after the content sync completes. Returns the file-write count,
-    or None when the block is absent.
+    or None when the block is absent or the step is skipped in dry-run.
 
     SECURITY (ADR-0042 scrub contract): the emitter reads BOTH profiles and
     base content from the DESTINATION tree, which this run has already
@@ -939,7 +960,14 @@ def _maybe_run_marketplace_emit(manifest: Manifest, dry_run: bool) -> int | None
     plugin directories, bypassing the scrub layer. The operator must
     therefore include `profiles/` (and `base/`) in [sources].allowlist so
     the scrubbed copies exist at the destination before this step runs.
+
+    Because the emit reads the destination, it CANNOT run under --dry-run:
+    a dry-run copies nothing, so the destination is empty (fresh) or stale
+    (prior run). Emitting then would either fail or verify the wrong tree.
+    The step is therefore skipped in dry-run with an explanatory note.
     """
+    # Partial blocks are rejected at manifest load; here all-three-present
+    # means enabled, none means disabled.
     if not (
         manifest.marketplace_catalog_name
         and manifest.marketplace_author_name
@@ -947,24 +975,33 @@ def _maybe_run_marketplace_emit(manifest: Manifest, dry_run: bool) -> int | None
     ):
         return None
 
+    if dry_run:
+        _stderr(
+            "marketplace emit skipped in dry-run: the emitter reads the "
+            "scrubbed destination tree, which a dry-run does not populate. "
+            "Re-run without --dry-run to emit the plugin catalogs."
+        )
+        return None
+
+    from marketplace_config import (
+        MarketplaceEmitError,
+        SyncMarketplaceManifest,
+        run_marketplace_emit,
+    )
+
     dest = manifest.destination_path
-
-    class _MarketplaceManifestAdapter:
-        def __init__(self, m: Manifest) -> None:
-            # repo_root == destination: read the SCRUBBED tree, not source.
-            self.repo_root = dest
-            self.destination = dest
-            self.catalog_name = m.marketplace_catalog_name or ""
-            self.author_name = m.marketplace_author_name or ""
-            self.author_email = m.marketplace_author_email
-            self.profiles_dir = (dest / (m.marketplace_profiles_dir or "")).resolve()
-            self.default_profile_version = m.marketplace_default_profile_version
-
-    from marketplace_config import MarketplaceEmitError, run_marketplace_emit
-
-    adapter = _MarketplaceManifestAdapter(manifest)
+    # repo_root == destination: read the SCRUBBED tree, not source.
+    adapter = SyncMarketplaceManifest(
+        repo_root=dest,
+        destination=dest,
+        catalog_name=manifest.marketplace_catalog_name or "",
+        author_name=manifest.marketplace_author_name or "",
+        author_email=manifest.marketplace_author_email,
+        profiles_dir=(dest / (manifest.marketplace_profiles_dir or "")).resolve(),
+        default_profile_version=manifest.marketplace_default_profile_version,
+    )
     try:
-        return run_marketplace_emit(adapter, dry_run=dry_run)
+        return run_marketplace_emit(adapter, dry_run=False)
     except MarketplaceEmitError as exc:
         # Preserve the emitter's declared exit code (5 = safety failure:
         # reserved name, slug, path-safety, materialize) so the scheduled

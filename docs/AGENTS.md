@@ -1,7 +1,7 @@
 # Documentation
 
 Owner: Rehan
-last_reviewed: 2026-05-28
+last_reviewed: 2026-05-29 (ADR-0043 marketplace emitter landed)
 
 ## Purpose
 

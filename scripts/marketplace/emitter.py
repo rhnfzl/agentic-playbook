@@ -3,8 +3,9 @@
 Per-profile work (plugin directories, plugin.json files, gemini-extension.json,
 per-plugin README, sidecar) happens inside `_emit_plugin_directory`. The
 root-level catalog manifests (`.claude-plugin/marketplace.json`, etc.) are
-written ONCE in `_emit_marketplace_manifests` with the FULL profile list,
-to avoid multi-profile overwrite. See risk callout #13 in the plan.
+written ONCE in `_emit_marketplace_manifests` with the FULL profile list.
+Writing them inside the per-profile loop would let later profiles overwrite
+earlier ones, so the post-loop write is load-bearing. See ADR-0043.
 """
 
 from __future__ import annotations

@@ -53,7 +53,6 @@ Module layout:
 | `types.py` | `RoleProfile`, `MetaProfile`, `Profile` union, `EmitterConfig` (with `author_name` distinct from `catalog_name`), `ComponentSpec` table, `specs_for(profile)` filter. |
 | `profile_loader.py` | Slug validation, reserved-name rejection, TOML parsing, meta-profile aggregation. |
 | `content_ops.py` | `_resolve_profile` walker, flat-vs-bundle MCP layout resolver, materialization with content-based idempotency, path-safety predicate, stale-path cleanup with directory protection. |
-| `content_ops_legacy.py` | Quarantined symlink-mode helper for a future flag flip. |
 | `hook_aggregator.py` | Per-profile `hooks/hooks.json` with `PLAYBOOK-HOOK-EVENT` header validation and actionable WARN lines. |
 | `mcp_aggregator.py` | Per-profile `.mcp.json` with `mcpServers` dedup and actionable WARN lines on unparseable JSON. |
 | `manifests/claude.py` | Claude `plugin.json` + `marketplace.json`. Local source is a bare string. `agents` is a list of `.md` paths. |
@@ -64,7 +63,7 @@ Module layout:
 
 ### Back-compat CLI shim
 
-`scripts/marketplace_emitter.py` re-exports the public surface and forwards to `main()` so existing `python3 scripts/marketplace_emitter.py ...` invocations and existing imports keep working. The shim is twenty-six lines.
+`scripts/marketplace_emitter.py` re-exports the public surface and forwards to `main()` so existing `python3 scripts/marketplace_emitter.py ...` invocations and existing imports keep working. The shim is a thin re-export plus a `__main__` guard.
 
 ### Facade for `sync_distribution.py`
 

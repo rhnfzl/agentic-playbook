@@ -1,7 +1,7 @@
 # Scripts
 
 Owner: Rehan
-last_reviewed: 2026-05-28 (review-fold sync: trajectory Phase 2 scripts added)
+last_reviewed: 2026-05-29 (marketplace emitter package added; ADR-0043)
 
 ## Purpose
 

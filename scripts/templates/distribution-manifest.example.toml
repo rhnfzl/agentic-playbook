@@ -26,6 +26,10 @@ require_clean_git = true
 # is included unless matched by denylist.
 allowlist = [
   "base/",
+  # Required when the [marketplace] block below is enabled: the emitter
+  # reads role profiles from the SCRUBBED destination tree, so profiles/
+  # must be synced there. Harmless to keep even without [marketplace].
+  "profiles/",
   "scripts/sync_distribution.py",
   "scripts/install.py",
   "scripts/install_lifecycle.py",

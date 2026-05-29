@@ -91,7 +91,7 @@ The list below mirrors the files in this directory in numerical order. See each 
 - ADR-0040 Base / overlay subtree split for content tiering.
 - ADR-0041 Content tiering guardrails (automated `scope_boundary` check).
 - ADR-0042 Playbook content distribution (manifest-driven sync to a downstream mirror).
-- ADR-0043 Marketplace distribution (designed in the upstream; ADR text and emitter intentionally not shipped in this public mirror per the portfolio's distribution choice).
+- ADR-0043 Marketplace emitter for personal-brand distribution (per-vendor plugin catalogs for Claude Code / Cursor / Codex / Gemini, emitted from the scrubbed destination; catalog identity `rhnfzl`).
 
 ### Trajectories (the eighth content type)
 
@@ -133,4 +133,4 @@ For a first read, the three highest-leverage ADRs are:
 
 For the security and operations story, read ADR-0047 → 0048 → 0049 in order.
 
-The marketplace plugin story (ADR-0043) is designed in the upstream and intentionally not shipped in this public mirror; the ADR text, the emitter source, and the per-role packs all live upstream-only. For the sync model that decides which artifacts flow downstream, read ADR-0042.
+The marketplace plugin story (ADR-0043) ships in this repo: `scripts/marketplace/` emits per-vendor plugin catalogs from the scrubbed destination tree, and `scripts/sync_distribution.py` invokes it after the content sync when the operator manifest declares a `[marketplace]` block. For the sync model that decides which artifacts flow downstream (and which the emitter then reads), read ADR-0042.

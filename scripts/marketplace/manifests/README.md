@@ -1,8 +1,10 @@
 # scripts/marketplace/manifests/
 
-Per-platform manifest builders. Each module knows ONE vendor's schema and nothing else; the orchestrator in `scripts/marketplace/emitter.py` stays platform-agnostic.
+These builders are what let one playbook profile install across four different coding agents: each turns the same role profile into the plugin manifest that Claude Code, Cursor, Codex, or Gemini expects, so a user runs one install command per vendor instead of hand-translating schemas.
 
-## What each builder does for the user
+Each module knows ONE vendor's schema and nothing else; the orchestrator in `scripts/marketplace/emitter.py` stays platform-agnostic.
+
+## How a builder works
 
 Takes a role profile + the emitter config + the resolved content refs and produces a plugin manifest dict the orchestrator JSON-serializes to the right path. The shape differences are constrained by the four vendor schemas; the builder's job is to translate the same internal profile into each vendor's expected shape.
 

@@ -6,6 +6,7 @@ internal layout. Only this module imports from marketplace.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -16,10 +17,34 @@ from marketplace import EmitError, EmitterConfig, TOOL_VERSION, emit
 # importing from the marketplace package directly.
 MarketplaceEmitError = EmitError
 
-__all__ = ["MarketplaceEmitError", "emitter_tool_version", "run_marketplace_emit"]
+__all__ = [
+    "MarketplaceEmitError",
+    "SyncMarketplaceManifest",
+    "emitter_tool_version",
+    "run_marketplace_emit",
+]
 
 
 class _ManifestLike(Protocol):
+    repo_root: Path
+    destination: Path
+    catalog_name: str
+    author_name: str
+    author_email: str | None
+    profiles_dir: Path
+    default_profile_version: str | None
+
+
+@dataclass
+class SyncMarketplaceManifest:
+    """Concrete `_ManifestLike` the sync layer constructs from its own
+    Manifest, so the caller need not define an inline adapter class. Both
+    roots are the (scrubbed) destination per ADR-0042; see
+    sync_distribution._maybe_run_marketplace_emit for why.
+
+    Not frozen: it satisfies the writable `_ManifestLike` protocol and is a
+    transient builder consumed immediately by run_marketplace_emit."""
+
     repo_root: Path
     destination: Path
     catalog_name: str

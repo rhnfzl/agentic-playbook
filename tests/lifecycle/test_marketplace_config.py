@@ -217,6 +217,20 @@ class TestSyncIntegration:
             is None
         )
 
+    def test_dry_run_skips_marketplace_emit(self, tmp_path, capsys):
+        """Regression: the emit reads the destination, which a dry-run does
+        not populate. Dry-run must SKIP emit (return None + explain), not
+        fail on an empty destination or verify stale content."""
+        dest = tmp_path / "dest"
+        dest.mkdir()  # intentionally empty: a dry-run copied nothing here
+        manifest = _make_marketplace_manifest(dest)
+        result = sync_distribution._maybe_run_marketplace_emit(manifest, dry_run=True)
+        assert result is None
+        assert "skipped in dry-run" in capsys.readouterr().err
+        # Nothing emitted.
+        assert not (dest / ".claude-plugin").exists()
+        assert not (dest / "backend").exists()
+
     def test_reserved_name_raises_systemexit_with_code_5(self, tmp_path):
         """P5 exit-code preservation: an EmitError (reserved catalog name)
         surfaces as SystemExit(5), not the generic exit 3, so the scheduled
