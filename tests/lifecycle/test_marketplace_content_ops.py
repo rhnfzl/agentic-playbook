@@ -325,6 +325,31 @@ class TestSymlinkSourceEscape:
         assert resolved == ()  # never resolved -> never copied
         assert warnings
 
+    def test_materialize_rechecks_source_at_copy_time(self, tmp_path):
+        """TOCTOU: even if a symlink passes _resolve_source's check and is
+        then swapped to point outside the repo before _materialize copies,
+        the copy-time re-resolve + re-validate must refuse it. We simulate
+        the swap deterministically (no race)."""
+        repo = tmp_path / "repo"
+        _seed_base_dirs(repo)
+        inside = repo / "base" / "rules" / "ok.md"
+        inside.write_text("ok", encoding="utf-8")
+        outside = tmp_path / "outside.md"
+        outside.write_text("UNSCRUBBED_SECRET", encoding="utf-8")
+        link = repo / "base" / "rules" / "swap.md"
+        link.symlink_to(inside)  # passes the resolve-time check (in-repo)
+        spec = ComponentSpec("rules", Path("base/rules"), "rules", "rules")
+        ref = ResolvedRef(
+            spec=spec, ref="swap", source=link, plugin_rel=Path("rules/swap.md")
+        )
+        # Simulate the TOCTOU swap: repoint the symlink outside the repo.
+        link.unlink()
+        link.symlink_to(outside)
+        plugin_dir = tmp_path / "plugin"
+        with pytest.raises(PathSafetyError):
+            _materialize((ref,), plugin_dir, dry_run=False, repo_root=repo)
+        assert not (plugin_dir / "rules" / "swap.md").exists()
+
 
 class TestSuffixFallbackParity:
     """Insurance against the recurring drop-bug (fixed in the bare-stem
@@ -368,7 +393,7 @@ class TestMaterialize:
         ref = ResolvedRef(
             spec=spec, ref="alpha", source=src, plugin_rel=Path("skills/alpha")
         )
-        count = _materialize((ref,), plugin_dir, dry_run=True)
+        count = _materialize((ref,), plugin_dir, dry_run=True, repo_root=tmp_path)
         assert count == 0
         assert not (plugin_dir / "skills" / "alpha").exists()
 
@@ -382,7 +407,7 @@ class TestMaterialize:
         ref = ResolvedRef(
             spec=spec, ref="alpha", source=src, plugin_rel=Path("skills/alpha")
         )
-        count = _materialize((ref,), plugin_dir, dry_run=False)
+        count = _materialize((ref,), plugin_dir, dry_run=False, repo_root=tmp_path)
         assert count == 1
         assert (plugin_dir / "skills" / "alpha" / "SKILL.md").read_text() == "hi"
         assert (
@@ -397,7 +422,7 @@ class TestMaterialize:
         ref = ResolvedRef(
             spec=spec, ref="tavily", source=src, plugin_rel=Path("mcp/tavily.json")
         )
-        count = _materialize((ref,), plugin_dir, dry_run=False)
+        count = _materialize((ref,), plugin_dir, dry_run=False, repo_root=tmp_path)
         assert count == 1
         assert (plugin_dir / "mcp" / "tavily.json").read_text() == "{}"
 
@@ -414,7 +439,7 @@ class TestMaterialize:
             plugin_rel=Path("../escape"),
         )
         with pytest.raises(PathSafetyError):
-            _materialize((bad_ref,), plugin_dir, dry_run=False)
+            _materialize((bad_ref,), plugin_dir, dry_run=False, repo_root=tmp_path)
 
 
 class TestExpectedPaths:

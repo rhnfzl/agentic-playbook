@@ -178,10 +178,21 @@ def _trees_match(a: Path, b: Path) -> bool:
 
 
 def _materialize(
-    resolved: tuple[ResolvedRef, ...], plugin_dir: Path, *, dry_run: bool
+    resolved: tuple[ResolvedRef, ...],
+    plugin_dir: Path,
+    *,
+    dry_run: bool,
+    repo_root: Path,
 ) -> int:
     """Copy every resolved source into the plugin dir. Idempotent: skips
-    write when the destination already matches the source content."""
+    write when the destination already matches the source content.
+
+    SECURITY (TOCTOU): copy from the canonical realpath re-resolved HERE and
+    re-validated against repo_root, not from the (possibly symlink) ref path
+    captured earlier in _resolve_source. A symlink swapped between resolution
+    and this copy therefore cannot redirect copy2/copytree at an out-of-repo
+    target -- we copy the concrete realpath we just validated.
+    """
     files_written = 0
     for entry in resolved:
         dest = plugin_dir / entry.plugin_rel
@@ -189,19 +200,25 @@ def _materialize(
             raise PathSafetyError(f"refusing to materialize outside plugin dir: {dest}")
         if dry_run:
             continue
+        real = entry.source.resolve()
+        if not _resolves_within_repo(real, repo_root):
+            raise PathSafetyError(
+                f"source '{entry.source}' resolves outside the repo at copy "
+                f"time ({real}); refusing to materialize"
+            )
         try:
-            if entry.source.is_dir():
-                if dest.exists() and dest.is_dir() and _trees_match(entry.source, dest):
+            if real.is_dir():
+                if dest.exists() and dest.is_dir() and _trees_match(real, dest):
                     continue
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 if dest.exists():
                     shutil.rmtree(dest)
-                shutil.copytree(entry.source, dest)
+                shutil.copytree(real, dest)
             else:
-                if dest.exists() and filecmp.cmp(entry.source, dest, shallow=False):
+                if dest.exists() and filecmp.cmp(real, dest, shallow=False):
                     continue
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(entry.source, dest)
+                shutil.copy2(real, dest)
             files_written += 1
         except OSError as exc:
             raise MaterializationError(

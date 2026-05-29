@@ -76,7 +76,9 @@ def _emit_plugin_directory(
     for warning in warnings:
         print(f"WARN: {warning}", file=sys.stderr)
 
-    files_written += _materialize(resolved, plugin_dir, dry_run=config.dry_run)
+    files_written += _materialize(
+        resolved, plugin_dir, dry_run=config.dry_run, repo_root=config.repo_root
+    )
     files_written += _build_hooks_json(profile, resolved, config, plugin_dir)
     files_written += _build_mcp_json(profile, resolved, config, plugin_dir)
 
