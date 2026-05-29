@@ -90,8 +90,11 @@ def _build_meta_profile(
 ) -> MetaProfile:
     if not members:
         raise ProfileLoadError("cannot build meta profile from empty members tuple")
+    # Name must be a valid installable slug: it becomes a plugin name in the
+    # Claude / Cursor / Codex catalogs, and `_all` (leading underscore) fails
+    # both this package's _validate_slug and Codex's hyphen-case requirement.
     return MetaProfile(
-        name="_all",
+        name="all-profiles",
         catalog_name=catalog_name,
         description=f"Aggregate of all role profiles in the {catalog_name} catalog",
         members=members,

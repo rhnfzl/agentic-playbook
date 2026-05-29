@@ -51,7 +51,7 @@ The root-level catalog manifests (`.claude-plugin/marketplace.json`, `.cursor-pl
 4. Add the attribute to `_load_profile`'s `_list("<section>")` lookups (`profile_loader.py`).
 5. If the type needs custom destination logic (like MCP's flat-vs-bundle), extend `_plugin_rel_for` in `content_ops.py`.
 6. If the type needs aggregation, add an aggregator module mirroring `hook_aggregator.py` or `mcp_aggregator.py` and wire it into `_emit_plugin_directory` in `emitter.py`.
-7. Add contract tests to `tests/lifecycle/test_marketplace_package.py`.
+7. Add contract tests to the matching `tests/lifecycle/test_marketplace_*.py` module (errors_types / content_ops / aggregators / manifests / emit_integration), reusing `tests/lifecycle/_marketplace_fixtures.py`.
 
 ## Extension recipe: add a new vendor (platform)
 
@@ -96,6 +96,6 @@ This repo's maintainer uses catalog name `rhnfzl` and author name `Rehan Fazal`.
 - [`docs/adr/0043-marketplace-emitter-for-personal-brand-distribution.md`](../../docs/adr/0043-marketplace-emitter-for-personal-brand-distribution.md) for the full design rationale.
 - [`docs/adr/0042-playbook-content-distribution.md`](../../docs/adr/0042-playbook-content-distribution.md) for the sync mechanism that delivers content to the destination before the marketplace step.
 - [`manifests/README.md`](manifests/README.md) for the per-platform schema details.
-- [`tests/lifecycle/test_marketplace_package.py`](../../tests/lifecycle/test_marketplace_package.py) for the contract test suite.
+- `tests/lifecycle/test_marketplace_*.py` (errors_types, content_ops, aggregators, manifests, emit_integration) + `tests/lifecycle/_marketplace_fixtures.py` for the contract test suite.
 - `scripts/marketplace_emitter.py` for the back-compat CLI shim.
 - `scripts/marketplace_config.py` for the facade used by `sync_distribution.py`.

@@ -136,8 +136,8 @@ class TestEmitterOrchestrator:
         emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
         data = json.loads((dest / ".claude-plugin" / "marketplace.json").read_text())
         names = sorted(p["name"] for p in data["plugins"])
-        # Two role profiles plus the _all meta.
-        assert names == ["_all", "alpha", "beta"]
+        # Two role profiles plus the all-profiles meta.
+        assert names == ["all-profiles", "alpha", "beta"]
 
     def test_emit_idempotent(self, tmp_path):
         f = self._fixture(tmp_path)
@@ -317,7 +317,7 @@ class TestEmitterOrchestrator:
         ):
             data = json.loads((dest / rel).read_text())
             names = sorted(p["name"] for p in data["plugins"])
-            assert names == ["_all", "alpha", "beta", "gamma"], rel
+            assert names == ["all-profiles", "alpha", "beta", "gamma"], rel
 
     def test_emit_no_owner_field_equals_catalog_name(self, tmp_path):
         f = self._fixture(tmp_path)

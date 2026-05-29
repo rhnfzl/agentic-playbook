@@ -991,13 +991,27 @@ def _maybe_run_marketplace_emit(manifest: Manifest, dry_run: bool) -> int | None
 
     dest = manifest.destination_path
     # repo_root == destination: read the SCRUBBED tree, not source.
+    # SECURITY: profiles_dir must stay INSIDE dest. An absolute or `..`
+    # value (e.g. "../raw-profiles") would otherwise point the emitter at
+    # an unscrubbed tree outside the destination and ship raw content into
+    # the public catalogs. Reject anything that escapes dest (exit 5,
+    # matching the marketplace safety carve-out).
+    profiles_dir = (dest / (manifest.marketplace_profiles_dir or "")).resolve()
+    if not _within(profiles_dir, dest):
+        _stderr(
+            "marketplace emit refused: [marketplace].profiles_dir "
+            f"'{manifest.marketplace_profiles_dir}' resolves outside the "
+            f"destination ({profiles_dir}). It must be a relative path inside "
+            "the destination so the emitter reads only scrubbed profiles."
+        )
+        raise SystemExit(5)
     adapter = SyncMarketplaceManifest(
         repo_root=dest,
         destination=dest,
         catalog_name=manifest.marketplace_catalog_name or "",
         author_name=manifest.marketplace_author_name or "",
         author_email=manifest.marketplace_author_email,
-        profiles_dir=(dest / (manifest.marketplace_profiles_dir or "")).resolve(),
+        profiles_dir=profiles_dir,
         default_profile_version=manifest.marketplace_default_profile_version,
     )
     try:

@@ -16,11 +16,13 @@ from marketplace import (
     PathSafetyError,
 )
 from marketplace.content_ops import (
+    _SUFFIX_FALLBACKS,
     ResolvedRef,
     _expected_paths,
     _is_stale_path,
     _materialize,
     _plugin_rel_for,
+    _ref_escapes_source_dir,
     _refs_for_spec,
     _remove_stale_plugin_content,
     _resolve_profile,
@@ -243,6 +245,73 @@ class TestBareStemResolution:
         resolved = _resolve_source(spec, "exact", tmp_path)
         assert resolved is not None
         assert resolved.name == "exact"
+
+
+class TestRefTraversalGuard:
+    """SECURITY: a profile ref must not escape base/<kind> via `..` or an
+    absolute path; otherwise an unscrubbed file from outside the content
+    root would be copied into the public plugin dirs. Reproduces the
+    reviewer's `../../../secret` finding."""
+
+    def test_ref_escapes_predicate(self):
+        assert _ref_escapes_source_dir("../../../secret")
+        assert _ref_escapes_source_dir("a/../../b")
+        assert _ref_escapes_source_dir("/etc/passwd")
+        assert not _ref_escapes_source_dir("no-em-dashes")
+        assert not _ref_escapes_source_dir("engineering/ci-failure-triage")
+
+    def test_dotdot_rule_ref_does_not_resolve(self, tmp_path):
+        _seed_base_dirs(tmp_path)
+        # An unscrubbed file outside base/rules that a traversal would target.
+        (tmp_path / "secret.md").write_text("UNSCRUBBED", encoding="utf-8")
+        spec = ComponentSpec("rules", Path("base/rules"), "rules", "rules")
+        assert _resolve_source(spec, "../../secret", tmp_path) is None
+
+    def test_dotdot_ref_is_not_materialized(self, tmp_path):
+        _seed_base_dirs(tmp_path)
+        (tmp_path / "secret.md").write_text("UNSCRUBBED", encoding="utf-8")
+        p = _make_role_profile(rules=("../../secret",))
+        cfg = _make_config(tmp_path, tmp_path / "dest")
+        resolved, warnings = _resolve_profile(p, cfg)
+        assert resolved == ()
+        assert warnings  # surfaced as a missing-ref warning, never copied
+
+    def test_absolute_ref_does_not_resolve(self, tmp_path):
+        _seed_base_dirs(tmp_path)
+        spec = ComponentSpec("rules", Path("base/rules"), "rules", "rules")
+        assert _resolve_source(spec, "/etc/passwd", tmp_path) is None
+
+
+class TestSuffixFallbackParity:
+    """Insurance against the recurring drop-bug (fixed in the bare-stem
+    commit): _SUFFIX_FALLBACKS must stay aligned with the globs the
+    canonical loader scripts/adapters/_reader.py uses, so a future
+    content-type change cannot silently drop content from emitted plugins."""
+
+    def test_matches_reader_globs(self):
+        import re
+        from pathlib import Path as _P
+
+        reader = (
+            _P(__file__).resolve().parents[2] / "scripts" / "adapters" / "_reader.py"
+        ).read_text(encoding="utf-8")
+        # Extract _walk_content_roots(content_paths, "<kind>", "*<ext>") calls.
+        pairs = dict(
+            re.findall(
+                r'_walk_content_roots\(content_paths,\s*"(\w+)",\s*"\*(\.\w+)"\)',
+                reader,
+            )
+        )
+        assert pairs, "could not find any _walk_content_roots globs in _reader.py"
+        for kind, ext in pairs.items():
+            assert kind in _SUFFIX_FALLBACKS, (
+                f"_reader globs {kind}/*{ext} but _SUFFIX_FALLBACKS has no entry; "
+                "emitter would silently drop bare-stem refs for this kind"
+            )
+            assert ext in _SUFFIX_FALLBACKS[kind], (
+                f"_reader globs {kind}/*{ext} but _SUFFIX_FALLBACKS[{kind!r}]="
+                f"{_SUFFIX_FALLBACKS[kind]} omits it"
+            )
 
 
 class TestMaterialize:

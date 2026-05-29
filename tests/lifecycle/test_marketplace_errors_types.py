@@ -268,7 +268,7 @@ class TestProfileLoader:
         a = _make_role_profile(name="a")
         b = _make_role_profile(name="b")
         m = _build_meta_profile((a, b), catalog_name="rhnfzl")
-        assert m.name == "_all"
+        assert m.name == "all-profiles"  # valid installable slug, not "_all"
         assert m.members == (a, b)
 
     def test_load_profiles_missing_dir_raises(self, tmp_path):
@@ -286,7 +286,7 @@ class TestProfileLoader:
         _seed_profile_toml(pdir, "beta", 'description = "B"\n')
         profiles = _load_profiles(pdir, catalog_name="rhnfzl")
         names = [p.name for p in profiles]
-        assert names == ["alpha", "beta", "_all"]
+        assert names == ["alpha", "beta", "all-profiles"]
 
     def test_load_profiles_validates_catalog_name(self, tmp_path):
         pdir = tmp_path / "profiles"

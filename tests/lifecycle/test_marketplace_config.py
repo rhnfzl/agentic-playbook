@@ -244,3 +244,66 @@ class TestSyncIntegration:
         with pytest.raises(SystemExit) as excinfo:
             sync_distribution._maybe_run_marketplace_emit(manifest, dry_run=False)
         assert excinfo.value.code == 5
+
+    def test_profiles_dir_escaping_dest_raises_systemexit_5(self, tmp_path):
+        """SECURITY (P1): a profiles_dir that resolves OUTSIDE the
+        destination (e.g. '../raw-profiles') must be refused before emit, so
+        the emitter never reads an unscrubbed tree. Reproduces the reviewer's
+        traversal finding."""
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        _seed_minimal_playbook(dest)
+        # Plant an unscrubbed profiles tree as a sibling of dest.
+        outside = tmp_path / "raw-profiles"
+        outside.mkdir()
+        (outside / "leak.toml").write_text(
+            'description = "UNSCRUBBED"\n', encoding="utf-8"
+        )
+        manifest = _make_marketplace_manifest(
+            dest, marketplace_profiles_dir="../raw-profiles"
+        )
+        with pytest.raises(SystemExit) as excinfo:
+            sync_distribution._maybe_run_marketplace_emit(manifest, dry_run=False)
+        assert excinfo.value.code == 5
+        # Nothing emitted from the outside tree.
+        assert not (dest / "leak").exists()
+
+
+class TestManifestMarketplaceValidation:
+    def test_partial_marketplace_block_raises_systemexit_1(self, tmp_path):
+        """A [marketplace] block with only some required keys fails LOUD at
+        manifest load (exit 1), never silently skips emit at run time."""
+        m = tmp_path / "manifest.toml"
+        m.write_text(
+            f'[destination]\npath = "{tmp_path}"\n'
+            '[sources]\nallowlist = ["base/"]\n'
+            '[marketplace]\ncatalog_name = "rhnfzl"\n',  # missing author_name + profiles_dir
+            encoding="utf-8",
+        )
+        with pytest.raises(SystemExit) as excinfo:
+            sync_distribution._load_manifest(m)
+        assert "partially configured" in str(excinfo.value)
+
+    def test_complete_marketplace_block_loads(self, tmp_path):
+        m = tmp_path / "manifest.toml"
+        m.write_text(
+            f'[destination]\npath = "{tmp_path}"\n'
+            '[sources]\nallowlist = ["base/"]\n'
+            "[marketplace]\n"
+            'catalog_name = "rhnfzl"\n'
+            'author_name = "Rehan Fazal"\n'
+            'profiles_dir = "profiles/"\n',
+            encoding="utf-8",
+        )
+        manifest = sync_distribution._load_manifest(m)
+        assert manifest.marketplace_catalog_name == "rhnfzl"
+        assert manifest.marketplace_author_name == "Rehan Fazal"
+
+    def test_no_marketplace_block_loads(self, tmp_path):
+        m = tmp_path / "manifest.toml"
+        m.write_text(
+            f'[destination]\npath = "{tmp_path}"\n[sources]\nallowlist = ["base/"]\n',
+            encoding="utf-8",
+        )
+        manifest = sync_distribution._load_manifest(m)
+        assert manifest.marketplace_catalog_name is None

@@ -70,13 +70,30 @@ _SUFFIX_FALLBACKS: dict[str, tuple[str, ...]] = {
 }
 
 
+def _ref_escapes_source_dir(ref: str) -> bool:
+    """True if `ref` is absolute or traverses out of base/<kind> via `..`.
+
+    SECURITY: refs come from profile TOML and name content WITHIN
+    base/<kind>. A ref like `../../../secret` or `/etc/passwd` would
+    otherwise resolve to a file outside the (scrubbed) content root and be
+    copied raw into the public plugin dirs. The check is LEXICAL on the ref
+    so it blocks traversal while still allowing the in-repo symlinks that
+    base/hooks/*.sh use to point at base/skills/<cat>/<name>/hooks/ (ADR-0035).
+    """
+    ref_path = Path(ref)
+    return ref_path.is_absolute() or ".." in ref_path.parts
+
+
 def _resolve_source(spec: ComponentSpec, ref: str, repo_root: Path) -> Path | None:
-    """Resolve a profile ref to its source path on disk, or None if absent.
+    """Resolve a profile ref to its source path on disk, or None if absent
+    or if the ref escapes the content root.
 
     Tries the bare ref first (directory-style content such as skills, and
     bundle-style MCP servers). Falls back to the extension(s) the canonical
     loader globs for that kind so bare-stem refs resolve to `<ref><suffix>`.
     """
+    if _ref_escapes_source_dir(ref):
+        return None
     base = repo_root / spec.source_dir / ref
     if base.exists():
         return base

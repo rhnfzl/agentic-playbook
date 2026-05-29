@@ -31,8 +31,13 @@ from ..content_ops import ResolvedRef
 from ..types import EmitterConfig, Profile
 from ._shared import _default_marketplace_description
 
+# Valid Codex policy enums (documented contract). The emitted defaults are
+# the first element of each, so these tuples are the single source of truth
+# for what the builder ships AND what the enum-parity tests assert.
 _CODEX_AUTH = ("ON_INSTALL", "ON_USE")
 _CODEX_INSTALLATION = ("AVAILABLE", "NOT_AVAILABLE", "INSTALLED_BY_DEFAULT")
+_DEFAULT_CODEX_AUTH = _CODEX_AUTH[0]
+_DEFAULT_CODEX_INSTALLATION = _CODEX_INSTALLATION[0]
 
 
 def _codex_plugin_manifest(profile: Profile, config: EmitterConfig) -> dict:
@@ -51,8 +56,8 @@ def _codex_plugin_entry(profile: Profile, config: EmitterConfig) -> dict:
         "version": config.version_for(profile),
         "source": {"source": "local", "path": f"./{profile.name}"},
         "policy": {
-            "installation": "AVAILABLE",
-            "authentication": "ON_INSTALL",
+            "installation": _DEFAULT_CODEX_INSTALLATION,
+            "authentication": _DEFAULT_CODEX_AUTH,
         },
         "category": "Productivity",
     }
@@ -69,11 +74,3 @@ def _codex_marketplace_manifest(
         "interface": {"displayName": f"{catalog_name} catalog"},
         "plugins": [_codex_plugin_entry(profile, config) for profile in profiles],
     }
-
-
-def _is_valid_codex_auth(value: str) -> bool:
-    return value in _CODEX_AUTH
-
-
-def _is_valid_codex_installation(value: str) -> bool:
-    return value in _CODEX_INSTALLATION

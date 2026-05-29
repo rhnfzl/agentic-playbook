@@ -29,8 +29,6 @@ from marketplace.manifests.codex import (
     _codex_marketplace_manifest,
     _codex_plugin_entry,
     _codex_plugin_manifest,
-    _is_valid_codex_auth,
-    _is_valid_codex_installation,
 )
 from marketplace.manifests.cursor import (
     _cursor_marketplace_manifest,
@@ -233,16 +231,12 @@ class TestCodexBuilders:
         assert entry["source"]["source"] == "local"
         assert entry["source"]["path"] == "./backend-developer"
 
-    def test_is_valid_codex_auth(self):
-        assert _is_valid_codex_auth("ON_INSTALL")
-        assert _is_valid_codex_auth("ON_USE")
-        assert not _is_valid_codex_auth("NONE")
-        assert not _is_valid_codex_auth("anything")
-
-    def test_is_valid_codex_installation(self):
-        for v in _CODEX_INSTALLATION:
-            assert _is_valid_codex_installation(v)
-        assert not _is_valid_codex_installation("UNKNOWN")
+    def test_emitted_policy_values_are_in_the_documented_enums(self):
+        # The emitted defaults must be members of the documented Codex enums.
+        cfg = _make_config(Path("/repo"), Path("/repo/dest"))
+        entry = _codex_plugin_entry(_make_role_profile(), cfg)
+        assert entry["policy"]["authentication"] in _CODEX_AUTH
+        assert entry["policy"]["installation"] in _CODEX_INSTALLATION
 
     def test_codex_auth_enum_matches_docs(self):
         assert set(_CODEX_AUTH) == {"ON_INSTALL", "ON_USE"}
