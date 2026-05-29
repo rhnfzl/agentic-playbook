@@ -70,7 +70,10 @@ def _write_passing_fixture(tmp_path: Path) -> Path:
             "startTimeUnixNano": "1000",
             "endTimeUnixNano": "1500",
             "attributes": [
-                {"key": "gen_ai.operation.name", "value": {"stringValue": "skill_load"}},
+                {
+                    "key": "gen_ai.operation.name",
+                    "value": {"stringValue": "skill_load"},
+                },
                 {"key": "skill.name", "value": {"stringValue": "demo"}},
             ],
         },
@@ -81,7 +84,10 @@ def _write_passing_fixture(tmp_path: Path) -> Path:
             "attributes": [
                 {"key": "gen_ai.operation.name", "value": {"stringValue": "tool_call"}},
                 {"key": "tool.name", "value": {"stringValue": "Write"}},
-                {"key": "tool.arguments", "value": {"stringValue": '{"path": "out.md", "content": "x"}'}},
+                {
+                    "key": "tool.arguments",
+                    "value": {"stringValue": '{"path": "out.md", "content": "x"}'},
+                },
             ],
         },
     ]
@@ -134,7 +140,9 @@ def test_verify_runs_judge_when_flag_set(tmp_path: Path) -> None:
     class _StubClient:
         def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
             return JudgeResult(
-                score=0.9, reasoning="good", raw_response="",
+                score=0.9,
+                reasoning="good",
+                raw_response="",
                 model="claude-sonnet-4-6",
             )
 
@@ -163,7 +171,9 @@ def test_verify_fails_when_judge_below_threshold(tmp_path: Path) -> None:
     class _LowClient:
         def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
             return JudgeResult(
-                score=0.4, reasoning="rubric not met", raw_response="",
+                score=0.4,
+                reasoning="rubric not met",
+                raw_response="",
                 model="claude-sonnet-4-6",
             )
 
@@ -189,15 +199,20 @@ def test_verify_fails_against_failing_fixture(tmp_path: Path) -> None:
     import trajectory_verify
 
     _seed(tmp_path)
-    spans = [{
-        "name": "skill_load",
-        "startTimeUnixNano": "1000",
-        "endTimeUnixNano": "1500",
-        "attributes": [
-            {"key": "gen_ai.operation.name", "value": {"stringValue": "skill_load"}},
-            {"key": "skill.name", "value": {"stringValue": "demo"}},
-        ],
-    }]
+    spans = [
+        {
+            "name": "skill_load",
+            "startTimeUnixNano": "1000",
+            "endTimeUnixNano": "1500",
+            "attributes": [
+                {
+                    "key": "gen_ai.operation.name",
+                    "value": {"stringValue": "skill_load"},
+                },
+                {"key": "skill.name", "value": {"stringValue": "demo"}},
+            ],
+        }
+    ]
     failing = tmp_path / "bad.jsonl"
     failing.write_text(json.dumps(spans[0]), encoding="utf-8")
 

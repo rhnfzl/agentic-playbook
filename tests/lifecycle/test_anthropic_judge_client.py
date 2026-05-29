@@ -50,21 +50,25 @@ def test_client_posts_to_anthropic_messages_endpoint(monkeypatch) -> None:
         captured["method"] = request.get_method()
         captured["headers"] = dict(request.header_items())
         captured["body"] = json.loads(request.data.decode("utf-8"))
-        return _mock_urlopen_response({
-            "content": [{
-                "type": "text",
-                "text": '{"score": 0.9, "reasoning": "good"}',
-            }],
-            "model": "claude-sonnet-4-6",
-        })
+        return _mock_urlopen_response(
+            {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": '{"score": 0.9, "reasoning": "good"}',
+                    }
+                ],
+                "model": "claude-sonnet-4-6",
+            }
+        )
 
-    monkeypatch.setattr(
-        "urllib.request.urlopen", fake_urlopen
-    )
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
     client = HttpAnthropicJudgeClient(api_key="sk-ant-test")
     result = client.score_trajectory(
-        rubric="x", trace_summary="y", model="claude-sonnet-4-6",
+        rubric="x",
+        trace_summary="y",
+        model="claude-sonnet-4-6",
     )
 
     assert "api.anthropic.com" in captured["url"]
@@ -88,6 +92,7 @@ def test_client_raises_on_missing_api_key() -> None:
     from adapters.anthropic_judge_client import HttpAnthropicJudgeClient
 
     import pytest as _pytest
+
     with _pytest.raises(ValueError, match="api_key"):
         HttpAnthropicJudgeClient(api_key="")
 
@@ -102,14 +107,19 @@ def test_client_returns_zero_score_on_http_error(monkeypatch) -> None:
     def boom(*args, **kwargs):
         raise _urlerror.HTTPError(
             url="https://api.anthropic.com/v1/messages",
-            code=429, msg="rate limited", hdrs=None, fp=None,  # type: ignore[arg-type]
+            code=429,
+            msg="rate limited",
+            hdrs=None,
+            fp=None,  # type: ignore[arg-type]
         )
 
     monkeypatch.setattr("urllib.request.urlopen", boom)
 
     client = HttpAnthropicJudgeClient(api_key="sk-ant-test")
     result = client.score_trajectory(
-        rubric="x", trace_summary="y", model="claude-sonnet-4-6",
+        rubric="x",
+        trace_summary="y",
+        model="claude-sonnet-4-6",
     )
     assert result.score == 0.0
     assert "429" in result.reasoning or "rate" in result.reasoning.lower()

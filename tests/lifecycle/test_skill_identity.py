@@ -66,9 +66,7 @@ class TestParseFrontmatter:
         assert fm["owner"] == "rehan"
 
     def test_comment_lines_skipped(self):
-        fm, _ = parse_frontmatter(
-            "---\n# this is a comment\nname: foo\n---\nbody\n"
-        )
+        fm, _ = parse_frontmatter("---\n# this is a comment\nname: foo\n---\nbody\n")
         assert fm == {"name": "foo"}
 
     def test_blank_lines_skipped(self):
@@ -95,9 +93,7 @@ class TestSkillIdentity:
         skill_dir = tmp_path / "skills" / "directory-name"
         skill_dir.mkdir(parents=True)
         skill_md = skill_dir / "SKILL.md"
-        skill_md.write_text(
-            "---\nname: frontmatter-name\n---\nbody", encoding="utf-8"
-        )
+        skill_md.write_text("---\nname: frontmatter-name\n---\nbody", encoding="utf-8")
         assert skill_identity(skill_md) == "frontmatter-name"
 
     def test_directory_fallback_when_no_frontmatter(self, tmp_path: Path):

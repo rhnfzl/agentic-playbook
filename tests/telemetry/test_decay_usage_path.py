@@ -44,7 +44,9 @@ def test_silent_skip_when_telemetry_off(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("TELEMETRY", "off")
     skill_md = _seed_skill(tmp_path, "demo")
     out = decay_check._usage_decay_findings(
-        [skill_md], tmp_path, today=date(2026, 5, 28),
+        [skill_md],
+        tmp_path,
+        today=date(2026, 5, 28),
     )
     assert out == []
 
@@ -56,30 +58,37 @@ def test_silent_skip_when_no_jsonl(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("TELEMETRY_DIR", str(tmp_path / "no-such-dir"))
     skill_md = _seed_skill(tmp_path, "demo")
     out = decay_check._usage_decay_findings(
-        [skill_md], tmp_path, today=date(2026, 5, 28),
+        [skill_md],
+        tmp_path,
+        today=date(2026, 5, 28),
     )
     assert out == []
 
 
-def test_flags_skill_with_no_telemetry_events(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_flags_skill_with_no_telemetry_events(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("TELEMETRY", raising=False)
     monkeypatch.delenv("TELEMETRY_ENABLED", raising=False)
     monkeypatch.delenv("PLAYBOOK_TELEMETRY", raising=False)
     monkeypatch.setenv("TELEMETRY_DIR", str(tmp_path / "tele"))
-    _seed_jsonl(tmp_path / "tele" / "skills.jsonl", [{
-        "skill": "other-skill",
-        "adapter": "claude-code",
-        "model": "m",
-        "fired_at": "2026-05-27T12:00:00+00:00",
-        "latency_ms": 100,
-        "input_tokens": 1,
-        "output_tokens": 1,
-    }])
+    _seed_jsonl(
+        tmp_path / "tele" / "skills.jsonl",
+        [
+            {
+                "skill": "other-skill",
+                "adapter": "claude-code",
+                "model": "m",
+                "fired_at": "2026-05-27T12:00:00+00:00",
+                "latency_ms": 100,
+                "input_tokens": 1,
+                "output_tokens": 1,
+            }
+        ],
+    )
     skill_md = _seed_skill(tmp_path, "demo")
     out = decay_check._usage_decay_findings(
-        [skill_md], tmp_path, today=date(2026, 5, 28),
+        [skill_md],
+        tmp_path,
+        today=date(2026, 5, 28),
     )
     assert any("no telemetry events" in line for line in out)
 
@@ -90,41 +99,53 @@ def test_flags_skill_with_stale_usage(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("PLAYBOOK_TELEMETRY", raising=False)
     monkeypatch.setenv("TELEMETRY_DIR", str(tmp_path / "tele"))
     stale_iso = (date(2026, 5, 28) - timedelta(days=65)).isoformat() + "T00:00:00+00:00"
-    _seed_jsonl(tmp_path / "tele" / "skills.jsonl", [{
-        "skill": "demo",
-        "adapter": "claude-code",
-        "model": "m",
-        "fired_at": stale_iso,
-        "latency_ms": 100,
-        "input_tokens": 1,
-        "output_tokens": 1,
-    }])
+    _seed_jsonl(
+        tmp_path / "tele" / "skills.jsonl",
+        [
+            {
+                "skill": "demo",
+                "adapter": "claude-code",
+                "model": "m",
+                "fired_at": stale_iso,
+                "latency_ms": 100,
+                "input_tokens": 1,
+                "output_tokens": 1,
+            }
+        ],
+    )
     skill_md = _seed_skill(tmp_path, "demo")
     out = decay_check._usage_decay_findings(
-        [skill_md], tmp_path, today=date(2026, 5, 28),
+        [skill_md],
+        tmp_path,
+        today=date(2026, 5, 28),
     )
     assert any("usage-decay band" in line for line in out)
 
 
-def test_does_not_flag_skill_with_recent_usage(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_does_not_flag_skill_with_recent_usage(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("TELEMETRY", raising=False)
     monkeypatch.delenv("TELEMETRY_ENABLED", raising=False)
     monkeypatch.delenv("PLAYBOOK_TELEMETRY", raising=False)
     monkeypatch.setenv("TELEMETRY_DIR", str(tmp_path / "tele"))
     fresh_iso = (date(2026, 5, 28) - timedelta(days=5)).isoformat() + "T00:00:00+00:00"
-    _seed_jsonl(tmp_path / "tele" / "skills.jsonl", [{
-        "skill": "demo",
-        "adapter": "claude-code",
-        "model": "m",
-        "fired_at": fresh_iso,
-        "latency_ms": 100,
-        "input_tokens": 1,
-        "output_tokens": 1,
-    }])
+    _seed_jsonl(
+        tmp_path / "tele" / "skills.jsonl",
+        [
+            {
+                "skill": "demo",
+                "adapter": "claude-code",
+                "model": "m",
+                "fired_at": fresh_iso,
+                "latency_ms": 100,
+                "input_tokens": 1,
+                "output_tokens": 1,
+            }
+        ],
+    )
     skill_md = _seed_skill(tmp_path, "demo")
     out = decay_check._usage_decay_findings(
-        [skill_md], tmp_path, today=date(2026, 5, 28),
+        [skill_md],
+        tmp_path,
+        today=date(2026, 5, 28),
     )
     assert out == []

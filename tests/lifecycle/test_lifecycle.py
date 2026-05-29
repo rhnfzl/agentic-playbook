@@ -1744,5 +1744,3 @@ def test_pointer_mode_switch_cleans_prior_symlink_install(
     assert not (tmp_target / ".agents" / "hooks" / "demo-hook.sh").exists(), (
         "prior hooks dir must be cleaned when switching to pointer mode"
     )
-
-

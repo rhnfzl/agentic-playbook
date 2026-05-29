@@ -91,10 +91,10 @@ def test_load_profile_parses_requires_overlays(tmp_path: Path) -> None:
         'name = "devops"\n'
         'description = "DevOps profile"\n'
         'requires_overlays = ["team"]\n'
-        '[skills]\ninclude = []\n'
-        '[rules]\ninclude = []\n'
-        '[hooks]\ninclude = []\n'
-        '[mcp]\ninclude = []\n',
+        "[skills]\ninclude = []\n"
+        "[rules]\ninclude = []\n"
+        "[hooks]\ninclude = []\n"
+        "[mcp]\ninclude = []\n",
     )
     p = load_profile(tmp_path, "devops")
     assert p.requires_overlays == ["team"]
@@ -109,10 +109,10 @@ def test_load_profile_defaults_requires_overlays_to_empty(tmp_path: Path) -> Non
         "research",
         'name = "research"\n'
         'description = "Research profile"\n'
-        '[skills]\ninclude = []\n'
-        '[rules]\ninclude = []\n'
-        '[hooks]\ninclude = []\n'
-        '[mcp]\ninclude = []\n',
+        "[skills]\ninclude = []\n"
+        "[rules]\ninclude = []\n"
+        "[hooks]\ninclude = []\n"
+        "[mcp]\ninclude = []\n",
     )
     p = load_profile(tmp_path, "research")
     assert p.requires_overlays == []
@@ -128,8 +128,8 @@ def test_load_profile_rejects_malformed_requires_overlays(tmp_path: Path) -> Non
         'name = "bad"\n'
         'description = ""\n'
         'requires_overlays = "team"\n'  # string instead of list
-        '[skills]\ninclude = []\n[rules]\ninclude = []\n'
-        '[hooks]\ninclude = []\n[mcp]\ninclude = []\n',
+        "[skills]\ninclude = []\n[rules]\ninclude = []\n"
+        "[hooks]\ninclude = []\n[mcp]\ninclude = []\n",
     )
     with pytest.raises(ValueError) as exc:
         load_profile(tmp_path, "bad")
@@ -144,22 +144,22 @@ def test_load_profiles_unions_requires_overlays(tmp_path: Path) -> None:
         tmp_path,
         "devops",
         'name = "devops"\ndescription = ""\nrequires_overlays = ["team"]\n'
-        '[skills]\ninclude = []\n[rules]\ninclude = []\n'
-        '[hooks]\ninclude = []\n[mcp]\ninclude = []\n',
+        "[skills]\ninclude = []\n[rules]\ninclude = []\n"
+        "[hooks]\ninclude = []\n[mcp]\ninclude = []\n",
     )
     _write_profile(
         tmp_path,
         "qa",
         'name = "qa"\ndescription = ""\nrequires_overlays = ["team"]\n'
-        '[skills]\ninclude = []\n[rules]\ninclude = []\n'
-        '[hooks]\ninclude = []\n[mcp]\ninclude = []\n',
+        "[skills]\ninclude = []\n[rules]\ninclude = []\n"
+        "[hooks]\ninclude = []\n[mcp]\ninclude = []\n",
     )
     _write_profile(
         tmp_path,
         "research",
         'name = "research"\ndescription = ""\n'
-        '[skills]\ninclude = []\n[rules]\ninclude = []\n'
-        '[hooks]\ninclude = []\n[mcp]\ninclude = []\n',
+        "[skills]\ninclude = []\n[rules]\ninclude = []\n"
+        "[hooks]\ninclude = []\n[mcp]\ninclude = []\n",
     )
 
     merged = load_profiles(tmp_path, ["devops", "qa", "research"])

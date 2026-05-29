@@ -86,8 +86,7 @@ def test_playbook_version_fails_on_hardcoded_constant(tmp_path: Path) -> None:
         tmp_path,
         version="0.11.0\n",
         install_body=(
-            'LOCKFILE_NAME = ".playbook-lock.json"\n'
-            'PLAYBOOK_VERSION = "0.4.0"\n'
+            'LOCKFILE_NAME = ".playbook-lock.json"\nPLAYBOOK_VERSION = "0.4.0"\n'
         ),
     )
     ctx = CheckContext(repo_root=repo_root, content=None)
@@ -106,9 +105,7 @@ def test_playbook_version_allows_function_call_form(tmp_path: Path) -> None:
     repo_root = _setup(
         tmp_path,
         version="0.11.0\n",
-        install_body=(
-            "PLAYBOOK_VERSION = _read_playbook_version()\n"
-        ),
+        install_body=("PLAYBOOK_VERSION = _read_playbook_version()\n"),
     )
     ctx = CheckContext(repo_root=repo_root, content=None)
     result = run(ctx)

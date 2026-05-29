@@ -49,8 +49,12 @@ def _make_trace():
         prompt="write a markdown file",
         events=[
             TraceEvent(
-                seq=0, kind="tool_call", name="Write",
-                arguments={"path": "out.md"}, duration_ms=8, raw_attrs={},
+                seq=0,
+                kind="tool_call",
+                name="Write",
+                arguments={"path": "out.md"},
+                duration_ms=8,
+                raw_attrs={},
             ),
         ],
         artifacts={"out.md": "sha256:abc"},
@@ -70,7 +74,10 @@ class _FixtureClient:
         self.calls: list[tuple[str, str, str, float]] = []
 
     def score_trajectory(
-        self, rubric: str, trace_summary: str, model: str,
+        self,
+        rubric: str,
+        trace_summary: str,
+        model: str,
         temperature: float = 0.0,
     ):
         from trajectory_judge import parse_judge_response
@@ -194,10 +201,7 @@ def test_parse_response_extracts_final_block_from_multi_block_response() -> None
     the LAST balanced block first."""
     from trajectory_judge import parse_judge_response
 
-    raw = (
-        '{"draft": "thinking aloud"}\n'
-        '{"score": 0.85, "reasoning": "good"}'
-    )
+    raw = '{"draft": "thinking aloud"}\n{"score": 0.85, "reasoning": "good"}'
     result = parse_judge_response(raw, model="claude-sonnet-4-6")
     assert result.score == 0.85
     assert result.reasoning == "good"
@@ -238,14 +242,20 @@ def test_trace_summary_includes_non_path_arguments() -> None:
         prompt="x",
         events=[
             TraceEvent(
-                seq=0, kind="tool_call", name="Bash",
+                seq=0,
+                kind="tool_call",
+                name="Bash",
                 arguments={"command": "ls -la /tmp"},
-                duration_ms=5, raw_attrs={},
+                duration_ms=5,
+                raw_attrs={},
             ),
             TraceEvent(
-                seq=1, kind="tool_call", name="Grep",
+                seq=1,
+                kind="tool_call",
+                name="Grep",
                 arguments={"pattern": "TODO", "path": "src/"},
-                duration_ms=10, raw_attrs={},
+                duration_ms=10,
+                raw_attrs={},
             ),
         ],
         artifacts={},
@@ -273,9 +283,12 @@ def test_trace_summary_truncates_long_argument_values() -> None:
         prompt="x",
         events=[
             TraceEvent(
-                seq=0, kind="tool_call", name="Write",
+                seq=0,
+                kind="tool_call",
+                name="Write",
                 arguments={"content": "x" * 500, "path": "out.md"},
-                duration_ms=5, raw_attrs={},
+                duration_ms=5,
+                raw_attrs={},
             ),
         ],
         artifacts={},
@@ -303,14 +316,30 @@ def test_evaluate_judge_summary_includes_tool_calls_in_order() -> None:
         session_id="s1",
         prompt="x",
         events=[
-            TraceEvent(seq=0, kind="skill_load", name="demo",
-                       arguments=None, duration_ms=None, raw_attrs={}),
-            TraceEvent(seq=1, kind="tool_call", name="Read",
-                       arguments={"path": "a.py"},
-                       duration_ms=5, raw_attrs={}),
-            TraceEvent(seq=2, kind="tool_call", name="Write",
-                       arguments={"path": "b.md"},
-                       duration_ms=8, raw_attrs={}),
+            TraceEvent(
+                seq=0,
+                kind="skill_load",
+                name="demo",
+                arguments=None,
+                duration_ms=None,
+                raw_attrs={},
+            ),
+            TraceEvent(
+                seq=1,
+                kind="tool_call",
+                name="Read",
+                arguments={"path": "a.py"},
+                duration_ms=5,
+                raw_attrs={},
+            ),
+            TraceEvent(
+                seq=2,
+                kind="tool_call",
+                name="Write",
+                arguments={"path": "b.md"},
+                duration_ms=8,
+                raw_attrs={},
+            ),
         ],
         artifacts={"b.md": "sha256:x"},
         total_input_tokens=0,

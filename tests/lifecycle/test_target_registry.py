@@ -104,9 +104,7 @@ def test_target_registry_atomic_write_does_not_leak_tempfile(tmp_path: Path) -> 
     proj = tmp_path / "proj-c"
     proj.mkdir()
 
-    record_target(
-        proj, profile="tech-lead", install_mode="pointer", path=registry_path
-    )
+    record_target(proj, profile="tech-lead", install_mode="pointer", path=registry_path)
     assert registry_path.is_file()
     assert not registry_path.with_suffix(".json.tmp").exists()
 

@@ -68,12 +68,8 @@ def test_scope_for_config_path_resolves_global_vs_project(tmp_path: Path) -> Non
     home = Path.home()
 
     assert scope_for_config_path(home / ".cursor" / "mcp.json", None) == "global"
-    assert scope_for_config_path(
-        project / ".cursor" / "mcp.json", project
-    ) == "project"
-    assert scope_for_config_path(
-        home / ".cursor" / "mcp.json", project
-    ) == "global"
+    assert scope_for_config_path(project / ".cursor" / "mcp.json", project) == "project"
+    assert scope_for_config_path(home / ".cursor" / "mcp.json", project) == "global"
     assert scope_for_config_path(project / ".cursor" / "mcp.json", home) == "global"
 
 
@@ -158,15 +154,11 @@ def test_env_var_substitution_dollar_env_syntax() -> None:
 
     os.environ["TEST_TOKEN_V09"] = "secret-abc"
     try:
-        result, missing = _substitute_env_in_value(
-            "Bearer ${env:TEST_TOKEN_V09}"
-        )
+        result, missing = _substitute_env_in_value("Bearer ${env:TEST_TOKEN_V09}")
         assert result == "Bearer secret-abc"
         assert missing == []
 
-        result, missing = _substitute_env_in_value(
-            "${env:DEFINITELY_NOT_SET_V09}"
-        )
+        result, missing = _substitute_env_in_value("${env:DEFINITELY_NOT_SET_V09}")
         assert missing == ["DEFINITELY_NOT_SET_V09"]
     finally:
         del os.environ["TEST_TOKEN_V09"]
@@ -620,9 +612,7 @@ def test_incompatible_lockfile_path_returns_none_for_v0_9(tmp_path: Path) -> Non
         ),
         encoding="utf-8",
     )
-    assert (
-        incompatible_lockfile_path(target=tmp_path, repo_root=tmp_path) is None
-    )
+    assert incompatible_lockfile_path(target=tmp_path, repo_root=tmp_path) is None
 
 
 def test_http_probe_parses_sse_response_body(tmp_path: Path) -> None:
@@ -644,12 +634,7 @@ def test_http_probe_parses_sse_response_body(tmp_path: Path) -> None:
         }
     )
     sse_body = (
-        f"event: message\n"
-        f"data: {payload}\n"
-        f"\n"
-        f"event: ping\n"
-        f"data: {{}}\n"
-        f"\n"
+        f"event: message\ndata: {payload}\n\nevent: ping\ndata: {{}}\n\n"
     ).encode("utf-8")
 
     class _SseHandler(BaseHTTPRequestHandler):
@@ -928,9 +913,7 @@ def test_incompatible_lockfile_respects_target_precedence(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    assert (
-        incompatible_lockfile_path(target=target, repo_root=repo_root) is None
-    ), (
+    assert incompatible_lockfile_path(target=target, repo_root=repo_root) is None, (
         "valid v3 target lockfile must shadow stale repo_root lockfile; "
         "round-3 implementation walked both and false-positived"
     )
@@ -959,10 +942,7 @@ def test_incompatible_lockfile_uses_repo_root_when_no_target(
         ),
         encoding="utf-8",
     )
-    assert (
-        incompatible_lockfile_path(target=target, repo_root=repo_root)
-        == stale
-    )
+    assert incompatible_lockfile_path(target=target, repo_root=repo_root) == stale
 
 
 def test_http_probe_sse_skips_heartbeat_before_initialize(tmp_path: Path) -> None:
@@ -1015,9 +995,7 @@ def test_http_probe_sse_skips_heartbeat_before_initialize(tmp_path: Path) -> Non
     with _fake_http_mcp_server(_HeartbeatThenDataHandler) as url:
         mcp_json = tmp_path / "mcp.json"
         mcp_json.write_text(
-            json.dumps(
-                {"mcpServers": {"hb": {"type": "streamable-http", "url": url}}}
-            ),
+            json.dumps({"mcpServers": {"hb": {"type": "streamable-http", "url": url}}}),
             encoding="utf-8",
         )
         result = probe_one_server("hb", mcp_json, timeout_sec=5.0)
@@ -1043,9 +1021,7 @@ def test_incompatible_lockfile_continues_past_corrupt_target(
     repo_root.mkdir()
 
     # Corrupt JSON at target.
-    (target / ".playbook-lock.json").write_text(
-        "{not valid json", encoding="utf-8"
-    )
+    (target / ".playbook-lock.json").write_text("{not valid json", encoding="utf-8")
     # Stale v0.8 lockfile at repo_root.
     stale = repo_root / ".playbook-lock.json"
     stale.write_text(
@@ -1097,7 +1073,9 @@ def test_http_probe_skips_data_bearing_ping_before_initialize(
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
             # data-bearing ping (would defeat round-4-r2 stop condition).
-            self.wfile.write(b'event: ping\ndata: {"jsonrpc":"2.0","method":"ping"}\n\n')
+            self.wfile.write(
+                b'event: ping\ndata: {"jsonrpc":"2.0","method":"ping"}\n\n'
+            )
             self.wfile.flush()
             # Real initialize response.
             self.wfile.write(b"event: message\ndata: ")
@@ -1303,8 +1281,7 @@ def test_http_probe_rejects_redirect_without_leaking_auth(
 
     # Sink must NEVER have been called (because we refuse the redirect).
     assert sink_received.get("auth", "") == "", (
-        f"sink should not have received the bearer token; got: "
-        f"{sink_received!r}"
+        f"sink should not have received the bearer token; got: {sink_received!r}"
     )
     # The probe must classify as fail, not ok.
     assert result.status == "fail"
@@ -1334,11 +1311,9 @@ def test_http_probe_handles_malformed_url(tmp_path: Path) -> None:
     result = probe_one_server("bad-url", mcp_json, timeout_sec=5.0)
     assert result.status == "fail"
     detail = result.detail.lower()
-    assert (
-        "malformed" in detail
-        or "scheme" in detail
-        or "missing a host" in detail
-    ), result.detail
+    assert "malformed" in detail or "scheme" in detail or "missing a host" in detail, (
+        result.detail
+    )
 
 
 def test_http_probe_handles_non_http_scheme(tmp_path: Path) -> None:
@@ -1485,16 +1460,11 @@ def test_http_probe_redacts_query_string_via_helper() -> None:
     from mcp_runtime_probe import _redact_url_for_logs
 
     assert (
-        _redact_url_for_logs(
-            "https://example.com/path?api_key=plain-secret-value"
-        )
+        _redact_url_for_logs("https://example.com/path?api_key=plain-secret-value")
         == "https://example.com/path?<redacted-query>"
     )
     # No query string -> no redacted marker.
-    assert (
-        _redact_url_for_logs("https://example.com/mcp")
-        == "https://example.com/mcp"
-    )
+    assert _redact_url_for_logs("https://example.com/mcp") == "https://example.com/mcp"
     # Userinfo (user:pass@) is stripped via hostname-only host.
     assert (
         _redact_url_for_logs("https://user:secret@example.com/api")
@@ -1507,9 +1477,7 @@ def test_http_probe_redacts_query_string_via_helper() -> None:
         _redact_url_for_logs("")
         _redact_url_for_logs("garbage")
     except Exception as exc:  # pragma: no cover - belt-and-braces
-        raise AssertionError(
-            f"_redact_url_for_logs must never raise; got {exc!r}"
-        )
+        raise AssertionError(f"_redact_url_for_logs must never raise; got {exc!r}")
 
 
 def test_http_probe_refuses_cleartext_auth_to_remote_host(
@@ -1565,10 +1533,7 @@ def test_http_probe_allows_loopback_http_auth(tmp_path: Path) -> None:
             seen["auth"] = self.headers.get("Authorization", "")
             length = int(self.headers.get("Content-Length", "0") or "0")
             self.rfile.read(length)
-            body = (
-                b'{"jsonrpc":"2.0","id":1,'
-                b'"result":{"serverInfo":{"name":"local"}}}'
-            )
+            body = b'{"jsonrpc":"2.0","id":1,"result":{"serverInfo":{"name":"local"}}}'
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -1617,8 +1582,7 @@ def test_http_probe_url_template_supplies_endpoint(tmp_path: Path) -> None:
             length = int(self.headers.get("Content-Length", "0") or "0")
             self.rfile.read(length)
             body = (
-                b'{"jsonrpc":"2.0","id":1,'
-                b'"result":{"serverInfo":{"name":"templated"}}}'
+                b'{"jsonrpc":"2.0","id":1,"result":{"serverInfo":{"name":"templated"}}}'
             )
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -1881,9 +1845,7 @@ def test_http_probe_redacts_server_error_when_url_was_substituted(
                 ),
                 encoding="utf-8",
             )
-            result = probe_one_server(
-                "echo-secret", mcp_json, timeout_sec=5.0
-            )
+            result = probe_one_server("echo-secret", mcp_json, timeout_sec=5.0)
     finally:
         del os.environ["RESP_LEAK_TOKEN"]
 
@@ -1958,9 +1920,11 @@ def test_verify_target_lockfile_cannot_mark_home_config_user_scoped(
     )
 
     # Default verify must NOT spawn the sentinel even though the
-    # target lockfile claims config_path is under HOME.
+    # target lockfile claims config_path is under HOME. We run verify
+    # for its side effect (it may or may not spawn); the return value is
+    # irrelevant -- the security contract is the sentinel-absence assert.
     env = {**_os.environ, "HOME": str(home)}
-    result = subprocess.run(
+    subprocess.run(
         [
             sys.executable,
             str(repo_root / "scripts" / "install.py"),
@@ -2007,9 +1971,7 @@ def test_http_probe_redacts_http_error_reason_when_url_substituted(
             self.rfile.read(length)
             # Reason text echoes the URL the gateway saw, including
             # the substituted token in the query string.
-            self.send_response(
-                401, f"Invalid api_key=would-leak-via-reason-text"
-            )
+            self.send_response(401, f"Invalid api_key={secret_value}")
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", "0")
             self.end_headers()
@@ -2159,9 +2121,7 @@ def test_http_probe_success_redacts_server_info_when_url_substituted(
                 ),
                 encoding="utf-8",
             )
-            result = probe_one_server(
-                "echo-success", mcp_json, timeout_sec=5.0
-            )
+            result = probe_one_server("echo-success", mcp_json, timeout_sec=5.0)
     finally:
         del os.environ["SUCCESS_PATH_TOKEN"]
 
@@ -2289,6 +2249,7 @@ def test_codex_narrow_removes_prior_managed_mcp_block(tmp_path: Path) -> None:
 
     # Redirect HOME so the adapter writes into the test config.toml.
     import os as _os
+
     saved_home = _os.environ.get("HOME")
     saved_path_home = Path.home
     Path.home = staticmethod(lambda: home)  # type: ignore[assignment]
@@ -2304,8 +2265,7 @@ def test_codex_narrow_removes_prior_managed_mcp_block(tmp_path: Path) -> None:
     # must not survive.
     after = config_toml.read_text(encoding="utf-8") if config_toml.exists() else ""
     assert "stale-server" not in after, (
-        "narrow install must remove prior managed MCP block; "
-        f"got:\n{after}"
+        f"narrow install must remove prior managed MCP block; got:\n{after}"
     )
 
 
@@ -2361,9 +2321,7 @@ def test_http_probe_redacts_id_mismatch_when_sensitive(tmp_path: Path) -> None:
                 ),
                 encoding="utf-8",
             )
-            result = probe_one_server(
-                "id-mismatch", mcp_json, timeout_sec=5.0
-            )
+            result = probe_one_server("id-mismatch", mcp_json, timeout_sec=5.0)
     finally:
         del os.environ["IDMISMATCH_TOKEN"]
     # The id value must NOT appear in detail since the request used
@@ -2422,10 +2380,9 @@ def test_http_probe_shows_http_error_reason_for_no_secret_probe(
     assert result.status == "fail"
     assert "401" in result.detail
     # The server reason text must be visible (no redaction).
-    assert (
-        "unauthorized" in result.detail.lower()
-        or "GITHUB_TOKEN" in result.detail
-    ), result.detail
+    assert "unauthorized" in result.detail.lower() or "GITHUB_TOKEN" in result.detail, (
+        result.detail
+    )
 
 
 def test_run_install_exits_3_on_v0_8_lockfile_with_empty_selection(
@@ -2796,10 +2753,7 @@ def test_http_probe_allows_static_non_auth_header(tmp_path: Path) -> None:
             seen_client["x-client"] = self.headers.get("X-Client", "")
             length = int(self.headers.get("Content-Length", "0") or "0")
             self.rfile.read(length)
-            body = (
-                b'{"jsonrpc":"2.0","id":1,'
-                b'"result":{"serverInfo":{"name":"static"}}}'
-            )
+            body = b'{"jsonrpc":"2.0","id":1,"result":{"serverInfo":{"name":"static"}}}'
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -2827,9 +2781,7 @@ def test_http_probe_allows_static_non_auth_header(tmp_path: Path) -> None:
             ),
             encoding="utf-8",
         )
-        result = probe_one_server(
-            "static-header", mcp_json, timeout_sec=5.0
-        )
+        result = probe_one_server("static-header", mcp_json, timeout_sec=5.0)
 
     assert result.status == "ok", result.detail
     assert seen_client.get("x-client") == "playbook"
@@ -2879,8 +2831,7 @@ def test_http_probe_refuses_vendor_prefixed_auth_over_cleartext(
         )
         detail = result.detail.lower()
         assert "cleartext" in detail or "https" in detail, (
-            f"{header_name}: expected cleartext-refusal detail, got "
-            f"{result.detail!r}"
+            f"{header_name}: expected cleartext-refusal detail, got {result.detail!r}"
         )
         assert "literal-secret-xyz" not in result.detail
 
@@ -2997,9 +2948,7 @@ def test_cmd_remove_reconciles_managed_mcp_entries_before_lockfile_delete(
         cwd=str(repo_root),
         timeout=30,
     )
-    assert result.returncode == 0, (
-        f"--remove failed: {result.stdout}\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"--remove failed: {result.stdout}\n{result.stderr}"
 
     # Lockfile deleted.
     assert not (target / ".playbook-lock.json").exists()
@@ -3152,9 +3101,7 @@ def test_http_probe_redacts_urlerror_reason_when_sensitive(
     os.environ["URLERROR_LEAK_HOST"] = secret
 
     def _fake_open(req, timeout=None):  # signature matches OpenerDirector.open
-        raise urllib.error.URLError(
-            f"TLS failed for host {secret}.example.com"
-        )
+        raise urllib.error.URLError(f"TLS failed for host {secret}.example.com")
 
     monkeypatch.setattr(_HTTP_OPENER, "open", _fake_open)
 
@@ -3232,9 +3179,7 @@ def test_http_probe_bearer_token_env_var(tmp_path: Path) -> None:
                 ),
                 encoding="utf-8",
             )
-            result = probe_one_server(
-                "codex-style", mcp_json, timeout_sec=5.0
-            )
+            result = probe_one_server("codex-style", mcp_json, timeout_sec=5.0)
     finally:
         del os.environ["PROBE_BEARER_V09"]
     assert result.status == "ok", result.detail

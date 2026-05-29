@@ -250,8 +250,7 @@ def uninstall() -> int:
             file=sys.stderr,
         )
         print(
-            "  1. `make install --profile <no-anchored-fs>` from the playbook root, "
-            "OR",
+            "  1. `make install --profile <no-anchored-fs>` from the playbook root, OR",
             file=sys.stderr,
         )
         print(

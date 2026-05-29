@@ -30,15 +30,20 @@ def test_read_jsonl_returns_empty_for_missing_file(tmp_path: Path) -> None:
 
 
 def test_read_jsonl_parses_telemetry_record_shape(tmp_path: Path) -> None:
-    p = _write_jsonl(tmp_path / "skills.jsonl", [{
-        "skill": "to-prd",
-        "adapter": "claude-code",
-        "model": "claude-opus-4-7",
-        "fired_at": "2026-05-28T12:00:00+00:00",
-        "latency_ms": 1200.5,
-        "input_tokens": 100,
-        "output_tokens": 200,
-    }])
+    p = _write_jsonl(
+        tmp_path / "skills.jsonl",
+        [
+            {
+                "skill": "to-prd",
+                "adapter": "claude-code",
+                "model": "claude-opus-4-7",
+                "fired_at": "2026-05-28T12:00:00+00:00",
+                "latency_ms": 1200.5,
+                "input_tokens": 100,
+                "output_tokens": 200,
+            }
+        ],
+    )
     records = read_jsonl(p)
     assert len(records) == 1
     assert records[0].skill == "to-prd"
@@ -48,17 +53,25 @@ def test_read_jsonl_parses_telemetry_record_shape(tmp_path: Path) -> None:
 
 def test_read_jsonl_tolerates_otlp_span_shape(tmp_path: Path) -> None:
     """Some collectors write raw OTLP spans; ingest should pluck attrs."""
-    p = _write_jsonl(tmp_path / "skills.jsonl", [{
-        "startTimeUnixNano": 1_700_000_000_000_000_000,
-        "endTimeUnixNano": 1_700_000_001_500_000_000,
-        "attributes": [
-            {"key": "skill.name", "value": {"stringValue": "to-prd"}},
-            {"key": "gen_ai.system", "value": {"stringValue": "claude-code"}},
-            {"key": "gen_ai.response.model", "value": {"stringValue": "claude-opus-4-7"}},
-            {"key": "gen_ai.usage.input_tokens", "value": {"intValue": 42}},
-            {"key": "gen_ai.usage.output_tokens", "value": {"intValue": 84}},
+    p = _write_jsonl(
+        tmp_path / "skills.jsonl",
+        [
+            {
+                "startTimeUnixNano": 1_700_000_000_000_000_000,
+                "endTimeUnixNano": 1_700_000_001_500_000_000,
+                "attributes": [
+                    {"key": "skill.name", "value": {"stringValue": "to-prd"}},
+                    {"key": "gen_ai.system", "value": {"stringValue": "claude-code"}},
+                    {
+                        "key": "gen_ai.response.model",
+                        "value": {"stringValue": "claude-opus-4-7"},
+                    },
+                    {"key": "gen_ai.usage.input_tokens", "value": {"intValue": 42}},
+                    {"key": "gen_ai.usage.output_tokens", "value": {"intValue": 84}},
+                ],
+            }
         ],
-    }])
+    )
     records = read_jsonl(p)
     assert len(records) == 1
     assert records[0].skill == "to-prd"
@@ -95,6 +108,7 @@ def test_aggregate_p50_p95_handle_single_value() -> None:
 
 def test_filter_recent_keeps_only_records_in_window() -> None:
     from datetime import datetime, timedelta, timezone
+
     now = datetime.now(timezone.utc)
     fresh = (now - timedelta(days=5)).isoformat(timespec="seconds")
     stale = (now - timedelta(days=45)).isoformat(timespec="seconds")
@@ -117,32 +131,51 @@ def test_read_jsonl_unwraps_otlp_resourcespan_envelope(tmp_path: Path) -> None:
     that wraps spans inside `resourceSpans -> scopeSpans -> spans`.
     Without unwrapping, every record would silently drop on the docker
     path (the entire docker collection path was effectively broken)."""
-    path = _write_jsonl(tmp_path / "skills.jsonl", [{
-        "resourceSpans": [{
-            "scopeSpans": [{
-                "spans": [
+    path = _write_jsonl(
+        tmp_path / "skills.jsonl",
+        [
+            {
+                "resourceSpans": [
                     {
-                        "startTimeUnixNano": 1_700_000_000_000_000_000,
-                        "endTimeUnixNano": 1_700_000_001_000_000_000,
-                        "attributes": [
-                            {"key": "skill.name", "value": {"stringValue": "to-prd"}},
-                            {"key": "gen_ai.usage.input_tokens",
-                             "value": {"intValue": 50}},
+                        "scopeSpans": [
+                            {
+                                "spans": [
+                                    {
+                                        "startTimeUnixNano": 1_700_000_000_000_000_000,
+                                        "endTimeUnixNano": 1_700_000_001_000_000_000,
+                                        "attributes": [
+                                            {
+                                                "key": "skill.name",
+                                                "value": {"stringValue": "to-prd"},
+                                            },
+                                            {
+                                                "key": "gen_ai.usage.input_tokens",
+                                                "value": {"intValue": 50},
+                                            },
+                                        ],
+                                    },
+                                    {
+                                        "startTimeUnixNano": 1_700_000_000_000_000_000,
+                                        "endTimeUnixNano": 1_700_000_000_500_000_000,
+                                        "attributes": [
+                                            {
+                                                "key": "skill.name",
+                                                "value": {"stringValue": "code-review"},
+                                            },
+                                            {
+                                                "key": "gen_ai.usage.input_tokens",
+                                                "value": {"intValue": 25},
+                                            },
+                                        ],
+                                    },
+                                ],
+                            }
                         ],
-                    },
-                    {
-                        "startTimeUnixNano": 1_700_000_000_000_000_000,
-                        "endTimeUnixNano": 1_700_000_000_500_000_000,
-                        "attributes": [
-                            {"key": "skill.name", "value": {"stringValue": "code-review"}},
-                            {"key": "gen_ai.usage.input_tokens",
-                             "value": {"intValue": 25}},
-                        ],
-                    },
+                    }
                 ],
-            }],
-        }],
-    }])
+            }
+        ],
+    )
     records = read_jsonl(path)
     assert {r.skill for r in records} == {"to-prd", "code-review"}
 
@@ -153,9 +186,12 @@ def test_filter_recent_handles_naive_iso_timestamp() -> None:
     would shift by the local-time offset and could drop a freshly-
     fired record on systems where the offset is positive."""
     from datetime import datetime, timedelta, timezone
+
     naive_recent = (
-        datetime.now(timezone.utc) - timedelta(days=5)
-    ).replace(tzinfo=None).isoformat(timespec="seconds")
+        (datetime.now(timezone.utc) - timedelta(days=5))
+        .replace(tzinfo=None)
+        .isoformat(timespec="seconds")
+    )
     records = [TelemetryRecord("a", "cc", "m", naive_recent, 0, 0, 0)]
     kept = filter_recent(records, days=30)
     assert len(kept) == 1, "naive ISO recent record should be kept"

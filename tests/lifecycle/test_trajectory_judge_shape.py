@@ -43,12 +43,19 @@ def test_judge_client_protocol_exists() -> None:
 
     class FakeClient:
         def score_trajectory(
-            self, rubric: str, trace_summary: str, model: str,
+            self,
+            rubric: str,
+            trace_summary: str,
+            model: str,
             temperature: float = 0.0,
         ):
             from trajectory_judge import JudgeResult
+
             return JudgeResult(
-                score=0.5, reasoning="fake", raw_response="", model=model,
+                score=0.5,
+                reasoning="fake",
+                raw_response="",
+                model=model,
             )
 
     # Duck-typing check: the protocol must accept any object with the right
@@ -56,6 +63,8 @@ def test_judge_client_protocol_exists() -> None:
     assert hasattr(JudgeClient, "__name__") or JudgeClient is not None
     c: JudgeClient = FakeClient()  # type: ignore[assignment]
     result = c.score_trajectory(
-        rubric="x", trace_summary="y", model="claude-sonnet-4-6",
+        rubric="x",
+        trace_summary="y",
+        model="claude-sonnet-4-6",
     )
     assert result.score == 0.5

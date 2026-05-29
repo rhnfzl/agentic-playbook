@@ -28,7 +28,10 @@ from telemetry._otlp_record import (  # noqa: E402
 
 _YAML_PATH = (
     Path(__file__).resolve().parents[2]
-    / "scripts" / "telemetry" / "otel_collector" / "collector-config.yaml"
+    / "scripts"
+    / "telemetry"
+    / "otel_collector"
+    / "collector-config.yaml"
 )
 
 
@@ -62,16 +65,20 @@ def test_span_to_record_drops_banned_prefixes() -> None:
     """Privacy: even when the upstream sends gen_ai.prompt.0,
     gen_ai.output.messages.5.content, etc., the canonical parser
     must drop them before returning a TelemetryRecord."""
-    record = span_to_record({
-        "startTimeUnixNano": 1_700_000_000_000_000_000,
-        "endTimeUnixNano": 1_700_000_001_000_000_000,
-        "attributes": [
-            {"key": "skill.name", "value": {"stringValue": "demo"}},
-            {"key": "gen_ai.prompt.0", "value": {"stringValue": "LEAK_A"}},
-            {"key": "gen_ai.output.messages.5.content",
-             "value": {"stringValue": "LEAK_B"}},
-        ],
-    })
+    record = span_to_record(
+        {
+            "startTimeUnixNano": 1_700_000_000_000_000_000,
+            "endTimeUnixNano": 1_700_000_001_000_000_000,
+            "attributes": [
+                {"key": "skill.name", "value": {"stringValue": "demo"}},
+                {"key": "gen_ai.prompt.0", "value": {"stringValue": "LEAK_A"}},
+                {
+                    "key": "gen_ai.output.messages.5.content",
+                    "value": {"stringValue": "LEAK_B"},
+                },
+            ],
+        }
+    )
     assert record is not None
     blob = json.dumps(record._asdict())
     assert "LEAK_A" not in blob
@@ -107,9 +114,11 @@ def test_pyotel_and_ingest_share_one_parser() -> None:
             {"key": "gen_ai.usage.output_tokens", "value": {"intValue": 84}},
         ],
     }
-    from_pyotel = pyotel_collector.extract_records({
-        "resourceSpans": [{"scopeSpans": [{"spans": [span]}]}],
-    })
+    from_pyotel = pyotel_collector.extract_records(
+        {
+            "resourceSpans": [{"scopeSpans": [{"spans": [span]}]}],
+        }
+    )
     from_ingest = _coerce_record(span)
     assert len(from_pyotel) == 1
     assert from_pyotel[0] == from_ingest

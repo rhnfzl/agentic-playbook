@@ -41,7 +41,10 @@ def _fake_completed(returncode: int = 0, stderr: str = "", stdout: str = ""):
     import subprocess
 
     return subprocess.CompletedProcess(
-        args=[], returncode=returncode, stdout=stdout, stderr=stderr,
+        args=[],
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
     )
 
 
@@ -55,7 +58,8 @@ def _otel_span_line(operation: str, name: str, **kwargs) -> str:
             {"key": "gen_ai.operation.name", "value": {"stringValue": operation}},
             *[
                 {"key": k, "value": {"stringValue": str(v)}}
-                for k, v in kwargs.items() if k not in ("start", "end")
+                for k, v in kwargs.items()
+                if k not in ("start", "end")
             ],
         ],
     }
@@ -70,6 +74,7 @@ def test_provider_raises_when_claude_not_on_path(tmp_path: Path) -> None:
     with patch("shutil.which", return_value=None):
         provider = ClaudeCodeProvider()
         import pytest as _pytest
+
         with _pytest.raises(RuntimeError, match="claude.*PATH"):
             provider(_trajectory(), "hello", "claude-code")
 
@@ -82,6 +87,7 @@ def test_provider_rejects_non_claude_code_adapter(tmp_path: Path) -> None:
     with patch("shutil.which", return_value="/usr/local/bin/claude"):
         provider = ClaudeCodeProvider()
         import pytest as _pytest
+
         with _pytest.raises(ValueError, match="codex"):
             provider(_trajectory(), "hello", "codex")
 
@@ -99,13 +105,16 @@ def test_provider_spawns_claude_with_phrasing_as_prompt(tmp_path: Path) -> None:
         captured["cwd"] = kwargs.get("cwd")
         return _fake_completed(
             stderr=_otel_span_line(
-                "skill_load", "trajectory-canary",
+                "skill_load",
+                "trajectory-canary",
                 **{"skill.name": "trajectory-canary"},
             ),
         )
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider()
         record = provider(_trajectory(), "run the canary", "claude-code")
 
@@ -131,8 +140,10 @@ def test_provider_sets_otel_env_vars(tmp_path: Path) -> None:
         captured["env"] = kwargs.get("env", {}) or {}
         return _fake_completed()
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider()
         provider(_trajectory(), "x", "claude-code")
 
@@ -149,11 +160,14 @@ def test_provider_parses_otel_spans_from_stderr(tmp_path: Path) -> None:
 
     spans_stderr = (
         _otel_span_line(
-            "skill_load", "trajectory-canary",
+            "skill_load",
+            "trajectory-canary",
             **{"skill.name": "trajectory-canary"},
-        ) + "\n" +
-        _otel_span_line(
-            "tool_call", "Write",
+        )
+        + "\n"
+        + _otel_span_line(
+            "tool_call",
+            "Write",
             **{
                 "tool.name": "Write",
                 "tool.arguments": '{"path": "out.md", "content": "x"}',
@@ -161,11 +175,13 @@ def test_provider_parses_otel_spans_from_stderr(tmp_path: Path) -> None:
         )
     )
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch(
-             "subprocess.run",
-             return_value=_fake_completed(stderr=spans_stderr),
-         ):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch(
+            "subprocess.run",
+            return_value=_fake_completed(stderr=spans_stderr),
+        ),
+    ):
         provider = ClaudeCodeProvider()
         record = provider(_trajectory(), "x", "claude-code")
 
@@ -184,17 +200,21 @@ def test_provider_filters_non_json_lines_from_stderr(tmp_path: Path) -> None:
     mixed = (
         "Loading skills from ~/.claude/skills/\n"
         + _otel_span_line(
-            "tool_call", "Write",
+            "tool_call",
+            "Write",
             **{"tool.name": "Write"},
-        ) + "\n"
+        )
+        + "\n"
         + "Session ended (cost: $0.01)\n"
     )
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch(
-             "subprocess.run",
-             return_value=_fake_completed(stderr=mixed),
-         ):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch(
+            "subprocess.run",
+            return_value=_fake_completed(stderr=mixed),
+        ),
+    ):
         provider = ClaudeCodeProvider()
         record = provider(_trajectory(), "x", "claude-code")
     assert len(record.tool_calls()) == 1
@@ -210,10 +230,13 @@ def test_provider_surfaces_timeout(tmp_path: Path) -> None:
     def fake_run(*args, **kwargs):
         raise subprocess.TimeoutExpired(cmd="claude", timeout=10)
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider(timeout=10)
         import pytest as _pytest
+
         with _pytest.raises(TimeoutError, match="10"):
             provider(_trajectory(), "x", "claude-code")
 
@@ -230,8 +253,10 @@ def test_provider_runs_in_isolated_cwd(tmp_path: Path) -> None:
         captured_cwds.append(kwargs.get("cwd"))
         return _fake_completed()
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider()
         provider(_trajectory(), "x", "claude-code")
 
@@ -260,8 +285,10 @@ def test_provider_default_uses_allowed_tools_allowlist(tmp_path: Path) -> None:
         captured["args"] = list(args)
         return _fake_completed()
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider()
         provider(_trajectory(), "x", "claude-code")
 
@@ -289,8 +316,10 @@ def test_provider_extra_allowed_tools_extends_default(tmp_path: Path) -> None:
         captured["args"] = list(args)
         return _fake_completed()
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider(
             extra_allowed_tools=frozenset({"Bash"}),
         )
@@ -313,8 +342,10 @@ def test_provider_dangerous_arg_switches_to_skip_permissions(tmp_path: Path) -> 
         captured["args"] = list(args)
         return _fake_completed()
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider(dangerous_skip_perms=True)
         provider(_trajectory(), "x", "claude-code")
 
@@ -323,7 +354,8 @@ def test_provider_dangerous_arg_switches_to_skip_permissions(tmp_path: Path) -> 
 
 
 def test_provider_dangerous_env_var_switches_to_skip_permissions(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     """`PHASE2_LIVE_DANGEROUS=1` opts in via env (for CI runners)."""
     monkeypatch.setenv("PHASE2_LIVE_DANGEROUS", "1")
@@ -335,8 +367,10 @@ def test_provider_dangerous_env_var_switches_to_skip_permissions(
         captured["args"] = list(args)
         return _fake_completed()
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider()
         provider(_trajectory(), "x", "claude-code")
 
@@ -348,8 +382,10 @@ def test_provider_dangerous_mode_warns_on_stderr(tmp_path: Path, capsys) -> None
     on stderr so a CI operator sees the escalation in their logs."""
     from adapters.claude_code_provider import ClaudeCodeProvider
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", return_value=_fake_completed()):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", return_value=_fake_completed()),
+    ):
         provider = ClaudeCodeProvider(dangerous_skip_perms=True)
         provider(_trajectory(), "x", "claude-code")
 
@@ -375,8 +411,10 @@ def test_provider_env_is_minimal_allowlist(tmp_path: Path, monkeypatch) -> None:
         captured["env"] = kwargs.get("env", {})
         return _fake_completed()
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider()
         provider(_trajectory(), "x", "claude-code")
 
@@ -392,16 +430,19 @@ def test_provider_raises_on_nonzero_exit_code(tmp_path: Path) -> None:
     RuntimeError so the harness records the crash distinctly."""
     from adapters.claude_code_provider import ClaudeCodeProvider
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch(
-             "subprocess.run",
-             return_value=_fake_completed(
-                 returncode=2,
-                 stderr="Error: authentication failed",
-             ),
-         ):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch(
+            "subprocess.run",
+            return_value=_fake_completed(
+                returncode=2,
+                stderr="Error: authentication failed",
+            ),
+        ),
+    ):
         provider = ClaudeCodeProvider()
         import pytest as _pytest
+
         with _pytest.raises(RuntimeError, match="code 2"):
             provider(_trajectory(), "x", "claude-code")
 
@@ -414,15 +455,18 @@ def test_provider_parses_spans_from_stdout_too(tmp_path: Path) -> None:
     from adapters.claude_code_provider import ClaudeCodeProvider
 
     span_on_stdout = _otel_span_line(
-        "tool_call", "Write",
+        "tool_call",
+        "Write",
         **{"tool.name": "Write"},
     )
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch(
-             "subprocess.run",
-             return_value=_fake_completed(stdout=span_on_stdout, stderr=""),
-         ):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch(
+            "subprocess.run",
+            return_value=_fake_completed(stdout=span_on_stdout, stderr=""),
+        ),
+    ):
         provider = ClaudeCodeProvider()
         record = provider(_trajectory(), "x", "claude-code")
 
@@ -445,14 +489,17 @@ def test_provider_excludes_hidden_dirs_from_artifacts(tmp_path: Path) -> None:
         # Hidden harness state:
         (cwd / ".claude").mkdir()
         (cwd / ".claude" / "session.json").write_text(
-            '{"...": "..."}', encoding="utf-8",
+            '{"...": "..."}',
+            encoding="utf-8",
         )
         (cwd / ".cache").mkdir()
         (cwd / ".cache" / "x.bin").write_text("blob", encoding="utf-8")
         return _fake_completed()
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider()
         record = provider(_trajectory(), "x", "claude-code")
 
@@ -472,8 +519,10 @@ def test_provider_temp_dir_prefix_names_the_trajectory(tmp_path: Path) -> None:
         captured["cwd"] = kwargs.get("cwd")
         return _fake_completed()
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider()
         provider(_trajectory(), "x", "claude-code")
 
@@ -491,8 +540,10 @@ def test_provider_captures_workdir_artifacts(tmp_path: Path) -> None:
         (cwd / "agent-output.md").write_text("canary chirped\n", encoding="utf-8")
         return _fake_completed()
 
-    with patch("shutil.which", return_value="/usr/local/bin/claude"), \
-         patch("subprocess.run", side_effect=fake_run):
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/claude"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
         provider = ClaudeCodeProvider()
         record = provider(_trajectory(), "x", "claude-code")
 

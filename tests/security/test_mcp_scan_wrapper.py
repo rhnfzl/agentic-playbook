@@ -34,9 +34,7 @@ def test_skips_when_env_var_unset(tmp_path: Path, monkeypatch) -> None:
     assert "SNYK_AGENT_SCAN_CONFIG" in result.note
 
 
-def test_skips_when_env_var_points_at_missing_file(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_skips_when_env_var_points_at_missing_file(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("SNYK_AGENT_SCAN_CONFIG", str(tmp_path / "nope.json"))
     with patch.object(mcp_scan_wrapper, "_have_uvx", return_value=True):
         result = mcp_scan_wrapper.run([tmp_path], tmp_path)
@@ -44,23 +42,25 @@ def test_skips_when_env_var_points_at_missing_file(
     assert "missing file" in result.note
 
 
-def test_parses_findings_when_subprocess_succeeds(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_parses_findings_when_subprocess_succeeds(tmp_path: Path, monkeypatch) -> None:
     config = tmp_path / "mcp.json"
     config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("SNYK_AGENT_SCAN_CONFIG", str(config))
 
     class FakeProc:
         returncode = 0
-        stdout = json.dumps({
-            "findings": [{
-                "path": str(tmp_path / "skill"),
-                "severity": "HIGH",
-                "rule": "CVE-2024-12345",
-                "message": "Known-bad pattern X",
-            }],
-        })
+        stdout = json.dumps(
+            {
+                "findings": [
+                    {
+                        "path": str(tmp_path / "skill"),
+                        "severity": "HIGH",
+                        "rule": "CVE-2024-12345",
+                        "message": "Known-bad pattern X",
+                    }
+                ],
+            }
+        )
         stderr = ""
 
     with patch.object(mcp_scan_wrapper, "_have_uvx", return_value=True):

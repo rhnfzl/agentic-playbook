@@ -44,8 +44,7 @@ def _make_trajectory(
         '    - "phrasing five"\n'
     )
     assertions = assertions_block or (
-        f"  - first_skill_loaded: {skill}\n"
-        f"  - must_invoke_tool: Write\n"
+        f"  - first_skill_loaded: {skill}\n  - must_invoke_tool: Write\n"
     )
     body = (
         f"---\n"
@@ -86,20 +85,36 @@ def _fixture_trace(
 
     events = [
         TraceEvent(
-            seq=0, kind="skill_load", name=skill,
-            arguments=None, duration_ms=None, raw_attrs={},
+            seq=0,
+            kind="skill_load",
+            name=skill,
+            arguments=None,
+            duration_ms=None,
+            raw_attrs={},
         ),
     ]
     if include_write:
-        events.append(TraceEvent(
-            seq=len(events), kind="tool_call", name="Write",
-            arguments={"path": "out.md"}, duration_ms=5, raw_attrs={},
-        ))
+        events.append(
+            TraceEvent(
+                seq=len(events),
+                kind="tool_call",
+                name="Write",
+                arguments={"path": "out.md"},
+                duration_ms=5,
+                raw_attrs={},
+            )
+        )
     if include_bash:
-        events.append(TraceEvent(
-            seq=len(events), kind="tool_call", name="Bash",
-            arguments=None, duration_ms=5, raw_attrs={},
-        ))
+        events.append(
+            TraceEvent(
+                seq=len(events),
+                kind="tool_call",
+                name="Bash",
+                arguments=None,
+                duration_ms=5,
+                raw_attrs={},
+            )
+        )
 
     return TraceRecord(
         adapter="claude-code",
@@ -137,13 +152,14 @@ def test_harness_fails_trajectory_when_assertion_fails(tmp_path: Path) -> None:
     _make_trajectory(
         tmp_path,
         assertions_block=(
-            "  - first_skill_loaded: demo\n"
-            "  - must_not_invoke_tool: Bash\n"
+            "  - first_skill_loaded: demo\n  - must_not_invoke_tool: Bash\n"
         ),
     )
     cfg = HarnessConfig(
         repo_root=tmp_path,
-        trace_provider=lambda _traj, _phrasing, _adapter: _fixture_trace(include_bash=True),
+        trace_provider=lambda _traj, _phrasing, _adapter: _fixture_trace(
+            include_bash=True
+        ),
     )
     matrix = run_harness(cfg)
     assert matrix.passed == 0
@@ -197,7 +213,9 @@ def test_harness_aggregates_skill_filter(tmp_path: Path) -> None:
     def provider(traj, _phrasing, _adapter):
         return _fixture_trace(skill=traj.skill)
 
-    cfg = HarnessConfig(repo_root=tmp_path, trace_provider=provider, skill_filter="alpha")
+    cfg = HarnessConfig(
+        repo_root=tmp_path, trace_provider=provider, skill_filter="alpha"
+    )
     matrix = run_harness(cfg)
     assert {c.skill for c in matrix.cells} == {"alpha"}
 
@@ -312,8 +330,7 @@ def test_harness_skips_judge_when_dsl_fails(tmp_path: Path) -> None:
     _make_trajectory(
         tmp_path,
         assertions_block=(
-            "  - first_skill_loaded: demo\n"
-            "  - must_not_invoke_tool: Bash\n"
+            "  - first_skill_loaded: demo\n  - must_not_invoke_tool: Bash\n"
         ),
     )
     judge = _StubJudgeClient(score=1.0)
@@ -410,8 +427,7 @@ def test_harness_failure_details_route_to_stderr(tmp_path: Path, capsys) -> None
     _make_trajectory(
         tmp_path,
         assertions_block=(
-            "  - first_skill_loaded: demo\n"
-            "  - must_not_invoke_tool: Bash\n"
+            "  - first_skill_loaded: demo\n  - must_not_invoke_tool: Bash\n"
         ),
     )
     cfg = HarnessConfig(
@@ -468,7 +484,9 @@ def test_harness_strict_mode_runs_when_judge_is_wired(tmp_path: Path) -> None:
     assert matrix.passed == 1
 
 
-def test_judge_client_is_skipped_when_trajectory_has_no_llm_judge(tmp_path: Path) -> None:
+def test_judge_client_is_skipped_when_trajectory_has_no_llm_judge(
+    tmp_path: Path,
+) -> None:
     """Codex review-fold finding: when judge_client is wired but a
     trajectory does NOT have an llm_judge block, the cell must skip
     the judge entirely. Without the trajectory.llm_judge truthiness
