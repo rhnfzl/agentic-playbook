@@ -44,17 +44,17 @@ _ADR_SUPERSEDES_RE = re.compile(r"[Ss]upersed(?:e|es)\s+(?:ADR-)?(\d{2,4})")
 
 
 class Node(NamedTuple):
-    id: str          # stable URL slug, e.g. "adr-0044" or "skill-engineering-to-prd"
-    kind: str        # "adr" | "skill" | "trajectory"
-    label: str       # human-readable title
-    href: str        # relative URL into docs/atlas/
-    meta: dict       # extra fields rendered on the per-node page
+    id: str  # stable URL slug, e.g. "adr-0044" or "skill-engineering-to-prd"
+    kind: str  # "adr" | "skill" | "trajectory"
+    label: str  # human-readable title
+    href: str  # relative URL into docs/atlas/
+    meta: dict  # extra fields rendered on the per-node page
 
 
 class Edge(NamedTuple):
-    source: str      # node id
-    target: str      # node id
-    kind: str        # "mentions" | "belongs_to" | "supersedes"
+    source: str  # node id
+    target: str  # node id
+    kind: str  # "mentions" | "belongs_to" | "supersedes"
 
 
 class Graph(NamedTuple):
@@ -83,7 +83,10 @@ def _tracked_paths(repo_root: Path, subpath: str) -> set[Path] | None:
     try:
         proc = subprocess.run(
             ["git", "-C", str(repo_root), "ls-files", subpath],
-            capture_output=True, text=True, timeout=10, check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
         )
     except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
         return None
@@ -146,7 +149,10 @@ def _adr_nodes(repo_root: Path) -> tuple[list[Node], dict[str, str]]:
             kind="adr",
             label=f"ADR-{number}: {title}",
             href=f"adr/{number}.html",
-            meta={"number": number, "source_path": str(adr_file.relative_to(repo_root))},
+            meta={
+                "number": number,
+                "source_path": str(adr_file.relative_to(repo_root)),
+            },
         )
         nodes.append(node)
         bodies[node.id] = text
@@ -155,8 +161,10 @@ def _adr_nodes(repo_root: Path) -> tuple[list[Node], dict[str, str]]:
 
 def _skill_nodes(repo_root: Path) -> list[Node]:
     nodes: list[Node] = []
-    for skill_root in (repo_root / "base" / "skills",
-                       repo_root / "overlays" / "team" / "skills"):
+    for skill_root in (
+        repo_root / "base" / "skills",
+        repo_root / "overlays" / "team" / "skills",
+    ):
         if not skill_root.is_dir():
             continue
         for skill_md in sorted(skill_root.rglob("SKILL.md")):
@@ -167,53 +175,64 @@ def _skill_nodes(repo_root: Path) -> list[Node]:
             category = parts[0] if len(parts) > 1 else "uncategorized"
             name = parts[-1]
             fm = _frontmatter(_read_text(skill_md))
-            scope = "base" if skill_root.name == "skills" and skill_root.parent.name == "base" else "team"
+            scope = (
+                "base"
+                if skill_root.name == "skills" and skill_root.parent.name == "base"
+                else "team"
+            )
             node_id = f"skill-{scope}-{category}-{name}"
-            nodes.append(Node(
-                id=node_id,
-                kind="skill",
-                label=f"{category}/{name}",
-                href=f"skill/{scope}-{category}-{name}.html",
-                meta={
-                    "name": fm.get("name", name),
-                    "description": fm.get("description", ""),
-                    "version": fm.get("version", ""),
-                    "owner": fm.get("owner", ""),
-                    "last_reviewed": fm.get("last_reviewed", ""),
-                    "category": category,
-                    "scope": scope,
-                    "source_path": str(skill_md.relative_to(repo_root)),
-                    "skill_name": fm.get("name", name),
-                },
-            ))
+            nodes.append(
+                Node(
+                    id=node_id,
+                    kind="skill",
+                    label=f"{category}/{name}",
+                    href=f"skill/{scope}-{category}-{name}.html",
+                    meta={
+                        "name": fm.get("name", name),
+                        "description": fm.get("description", ""),
+                        "version": fm.get("version", ""),
+                        "owner": fm.get("owner", ""),
+                        "last_reviewed": fm.get("last_reviewed", ""),
+                        "category": category,
+                        "scope": scope,
+                        "source_path": str(skill_md.relative_to(repo_root)),
+                        "skill_name": fm.get("name", name),
+                    },
+                )
+            )
     return nodes
 
 
 def _trajectory_nodes(repo_root: Path) -> list[Node]:
     nodes: list[Node] = []
-    for root in (repo_root / "base" / "trajectories",
-                 repo_root / "overlays" / "team" / "trajectories"):
+    for root in (
+        repo_root / "base" / "trajectories",
+        repo_root / "overlays" / "team" / "trajectories",
+    ):
         if not root.is_dir():
             continue
         for skill_dir in sorted(p for p in root.iterdir() if p.is_dir()):
             for traj in sorted(skill_dir.glob("*.yaml")):
                 slug = f"{skill_dir.name}-{traj.stem}"
-                nodes.append(Node(
-                    id=f"trajectory-{slug}",
-                    kind="trajectory",
-                    label=f"{skill_dir.name}/{traj.stem}",
-                    href=f"trajectory/{slug}.html",
-                    meta={
-                        "skill_dir_name": skill_dir.name,
-                        "scenario": traj.stem,
-                        "source_path": str(traj.relative_to(repo_root)),
-                    },
-                ))
+                nodes.append(
+                    Node(
+                        id=f"trajectory-{slug}",
+                        kind="trajectory",
+                        label=f"{skill_dir.name}/{traj.stem}",
+                        href=f"trajectory/{slug}.html",
+                        meta={
+                            "skill_dir_name": skill_dir.name,
+                            "scenario": traj.stem,
+                            "source_path": str(traj.relative_to(repo_root)),
+                        },
+                    )
+                )
     return nodes
 
 
-def _adr_to_skill_edges(adr_nodes: list[Node], skill_nodes: list[Node],
-                        adr_bodies: dict[str, str]) -> list[Edge]:
+def _adr_to_skill_edges(
+    adr_nodes: list[Node], skill_nodes: list[Node], adr_bodies: dict[str, str]
+) -> list[Edge]:
     """Heuristic: if an ADR body contains a skill's frontmatter name as
     a whole word, add a mentions edge. Avoids false positives by
     requiring word + hyphen boundaries and a minimum length.
@@ -244,8 +263,9 @@ def _adr_to_skill_edges(adr_nodes: list[Node], skill_nodes: list[Node],
     return edges
 
 
-def _trajectory_to_skill_edges(trajectory_nodes: list[Node],
-                               skill_nodes: list[Node]) -> list[Edge]:
+def _trajectory_to_skill_edges(
+    trajectory_nodes: list[Node], skill_nodes: list[Node]
+) -> list[Edge]:
     """Trajectories live under base/trajectories/<skill-name>/. Map by
     matching skill_dir_name against skill labels."""
     by_short_name: dict[str, str] = {}
@@ -262,8 +282,9 @@ def _trajectory_to_skill_edges(trajectory_nodes: list[Node],
     return edges
 
 
-def _adr_to_adr_supersedes(adr_nodes: list[Node],
-                           adr_bodies: dict[str, str]) -> list[Edge]:
+def _adr_to_adr_supersedes(
+    adr_nodes: list[Node], adr_bodies: dict[str, str]
+) -> list[Edge]:
     """Reuses the body cache populated by `_adr_nodes`."""
     by_number: dict[str, str] = {n.meta["number"]: n.id for n in adr_nodes}
     edges: list[Edge] = []

@@ -51,8 +51,10 @@ def test_enumerates_three_node_kinds(tmp_path: Path) -> None:
     _seed_skill(tmp_path, "base", "engineering", "to-prd")
     _seed_trajectory(tmp_path, "to-prd", "happy-path")
     graph = graph_builder.build_graph(tmp_path)
-    by_kind = {kind: [n for n in graph.nodes if n.kind == kind]
-               for kind in ("adr", "skill", "trajectory")}
+    by_kind = {
+        kind: [n for n in graph.nodes if n.kind == kind]
+        for kind in ("adr", "skill", "trajectory")
+    }
     assert len(by_kind["adr"]) == 1
     assert len(by_kind["skill"]) == 1
     assert len(by_kind["trajectory"]) == 1
@@ -61,7 +63,9 @@ def test_enumerates_three_node_kinds(tmp_path: Path) -> None:
 def test_adr_to_skill_edge_when_body_mentions_skill(tmp_path: Path) -> None:
     _seed_skill(tmp_path, "base", "engineering", "trajectory-arc")
     _seed_adr(
-        tmp_path, "0044", "Trajectories",
+        tmp_path,
+        "0044",
+        "Trajectories",
         body="The trajectory-arc skill is the surface this ADR addresses.",
     )
     graph = graph_builder.build_graph(tmp_path)
@@ -82,7 +86,9 @@ def test_trajectory_to_skill_belongs_to_edge(tmp_path: Path) -> None:
 def test_adr_supersedes_edge(tmp_path: Path) -> None:
     _seed_adr(tmp_path, "0001", "Original", "context")
     _seed_adr(
-        tmp_path, "0050", "Replacement",
+        tmp_path,
+        "0050",
+        "Replacement",
         body="Supersedes 0001 because the original premise no longer holds.",
     )
     graph = graph_builder.build_graph(tmp_path)
@@ -129,7 +135,9 @@ def test_hyphenated_skill_name_not_matched_inside_compound(
     # ADR body mentions a longer compound that contains "to-prd"
     # as a substring but is NOT a reference to the skill.
     _seed_adr(
-        tmp_path, "0001", "Compound",
+        tmp_path,
+        "0001",
+        "Compound",
         body="The push-to-prd-v2 pipeline was deprecated last quarter.",
     )
     graph = graph_builder.build_graph(tmp_path)
@@ -146,7 +154,9 @@ def test_hyphenated_skill_name_still_matches_real_reference(
     genuine references, not just compound exclusions."""
     _seed_skill(tmp_path, "base", "engineering", "to-prd")
     _seed_adr(
-        tmp_path, "0001", "Real",
+        tmp_path,
+        "0001",
+        "Real",
         body="The to-prd skill is the canonical example here.",
     )
     graph = graph_builder.build_graph(tmp_path)

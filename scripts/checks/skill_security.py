@@ -7,6 +7,4 @@ from ._legacy import capture_legacy_main
 
 
 def run(ctx: CheckContext) -> CheckResult:
-    return capture_legacy_main(
-        "audit_security", summary="supply-chain security audit"
-    )
+    return capture_legacy_main("audit_security", summary="supply-chain security audit")

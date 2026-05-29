@@ -11,7 +11,6 @@ author edits. This file tests:
 
 from __future__ import annotations
 
-import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,15 +27,25 @@ def _make_trace(
 
     events = [
         TraceEvent(
-            seq=0, kind="skill_load", name=skill,
-            arguments=None, duration_ms=None, raw_attrs={},
+            seq=0,
+            kind="skill_load",
+            name=skill,
+            arguments=None,
+            duration_ms=None,
+            raw_attrs={},
         ),
     ]
     for i, (tool, args) in enumerate(tool_calls or [], start=1):
-        events.append(TraceEvent(
-            seq=i, kind="tool_call", name=tool,
-            arguments=args, duration_ms=5, raw_attrs={},
-        ))
+        events.append(
+            TraceEvent(
+                seq=i,
+                kind="tool_call",
+                name=tool,
+                arguments=args,
+                duration_ms=5,
+                raw_attrs={},
+            )
+        )
     return TraceRecord(
         adapter="claude-code",
         model="claude-opus-4-7",
@@ -98,10 +107,12 @@ def test_draft_yaml_infers_must_invoke_tool_for_each_tool_call() -> None:
     a starting list rather than a blank assertions block."""
     from trajectory_record import draft_trajectory_yaml
 
-    trace = _make_trace([
-        ("Write", {"path": "spec.md"}),
-        ("Read", {"file_path": "old.md"}),
-    ])
+    trace = _make_trace(
+        [
+            ("Write", {"path": "spec.md"}),
+            ("Read", {"file_path": "old.md"}),
+        ]
+    )
     yaml_text = draft_trajectory_yaml(
         skill="to-prd",
         scenario="happy-path",
@@ -118,7 +129,8 @@ def test_draft_yaml_seeds_first_skill_loaded_when_skill_present() -> None:
     from trajectory_record import draft_trajectory_yaml
 
     trace = _make_trace(
-        [("Write", {"path": "spec.md"})], skill="to-prd",
+        [("Write", {"path": "spec.md"})],
+        skill="to-prd",
     )
     yaml_text = draft_trajectory_yaml(
         skill="to-prd",
@@ -164,7 +176,11 @@ def test_save_fixture_writes_jsonl_at_canonical_path(tmp_path: Path) -> None:
         trace=trace,
     )
     expected = (
-        tmp_path / "base" / "trajectories" / "to-prd" / "fixtures"
+        tmp_path
+        / "base"
+        / "trajectories"
+        / "to-prd"
+        / "fixtures"
         / "happy-path-pass.jsonl"
     )
     assert path == expected
@@ -178,10 +194,12 @@ def test_save_fixture_round_trips_through_parse_otel_jsonl(tmp_path: Path) -> No
     from adapters.claude_code_trace import parse_otel_jsonl
     from trajectory_record import save_fixture
 
-    trace = _make_trace([
-        ("Write", {"path": "spec.md", "content": "Hello"}),
-        ("Read", {"file_path": "old.md"}),
-    ])
+    trace = _make_trace(
+        [
+            ("Write", {"path": "spec.md", "content": "Hello"}),
+            ("Read", {"file_path": "old.md"}),
+        ]
+    )
     path = save_fixture(
         repo_root=tmp_path,
         skill="to-prd",
@@ -229,12 +247,14 @@ def test_main_records_fixture_and_writes_draft(tmp_path: Path) -> None:
         )
     assert rc == 0
     fixture = (
-        tmp_path / "base" / "trajectories" / "to-prd" / "fixtures"
+        tmp_path
+        / "base"
+        / "trajectories"
+        / "to-prd"
+        / "fixtures"
         / "happy-path-pass.jsonl"
     )
-    draft = (
-        tmp_path / "base" / "trajectories" / "to-prd" / "happy-path.yaml.draft"
-    )
+    draft = tmp_path / "base" / "trajectories" / "to-prd" / "happy-path.yaml.draft"
     assert fixture.is_file()
     assert draft.is_file()
     out = buf.getvalue()
@@ -258,7 +278,8 @@ def test_main_refuses_to_overwrite_existing_trajectory(tmp_path: Path) -> None:
     traj_dir = tmp_path / "base" / "trajectories" / "demo"
     traj_dir.mkdir(parents=True)
     (traj_dir / "happy-path.yaml").write_text(
-        "already exists", encoding="utf-8",
+        "already exists",
+        encoding="utf-8",
     )
 
     import trajectory_record
@@ -278,9 +299,9 @@ def test_main_refuses_to_overwrite_existing_trajectory(tmp_path: Path) -> None:
         )
     assert rc == 0
     # Existing file untouched.
-    assert (
-        traj_dir / "happy-path.yaml"
-    ).read_text(encoding="utf-8") == "already exists"
+    assert (traj_dir / "happy-path.yaml").read_text(
+        encoding="utf-8"
+    ) == "already exists"
     # Draft sibling written.
     assert (traj_dir / "happy-path.yaml.draft").is_file()
 

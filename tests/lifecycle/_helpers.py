@@ -261,7 +261,7 @@ def _write_fake_mcp_config(
         path = tmp_path / "config.toml"
         args_toml = "[" + ", ".join(f'"{a}"' for a in args) + "]"
         path.write_text(
-            f"[mcp_servers.{server_name}]\ncommand = \"{command}\"\nargs = {args_toml}\n",
+            f'[mcp_servers.{server_name}]\ncommand = "{command}"\nargs = {args_toml}\n',
             encoding="utf-8",
         )
     return path

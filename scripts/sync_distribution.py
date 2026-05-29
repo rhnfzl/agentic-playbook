@@ -17,6 +17,10 @@ Exit codes:
   2  another sync run is active (lock file present and fresh)
   3  source / destination IO error
   4  user-rejected direction (--direction reverse not implemented)
+  5  marketplace emit safety failure (reserved catalog name, slug,
+     path-safety, or materialize failure; per ADR-0043). Raised by the
+     [marketplace] integration so the cron wrapper can distinguish a
+     safety failure from a generic IO error (3).
 """
 
 from __future__ import annotations
@@ -51,32 +55,70 @@ TOOL_VERSION = "sync_distribution.py v1.1"
 # scrubbed; the conservative play is to copy them as bytes without
 # touching content. The list is intentionally explicit so an unknown
 # extension errs on the safe side (bytes copy, no scrub).
-TEXT_EXTENSIONS = frozenset({
-    ".md", ".py", ".toml", ".yaml", ".yml", ".json", ".sh",
-    ".jinja", ".jinja2", ".j2", ".html", ".css", ".js", ".ts", ".tsx",
-    ".txt", ".cfg", ".ini", ".conf", ".env", ".example",
-})
+TEXT_EXTENSIONS = frozenset(
+    {
+        ".md",
+        ".py",
+        ".toml",
+        ".yaml",
+        ".yml",
+        ".json",
+        ".sh",
+        ".jinja",
+        ".jinja2",
+        ".j2",
+        ".html",
+        ".css",
+        ".js",
+        ".ts",
+        ".tsx",
+        ".txt",
+        ".cfg",
+        ".ini",
+        ".conf",
+        ".env",
+        ".example",
+    }
+)
 
 # Files whose name (not suffix) marks them as text. Dotfiles + extension-
 # less files don't get caught by Path.suffix (".gitattributes" → suffix
 # ""); they're handled here explicitly. Without this, root dotfiles in
 # the allowlist take the binary copy path and bypass scrub even when the
 # operator clearly intended for their contents to be scrubbed.
-TEXT_FILENAMES = frozenset({
-    "Makefile", "Dockerfile", "LICENSE", "VERSION", "README",
-    ".gitignore", ".gitattributes", ".agents-md-ignore",
-    ".editorconfig", ".dockerignore",
-})
+TEXT_FILENAMES = frozenset(
+    {
+        "Makefile",
+        "Dockerfile",
+        "LICENSE",
+        "VERSION",
+        "README",
+        ".gitignore",
+        ".gitattributes",
+        ".agents-md-ignore",
+        ".editorconfig",
+        ".dockerignore",
+    }
+)
 
 # Default exclusions baked into the allowlist walker. These are caches
 # and metadata dirs that should never flow to a destination repo
 # regardless of operator manifest content. Public-facing destinations
 # would otherwise receive .pyc bytes when scripts/ or tests/ are
 # allowlisted whole.
-DEFAULT_EXCLUDED_DIR_NAMES = frozenset({
-    "__pycache__", ".git", ".pytest_cache", ".ruff_cache", ".mypy_cache",
-    "node_modules", ".venv", "venv", ".DS_Store",
-})
+DEFAULT_EXCLUDED_DIR_NAMES = frozenset(
+    {
+        "__pycache__",
+        ".git",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        "node_modules",
+        ".venv",
+        "venv",
+        ".DS_Store",
+    }
+)
 
 AUDIT_FILENAME = ".sync-manifest.json"
 
@@ -105,6 +147,11 @@ class Manifest:
     memory_destination_dir: Path | None = None
     memory_allowlist: list[str] = field(default_factory=list)
     memory_denylist: list[str] = field(default_factory=list)
+    marketplace_catalog_name: str | None = None
+    marketplace_author_name: str | None = None
+    marketplace_author_email: str | None = None
+    marketplace_profiles_dir: str | None = None
+    marketplace_default_profile_version: str | None = None
 
     def scrub_rules_hash(self) -> str:
         # Include compiled flags so case_insensitive flips trigger drift
@@ -192,9 +239,7 @@ def _load_manifest(manifest_path: Path) -> Manifest:
     memory_allowlist_raw = memory_block.get("allowlist", [])
     memory_denylist_raw = memory_block.get("denylist", [])
     memory_source_dir = Path(msrc).expanduser() if isinstance(msrc, str) else None
-    memory_destination_dir = (
-        Path(mdst).expanduser() if isinstance(mdst, str) else None
-    )
+    memory_destination_dir = Path(mdst).expanduser() if isinstance(mdst, str) else None
     if isinstance(memory_allowlist_raw, list):
         memory_allowlist = [str(s) for s in memory_allowlist_raw if isinstance(s, str)]
     else:
@@ -203,6 +248,51 @@ def _load_manifest(manifest_path: Path) -> Manifest:
         memory_denylist = [str(s) for s in memory_denylist_raw if isinstance(s, str)]
     else:
         memory_denylist = []
+
+    marketplace_block = data.get("marketplace", {})
+    if not isinstance(marketplace_block, dict):
+        raise SystemExit("manifest: [marketplace] must be a table")
+    marketplace_catalog_name = marketplace_block.get("catalog_name")
+    marketplace_author_name = marketplace_block.get("author_name")
+    marketplace_author_email = marketplace_block.get("author_email")
+    marketplace_profiles_dir = marketplace_block.get("profiles_dir")
+    marketplace_default_profile_version = marketplace_block.get(
+        "default_profile_version"
+    )
+    for name, value in (
+        ("catalog_name", marketplace_catalog_name),
+        ("author_name", marketplace_author_name),
+        ("profiles_dir", marketplace_profiles_dir),
+    ):
+        if value is not None and not isinstance(value, str):
+            raise SystemExit(f"manifest: [marketplace].{name} must be a string")
+    if marketplace_author_email is not None and not isinstance(
+        marketplace_author_email, str
+    ):
+        raise SystemExit("manifest: [marketplace].author_email must be a string")
+    if marketplace_default_profile_version is not None and not isinstance(
+        marketplace_default_profile_version, str
+    ):
+        raise SystemExit(
+            "manifest: [marketplace].default_profile_version must be a string"
+        )
+    # All-or-none: a partial [marketplace] block must fail loud at load time
+    # rather than silently skipping the emit step at run time. The three
+    # required keys are catalog_name + author_name + profiles_dir.
+    _required_marketplace = {
+        "catalog_name": marketplace_catalog_name,
+        "author_name": marketplace_author_name,
+        "profiles_dir": marketplace_profiles_dir,
+    }
+    _present = [k for k, v in _required_marketplace.items() if v]
+    if _present and len(_present) != len(_required_marketplace):
+        _missing = sorted(set(_required_marketplace) - set(_present))
+        raise SystemExit(
+            "manifest: [marketplace] is partially configured; it requires "
+            f"all of catalog_name + author_name + profiles_dir (missing: "
+            f"{', '.join(_missing)}). Remove the block to disable marketplace "
+            "emit, or fill in every required key."
+        )
 
     return Manifest(
         destination_path=Path(dest_path_str).expanduser().resolve(),
@@ -214,6 +304,11 @@ def _load_manifest(manifest_path: Path) -> Manifest:
         memory_destination_dir=memory_destination_dir,
         memory_allowlist=memory_allowlist,
         memory_denylist=memory_denylist,
+        marketplace_catalog_name=marketplace_catalog_name,
+        marketplace_author_name=marketplace_author_name,
+        marketplace_author_email=marketplace_author_email,
+        marketplace_profiles_dir=marketplace_profiles_dir,
+        marketplace_default_profile_version=marketplace_default_profile_version,
     )
 
 
@@ -402,7 +497,7 @@ def _resolve_sources(
     seen: set[Path] = set()
     source_root_resolved = source_root.resolve()
     for entry in allowlist:
-        candidate = (source_root / entry.rstrip("/"))
+        candidate = source_root / entry.rstrip("/")
         if not _within(candidate, source_root_resolved):
             _stderr(
                 f"WARN: allowlist entry escapes source_root and will be "
@@ -491,7 +586,7 @@ def _copy_file(
                 if target_path.is_absolute():
                     resolved = target_path
                 else:
-                    resolved = (src.parent / target_path)
+                    resolved = src.parent / target_path
                 try:
                     resolved_abs = resolved.resolve(strict=False)
                 except OSError:
@@ -655,7 +750,7 @@ def _delete_stale_files(
     deleted: list[str] = []
     for rel in sorted(set(prior_files) - current_set):
         if not isinstance(rel, str) or not rel:
-            _stderr(f"WARN: prior synced_files entry is not a string; skipping")
+            _stderr("WARN: prior synced_files entry is not a string; skipping")
             continue
         # Reject absolute paths and any traversal that resolves outside
         # destination. Without this, `synced_files: ["../etc/passwd"]`
@@ -667,7 +762,7 @@ def _delete_stale_files(
                 "refusing to delete; audit may be corrupted"
             )
             continue
-        target = (destination / rel_path)
+        target = destination / rel_path
         if not _within(target, destination_resolved):
             _stderr(
                 f"WARN: prior synced_files path {rel!r} resolves outside "
@@ -764,7 +859,9 @@ def run_distribution(args: argparse.Namespace) -> int:
 
     if manifest.require_clean_git and not args.allow_dirty:
         if not _validate_clean_git(manifest.destination_path):
-            _stderr("destination working tree is not clean; use --allow-dirty to override")
+            _stderr(
+                "destination working tree is not clean; use --allow-dirty to override"
+            )
             return 1
 
     # Source dirty state breaks the audit's reproducibility contract:
@@ -802,9 +899,7 @@ def run_distribution(args: argparse.Namespace) -> int:
         # relative_to would still get caught before we touch the
         # filesystem outside the destination.
         if not _within(dst, destination_resolved):
-            errors.append(
-                f"destination path escapes destination_path: {rel}"
-            )
+            errors.append(f"destination path escapes destination_path: {rel}")
             continue
         was_changed, err = _copy_file(
             src, dst, manifest.scrubs, args.dry_run, source_root=source_root
@@ -834,6 +929,8 @@ def run_distribution(args: argparse.Namespace) -> int:
     else:
         audit_written = False
 
+    marketplace_files = _maybe_run_marketplace_emit(manifest, args.dry_run)
+
     print(f"Source commit: {source_sha} ({source_branch})")
     print(f"Destination:   {destination}")
     print(f"Files scanned: {len(sources)}")
@@ -841,12 +938,90 @@ def run_distribution(args: argparse.Namespace) -> int:
     print(f"Stale removed: {len(deleted)}")
     print(f"Audit updated: {'yes' if audit_written else 'no (idempotent)'}")
     print(f"Scrub rules:   {len(manifest.scrubs)}")
+    if marketplace_files is not None:
+        print(f"Marketplace:   {marketplace_files} file writes")
     if args.dry_run:
         print(
             "\nDry-run complete. Review the diff at destination "
             "(`git -C <dest> diff`) before re-running without --dry-run."
         )
     return 0
+
+
+def _maybe_run_marketplace_emit(manifest: Manifest, dry_run: bool) -> int | None:
+    """If the manifest declares a [marketplace] block, invoke the emitter
+    facade after the content sync completes. Returns the file-write count,
+    or None when the block is absent or the step is skipped in dry-run.
+
+    SECURITY (ADR-0042 scrub contract): the emitter reads BOTH profiles and
+    base content from the DESTINATION tree, which this run has already
+    scrubbed + allowlist/denylist filtered. Reading from the source would
+    copy unscrubbed skills/rules/hooks/profiles straight into the public
+    plugin directories, bypassing the scrub layer. The operator must
+    therefore include `profiles/` (and `base/`) in [sources].allowlist so
+    the scrubbed copies exist at the destination before this step runs.
+
+    Because the emit reads the destination, it CANNOT run under --dry-run:
+    a dry-run copies nothing, so the destination is empty (fresh) or stale
+    (prior run). Emitting then would either fail or verify the wrong tree.
+    The step is therefore skipped in dry-run with an explanatory note.
+    """
+    # Partial blocks are rejected at manifest load; here all-three-present
+    # means enabled, none means disabled.
+    if not (
+        manifest.marketplace_catalog_name
+        and manifest.marketplace_author_name
+        and manifest.marketplace_profiles_dir
+    ):
+        return None
+
+    if dry_run:
+        _stderr(
+            "marketplace emit skipped in dry-run: the emitter reads the "
+            "scrubbed destination tree, which a dry-run does not populate. "
+            "Re-run without --dry-run to emit the plugin catalogs."
+        )
+        return None
+
+    from marketplace_config import (
+        MarketplaceEmitError,
+        SyncMarketplaceManifest,
+        run_marketplace_emit,
+    )
+
+    dest = manifest.destination_path
+    # repo_root == destination: read the SCRUBBED tree, not source.
+    # SECURITY: profiles_dir must stay INSIDE dest. An absolute or `..`
+    # value (e.g. "../raw-profiles") would otherwise point the emitter at
+    # an unscrubbed tree outside the destination and ship raw content into
+    # the public catalogs. Reject anything that escapes dest (exit 5,
+    # matching the marketplace safety carve-out).
+    profiles_dir = (dest / (manifest.marketplace_profiles_dir or "")).resolve()
+    if not _within(profiles_dir, dest):
+        _stderr(
+            "marketplace emit refused: [marketplace].profiles_dir "
+            f"'{manifest.marketplace_profiles_dir}' resolves outside the "
+            f"destination ({profiles_dir}). It must be a relative path inside "
+            "the destination so the emitter reads only scrubbed profiles."
+        )
+        raise SystemExit(5)
+    adapter = SyncMarketplaceManifest(
+        repo_root=dest,
+        destination=dest,
+        catalog_name=manifest.marketplace_catalog_name or "",
+        author_name=manifest.marketplace_author_name or "",
+        author_email=manifest.marketplace_author_email,
+        profiles_dir=profiles_dir,
+        default_profile_version=manifest.marketplace_default_profile_version,
+    )
+    try:
+        return run_marketplace_emit(adapter, dry_run=False)
+    except MarketplaceEmitError as exc:
+        # Preserve the emitter's declared exit code (5 = safety failure:
+        # reserved name, slug, path-safety, materialize) so the scheduled
+        # wrapper can distinguish it from a generic IO error (3).
+        _stderr(f"marketplace emit failed: {exc}")
+        raise SystemExit(exc.exit_code) from exc
 
 
 def run_memory(args: argparse.Namespace) -> int:
@@ -908,9 +1083,7 @@ def run_memory(args: argparse.Namespace) -> int:
         )
         # Track which entries this run ported so the next run knows what
         # IT previously wrote and can stale-delete safely.
-        _write_memory_audit(
-            manifest.memory_destination_dir, ported, manifest.scrubs
-        )
+        _write_memory_audit(manifest.memory_destination_dir, ported, manifest.scrubs)
 
     print(f"Memory source:      {manifest.memory_source_dir}")
     print(f"Memory destination: {manifest.memory_destination_dir}")
@@ -953,7 +1126,7 @@ def _delete_stale_memory_entries(
         # _delete_stale_files. A bare filename like "feedback_a.md" can
         # never escape memory_dir; absolute / traversal entries are
         # malformed audit content and get refused with a warning.
-        candidate = (memory_dir / filename)
+        candidate = memory_dir / filename
         if not _within(candidate, memory_dir_resolved):
             _stderr(
                 f"WARN: prior memory audit entry {filename!r} resolves outside "
@@ -965,9 +1138,7 @@ def _delete_stale_memory_entries(
                 candidate.unlink()
                 deleted += 1
             except OSError as exc:
-                _stderr(
-                    f"WARN: could not delete stale memory entry {candidate}: {exc}"
-                )
+                _stderr(f"WARN: could not delete stale memory entry {candidate}: {exc}")
     return deleted
 
 
@@ -1017,8 +1188,7 @@ def _scrubs_hash(scrubs: list[ScrubPattern]) -> str:
     two audits compare consistently.
     """
     payload = "\n".join(
-        f"{p.pattern.pattern}::flags={p.pattern.flags}::{p.replacement}"
-        for p in scrubs
+        f"{p.pattern.pattern}::flags={p.pattern.flags}::{p.replacement}" for p in scrubs
     )
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -1031,7 +1201,11 @@ def _build_memory_index(ported_slugs: list[str]) -> str:
     """
     lines = ["# Memory Index", ""]
     by_type: dict[str, list[str]] = {
-        "user": [], "project": [], "feedback": [], "reference": [], "other": []
+        "user": [],
+        "project": [],
+        "feedback": [],
+        "reference": [],
+        "other": [],
     }
     for slug in sorted(ported_slugs):
         kind = "other"

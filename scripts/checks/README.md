@@ -5,7 +5,7 @@ The 17 pluggable quality-gate modules that `make check` runs against the playboo
 Module shape is split between:
 
 - **Self-contained checks** that implement their logic directly inside `scripts/checks/<name>.py` (the three at the bottom of the table).
-- **Delegating checks** that call `run_legacy_main()` into a legacy `scripts/<name>.py` so the standalone CLI (e.g. `make audit` invoking `scripts/audit_external_skill.py` directly) and the gate share one implementation.
+- **Delegating checks** that call `capture_legacy_main()` (from `scripts/checks/_legacy.py`) into a legacy `scripts/<name>.py` so the standalone CLI (e.g. `make audit` invoking `scripts/audit_external_skill.py` directly) and the gate share one implementation.
 
 ## Gates today
 
@@ -32,7 +32,7 @@ Module shape is split between:
 ## How to add a new gate
 
 1. Create `scripts/checks/<name>.py`. Implement `def run(ctx: CheckContext) -> CheckResult`.
-2. Choose: self-contained (implement logic inline) or delegating (call `run_legacy_main("scripts/<name>.py")`).
+2. Choose: self-contained (implement logic inline) or delegating (call `capture_legacy_main("<legacy-module-name>", summary="...")` from `_legacy.py`).
 3. Register in `scripts/checks/__init__.py:CHECKS`. Order matters when one gate's output is consumed by a later gate.
 4. Add a row to the table above so reviewers know what the new gate covers.
 5. Run `make check` against a clean tree + a tree with a known violation; confirm pass and fail.

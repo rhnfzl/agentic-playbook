@@ -75,13 +75,9 @@ def test_resolve_git_config_path_worktree_with_commondir(tmp_path: Path) -> None
     worktree_gitdir = main_git / "worktrees" / "wt1"
     worktree_gitdir.mkdir(parents=True)
     # commondir file points back to main_git
-    (worktree_gitdir / "commondir").write_text(
-        str(main_git), encoding="utf-8"
-    )
+    (worktree_gitdir / "commondir").write_text(str(main_git), encoding="utf-8")
     # .git file inside the worktree points at the gitdir
-    (worktree_dir / ".git").write_text(
-        f"gitdir: {worktree_gitdir}\n", encoding="utf-8"
-    )
+    (worktree_dir / ".git").write_text(f"gitdir: {worktree_gitdir}\n", encoding="utf-8")
 
     assert resolve_git_config_path(worktree_dir) == main_config
 
@@ -94,7 +90,7 @@ def test_detect_scope_returns_team_on_match(tmp_path: Path) -> None:
 
     (tmp_path / ".git").mkdir()
     (tmp_path / ".git" / "config").write_text(
-        "[remote \"origin\"]\n"
+        '[remote "origin"]\n'
         "    url = git@<vcs-host>:<team>/coding-agents-playbook.git\n",
         encoding="utf-8",
     )
@@ -107,7 +103,7 @@ def test_detect_scope_returns_empty_on_unrecognized_remote(tmp_path: Path) -> No
 
     (tmp_path / ".git").mkdir()
     (tmp_path / ".git" / "config").write_text(
-        "[remote \"origin\"]\n    url = git@github.com:other/repo.git\n",
+        '[remote "origin"]\n    url = git@github.com:other/repo.git\n',
         encoding="utf-8",
     )
 

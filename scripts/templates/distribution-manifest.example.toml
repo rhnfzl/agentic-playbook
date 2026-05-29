@@ -26,6 +26,10 @@ require_clean_git = true
 # is included unless matched by denylist.
 allowlist = [
   "base/",
+  # Required when the [marketplace] block below is enabled: the emitter
+  # reads role profiles from the SCRUBBED destination tree, so profiles/
+  # must be synced there. Harmless to keep even without [marketplace].
+  "profiles/",
   "scripts/sync_distribution.py",
   "scripts/install.py",
   "scripts/install_lifecycle.py",
@@ -91,8 +95,11 @@ denylist = [
 # BEFORE the bare token (like "CI") so the compound wins. Without
 # this, "CI" matches first and "CI config" becomes "CIfile".
 patterns = [
-  # Ticket-tracker IDs (any project prefix).
-  { match = "(R8|MATCH|JIRA|TICKET)-\\d+", replace = "[ticket]" },
+  # Ticket-tracker IDs. The example matches the conventional uppercase
+  # prefix + dash + digit form (e.g. PROJ-123, TICKET-456). Replace the
+  # prefix alternation with your tracker's actual prefixes when you
+  # customize this file in your own out-of-repo manifest.
+  { match = "(PROJ|TICKET)-\\d+", replace = "[ticket]" },
 
   # Team identifiers. Replace with a generic placeholder so the rule's
   # logic survives and only the identity is anonymized. No word
@@ -114,6 +121,38 @@ patterns = [
   # Add more as the first sync's diff surfaces them.
   # { match = "<internal-product-name>", replace = "<placeholder>" },
 ]
+
+
+# Optional. The marketplace sub-step runs after the content sync inside
+# `sync_distribution.py distribution`. It emits per-vendor plugin
+# catalogs (Claude / Cursor / Codex / Gemini) at the destination so users
+# can install your playbook content with one command instead of cloning
+# and wiring by hand. Leave the block out if you do not want a plugin
+# marketplace at the destination.
+#
+# IMPORTANT: catalog_name is the public namespace your plugins install
+# under (`/plugin install <plugin>@<catalog_name>`). Pick a personal-brand
+# slug (typically your GitHub handle) -- it must be kebab-case, 2-64
+# chars, lowercase, and must NOT impersonate Anthropic-reserved names
+# (see scripts/marketplace/profile_loader.py:RESERVED_MARKETPLACE_NAMES).
+#
+# IMPORTANT: author_name is the PERSON behind the catalog (e.g. your
+# real name). It is distinct from catalog_name and goes into emitted
+# manifest `author{}` / `owner{}` blocks. Mixing the two is a bug the
+# emitter is designed to prevent.
+#
+# IMPORTANT (scrub safety): the emitter reads profiles + base content from
+# the DESTINATION tree, which this run has already scrubbed. For that to
+# work you MUST include `profiles/` and `base/` in [sources].allowlist
+# above, so their scrubbed copies exist at the destination before the
+# marketplace step runs. If `profiles_dir` is not present at the
+# destination the emit fails fast rather than shipping unscrubbed content.
+[marketplace]
+# catalog_name = "<your-catalog-handle>"
+# author_name = "<Your Name>"
+# author_email = "you@example.com"   # optional
+# profiles_dir = "profiles/"          # relative to the destination root
+# default_profile_version = "0.1.0"   # optional; per-profile override wins
 
 
 # Optional. The memory sub-command (`sync_distribution.py memory`) uses

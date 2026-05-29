@@ -594,17 +594,14 @@ def test_anchored_fs_v0_7_baseline_settings_survives_v0_8_install(
 
     # Legacy direct-Python entry survives.
     assert any(
-        "mcp/anchored-fs/hooks/claude-code/pretool_edit.py" in c
-        for c in pre_commands
+        "mcp/anchored-fs/hooks/claude-code/pretool_edit.py" in c for c in pre_commands
     ), (
         "v0.7 baseline pre_tool_edit.py entry must survive v0.8 install -- "
         "playbook only owns what it wrote in a prior run"
     )
 
     # New wrapper entry was added.
-    assert any(
-        "anchored-fs-pretool-edit.sh" in c for c in pre_commands
-    ), (
+    assert any("anchored-fs-pretool-edit.sh" in c for c in pre_commands), (
         "v0.8 wrapper hook must be registered under PreToolUse alongside "
         "the legacy entry"
     )
@@ -617,8 +614,7 @@ def test_anchored_fs_v0_7_baseline_settings_survives_v0_8_install(
         for h in entry.get("hooks", []):
             post_commands.append(h.get("command", ""))
     assert any(
-        "mcp/anchored-fs/hooks/claude-code/posttool_read.py" in c
-        for c in post_commands
+        "mcp/anchored-fs/hooks/claude-code/posttool_read.py" in c for c in post_commands
     )
 
 
@@ -702,11 +698,7 @@ def test_managed_keys_excludes_user_authored_mcp_entries(tmp_home: Path) -> None
         pre_install_per_config=pre_install_per_config,
         prior_entries=[],
     )
-    managed = {
-        e["name"]
-        for e in keys.get("mcp_servers", [])
-        if isinstance(e, dict)
-    }
+    managed = {e["name"] for e in keys.get("mcp_servers", []) if isinstance(e, dict)}
     assert "shared" not in managed, (
         "'shared' was pre-existing; recording it as managed would let a "
         "later narrow reconcile delete the user-authored entry"
@@ -763,9 +755,7 @@ def test_managed_keys_records_freshly_installed_mcp_servers(
         cwd=str(repo_root),
         timeout=120,
     )
-    assert result.returncode == 0, (
-        f"install failed: {result.stdout}\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"install failed: {result.stdout}\n{result.stderr}"
 
     lockfile = _json.loads((target / ".playbook-lock.json").read_text())
     managed = (
@@ -781,9 +771,7 @@ def test_managed_keys_records_freshly_installed_mcp_servers(
     # name field for the native-config presence check.
     native = _json.loads((home / ".claude.json").read_text())
     native_servers = set((native.get("mcpServers") or {}).keys())
-    managed_names = [
-        e["name"] for e in managed if isinstance(e, dict) and "name" in e
-    ]
+    managed_names = [e["name"] for e in managed if isinstance(e, dict) and "name" in e]
     for name in managed_names:
         assert name in native_servers, (
             f"managed_keys records {name!r} but it is not in native config"
@@ -856,8 +844,6 @@ def test_managed_keys_survives_repeat_install_and_narrow(
         if isinstance(e, dict) and "name" in e
     }
     assert managed1, "first install must record managed MCP servers"
-    native1 = _json.loads((home / ".claude.json").read_text())
-    native_servers1 = set((native1.get("mcpServers") or {}).keys())
 
     # Repeat install (same args).
     result = subprocess.run(
@@ -953,9 +939,7 @@ def test_uninstall_blocks_on_v0_7_legacy_python_entries(tmp_path: Path) -> None:
 
     env = {"HOME": str(home), "PATH": os.environ["PATH"]}
     # v0.11 (ADR-0040): mcp/anchored-fs/ moved to base/mcp/anchored-fs/
-    project_root = (
-        Path(__file__).resolve().parents[2] / "base" / "mcp" / "anchored-fs"
-    )
+    project_root = Path(__file__).resolve().parents[2] / "base" / "mcp" / "anchored-fs"
 
     # init succeeds (init does not touch settings.json post-ADR-0037).
     subprocess.run(
@@ -981,9 +965,7 @@ def test_uninstall_blocks_on_v0_7_legacy_python_entries(tmp_path: Path) -> None:
     )
     assert "REFUSE" in (result.stdout + result.stderr)
     # Legacy entries survived the refusal.
-    settings_after = _json.loads(
-        (home / ".claude" / "settings.json").read_text()
-    )
+    settings_after = _json.loads((home / ".claude" / "settings.json").read_text())
     assert settings_after == legacy_settings
 
 
@@ -1086,8 +1068,8 @@ def test_cursor_mcp_pre_existing_in_user_config_not_claimed_as_managed(
 
     pre_install_per_config: dict[tuple[str, str], set[str]] = {}
     for cfg_path, fmt in mcp_config_paths_for("cursor", target):
-        pre_install_per_config[("cursor", str(cfg_path))] = (
-            parse_native_mcp_servers(cfg_path, fmt)
+        pre_install_per_config[("cursor", str(cfg_path))] = parse_native_mcp_servers(
+            cfg_path, fmt
         )
 
     keys = _new_managed_keys_for(

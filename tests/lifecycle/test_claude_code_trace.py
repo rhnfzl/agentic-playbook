@@ -38,7 +38,12 @@ def _span(
         "startTimeUnixNano": str(start_unix_nano),
         "endTimeUnixNano": str(end_unix_nano),
         "attributes": [
-            {"key": k, "value": {"stringValue": str(v)} if not isinstance(v, int) else {"intValue": str(v)}}
+            {
+                "key": k,
+                "value": {"stringValue": str(v)}
+                if not isinstance(v, int)
+                else {"intValue": str(v)},
+            }
             for k, v in attrs.items()
         ],
     }
@@ -61,11 +66,16 @@ def test_shim_parses_tool_call_span(tmp_path: Path) -> None:
 
     out = _write_otel_jsonl(
         tmp_path,
-        [_span("Write", attributes={
-            "gen_ai.operation.name": "tool_call",
-            "tool.name": "Write",
-            "tool.arguments": '{"path": "spec.md"}',
-        })],
+        [
+            _span(
+                "Write",
+                attributes={
+                    "gen_ai.operation.name": "tool_call",
+                    "tool.name": "Write",
+                    "tool.arguments": '{"path": "spec.md"}',
+                },
+            )
+        ],
     )
     record = parse_otel_jsonl(out, session_id="s1", prompt="x")
     calls = record.tool_calls()
@@ -79,10 +89,15 @@ def test_shim_parses_skill_load_span(tmp_path: Path) -> None:
 
     out = _write_otel_jsonl(
         tmp_path,
-        [_span("skill_load", attributes={
-            "gen_ai.operation.name": "skill_load",
-            "skill.name": "to-prd",
-        })],
+        [
+            _span(
+                "skill_load",
+                attributes={
+                    "gen_ai.operation.name": "skill_load",
+                    "skill.name": "to-prd",
+                },
+            )
+        ],
     )
     record = parse_otel_jsonl(out, session_id="s1", prompt="x")
     loads = record.skill_loads()
@@ -105,7 +120,10 @@ def test_shim_preserves_seq_order(tmp_path: Path) -> None:
             ),
             _span(
                 "skill_load",
-                attributes={"gen_ai.operation.name": "skill_load", "skill.name": "to-prd"},
+                attributes={
+                    "gen_ai.operation.name": "skill_load",
+                    "skill.name": "to-prd",
+                },
                 start_unix_nano=1000,
                 end_unix_nano=1500,
             ),
@@ -125,18 +143,24 @@ def test_shim_accumulates_token_usage(tmp_path: Path) -> None:
     out = _write_otel_jsonl(
         tmp_path,
         [
-            _span("inference", attributes={
-                "gen_ai.operation.name": "chat",
-                "gen_ai.request.model": "claude-opus-4-7",
-                "gen_ai.usage.input_tokens": 50,
-                "gen_ai.usage.output_tokens": 100,
-            }),
-            _span("inference", attributes={
-                "gen_ai.operation.name": "chat",
-                "gen_ai.request.model": "claude-opus-4-7",
-                "gen_ai.usage.input_tokens": 60,
-                "gen_ai.usage.output_tokens": 120,
-            }),
+            _span(
+                "inference",
+                attributes={
+                    "gen_ai.operation.name": "chat",
+                    "gen_ai.request.model": "claude-opus-4-7",
+                    "gen_ai.usage.input_tokens": 50,
+                    "gen_ai.usage.output_tokens": 100,
+                },
+            ),
+            _span(
+                "inference",
+                attributes={
+                    "gen_ai.operation.name": "chat",
+                    "gen_ai.request.model": "claude-opus-4-7",
+                    "gen_ai.usage.input_tokens": 60,
+                    "gen_ai.usage.output_tokens": 120,
+                },
+            ),
         ],
     )
     record = parse_otel_jsonl(out, session_id="s1", prompt="x")
@@ -150,11 +174,16 @@ def test_shim_records_artifacts_from_write_calls(tmp_path: Path) -> None:
 
     out = _write_otel_jsonl(
         tmp_path,
-        [_span("Write", attributes={
-            "gen_ai.operation.name": "tool_call",
-            "tool.name": "Write",
-            "tool.arguments": '{"path": "spec.md", "content": "# Hello"}',
-        })],
+        [
+            _span(
+                "Write",
+                attributes={
+                    "gen_ai.operation.name": "tool_call",
+                    "tool.name": "Write",
+                    "tool.arguments": '{"path": "spec.md", "content": "# Hello"}',
+                },
+            )
+        ],
     )
     record = parse_otel_jsonl(out, session_id="s1", prompt="x")
     assert "spec.md" in record.artifacts
@@ -168,10 +197,16 @@ def test_shim_handles_malformed_jsonl_gracefully(tmp_path: Path) -> None:
 
     out = tmp_path / "traces.jsonl"
     out.write_text(
-        "not json\n" + json.dumps(_span("Write", attributes={
-            "gen_ai.operation.name": "tool_call",
-            "tool.name": "Write",
-        })),
+        "not json\n"
+        + json.dumps(
+            _span(
+                "Write",
+                attributes={
+                    "gen_ai.operation.name": "tool_call",
+                    "tool.name": "Write",
+                },
+            )
+        ),
         encoding="utf-8",
     )
     record = parse_otel_jsonl(out, session_id="s1", prompt="x")
@@ -186,11 +221,16 @@ def test_shim_records_artifact_for_edit_tool(tmp_path: Path) -> None:
 
     out = _write_otel_jsonl(
         tmp_path,
-        [_span("Edit", attributes={
-            "gen_ai.operation.name": "tool_call",
-            "tool.name": "Edit",
-            "tool.arguments": '{"file_path": "src/foo.py"}',
-        })],
+        [
+            _span(
+                "Edit",
+                attributes={
+                    "gen_ai.operation.name": "tool_call",
+                    "tool.name": "Edit",
+                    "tool.arguments": '{"file_path": "src/foo.py"}',
+                },
+            )
+        ],
     )
     record = parse_otel_jsonl(out, session_id="s1", prompt="x")
     assert "src/foo.py" in record.artifacts
@@ -202,11 +242,16 @@ def test_shim_records_artifact_for_notebookedit_tool(tmp_path: Path) -> None:
 
     out = _write_otel_jsonl(
         tmp_path,
-        [_span("NotebookEdit", attributes={
-            "gen_ai.operation.name": "tool_call",
-            "tool.name": "NotebookEdit",
-            "tool.arguments": '{"notebook_path": "analysis.ipynb"}',
-        })],
+        [
+            _span(
+                "NotebookEdit",
+                attributes={
+                    "gen_ai.operation.name": "tool_call",
+                    "tool.name": "NotebookEdit",
+                    "tool.arguments": '{"notebook_path": "analysis.ipynb"}',
+                },
+            )
+        ],
     )
     record = parse_otel_jsonl(out, session_id="s1", prompt="x")
     assert "analysis.ipynb" in record.artifacts
@@ -224,14 +269,20 @@ def test_shim_flattens_nested_otlp_envelope(tmp_path: Path) -> None:
                 "scopeSpans": [
                     {
                         "spans": [
-                            _span("skill_load", attributes={
-                                "gen_ai.operation.name": "skill_load",
-                                "skill.name": "demo",
-                            }),
-                            _span("Write", attributes={
-                                "gen_ai.operation.name": "tool_call",
-                                "tool.name": "Write",
-                            }),
+                            _span(
+                                "skill_load",
+                                attributes={
+                                    "gen_ai.operation.name": "skill_load",
+                                    "skill.name": "demo",
+                                },
+                            ),
+                            _span(
+                                "Write",
+                                attributes={
+                                    "gen_ai.operation.name": "tool_call",
+                                    "tool.name": "Write",
+                                },
+                            ),
                         ]
                     }
                 ]
@@ -251,20 +302,32 @@ def test_shim_handles_mixed_flat_and_nested_envelope_lines(tmp_path: Path) -> No
     """A JSONL may have lines in either format. Both must be ingested."""
     from adapters.claude_code_trace import parse_otel_jsonl
 
-    flat_line = _span("Write", attributes={
-        "gen_ai.operation.name": "tool_call",
-        "tool.name": "Write",
-        "tool.arguments": '{"path": "a.md", "content": "a"}',
-    })
+    flat_line = _span(
+        "Write",
+        attributes={
+            "gen_ai.operation.name": "tool_call",
+            "tool.name": "Write",
+            "tool.arguments": '{"path": "a.md", "content": "a"}',
+        },
+    )
     nested_line = {
         "resourceSpans": [
-            {"scopeSpans": [{"spans": [
-                _span("Edit", attributes={
-                    "gen_ai.operation.name": "tool_call",
-                    "tool.name": "Edit",
-                    "tool.arguments": '{"file_path": "b.py"}',
-                })
-            ]}]}
+            {
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            _span(
+                                "Edit",
+                                attributes={
+                                    "gen_ai.operation.name": "tool_call",
+                                    "tool.name": "Edit",
+                                    "tool.arguments": '{"file_path": "b.py"}',
+                                },
+                            )
+                        ]
+                    }
+                ]
+            }
         ]
     }
     out = tmp_path / "mixed.jsonl"
@@ -329,7 +392,7 @@ def test_events_from_text_skips_non_dict_attribute_entries() -> None:
     malformed_span = {
         "name": "Write",
         "startTimeUnixNano": "1717000000000000000",
-        "endTimeUnixNano":   "1717000000010000000",
+        "endTimeUnixNano": "1717000000010000000",
         "attributes": [
             "this should be a dict, not a string",
             {"key": "gen_ai.operation.name", "value": {"stringValue": "tool_call"}},

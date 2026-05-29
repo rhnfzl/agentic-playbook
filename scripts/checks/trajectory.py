@@ -200,7 +200,9 @@ def run(ctx: CheckContext) -> CheckResult:
                 )
                 break
         rubric_text = traj.llm_judge.get("rubric", "")
-        if isinstance(rubric_text, str) and rubric_text.strip().upper().startswith("TODO"):
+        if isinstance(rubric_text, str) and rubric_text.strip().upper().startswith(
+            "TODO"
+        ):
             errors.append(
                 f"{rel}: llm_judge.rubric starts with TODO; replace the "
                 f"scaffolded placeholder text before committing"
@@ -265,13 +267,13 @@ def run(ctx: CheckContext) -> CheckResult:
                 )
             else:
                 if not (0.0 <= t <= 1.0):
-                    errors.append(
-                        f"{rel}: llm_judge.threshold {t} outside [0, 1]"
-                    )
+                    errors.append(f"{rel}: llm_judge.threshold {t} outside [0, 1]")
 
     details: list[str] = []
     if errors:
-        details.append(f"  Trajectory lint: {len(errors)} error(s) in {checked} trajectory file(s)")
+        details.append(
+            f"  Trajectory lint: {len(errors)} error(s) in {checked} trajectory file(s)"
+        )
         details.extend(f"  x  {e}" for e in errors)
     if warnings:
         details.append(f"  Trajectory lint: {len(warnings)} warning(s)")

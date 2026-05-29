@@ -97,6 +97,7 @@ def verify_adapter(
         # is_dir()) as a real drift now, not a silent no-op.
         if isinstance(locked, dict) and locked.get("kind") == "copied_dir":
             from install_lockfile import copied_dir_drift as _drift
+
             drift = _drift(full, locked)
             if drift == "drift":
                 expected = locked.get("tree_sha256", "")
@@ -399,9 +400,7 @@ def cmd_verify(
         if adapter_name not in detected:
             continue
         raw_entries = (
-            lock.get("managed_keys", {})
-            .get(adapter_name, {})
-            .get("mcp_servers", [])
+            lock.get("managed_keys", {}).get(adapter_name, {}).get("mcp_servers", [])
         )
         for entry in raw_entries:
             if not isinstance(entry, dict):
@@ -519,9 +518,7 @@ def cmd_verify(
                 "MCP configs)"
             )
         else:
-            print(
-                "MCP runtime probe: SKIPPED (MCP_RUNTIME_PROBE env var disables it)"
-            )
+            print("MCP runtime probe: SKIPPED (MCP_RUNTIME_PROBE env var disables it)")
         print()
 
     if not any_verified:

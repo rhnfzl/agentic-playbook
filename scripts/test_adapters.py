@@ -520,9 +520,7 @@ def test_agent_to_toml_roundtrip(r: Reporter) -> None:
     print("\n[agent_to_toml roundtrip]")
     from adapters import _loader
 
-    agents = _loader.load_agents(
-        _loader.resolve_content_paths(["team"], REPO_ROOT)
-    )
+    agents = _loader.load_agents(_loader.resolve_content_paths(["team"], REPO_ROOT))
     r.check(
         "agent_to_toml: agents directory has loadable content",
         len(agents) > 0,

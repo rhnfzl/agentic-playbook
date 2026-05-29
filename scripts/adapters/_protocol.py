@@ -192,7 +192,9 @@ class PlaybookContent(NamedTuple):
     agents: list[Agent]
     commands: list[Command]
     prompts: list[Prompt]
-    trajectories: list[Trajectory]  # required: no mutable default to share across instances
+    trajectories: list[
+        Trajectory
+    ]  # required: no mutable default to share across instances
 
     @classmethod
     def load(

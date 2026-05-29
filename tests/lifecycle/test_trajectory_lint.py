@@ -158,9 +158,7 @@ def test_lint_fails_when_required_field_missing(tmp_path: Path) -> None:
 
 
 def test_lint_fails_when_judge_threshold_out_of_range(tmp_path: Path) -> None:
-    yaml_bad_threshold = VALID_FRONTMATTER.replace(
-        "threshold: 0.7", "threshold: 1.5"
-    )
+    yaml_bad_threshold = VALID_FRONTMATTER.replace("threshold: 0.7", "threshold: 1.5")
     repo = _setup_repo(tmp_path, trajectory_yaml=yaml_bad_threshold)
     result = _run_check(repo)
     assert result.status == "fail"
@@ -291,12 +289,10 @@ def test_lint_fails_when_frontmatter_field_is_TODO_placeholder(
 
 def test_lint_accepts_quoted_frontmatter_values(tmp_path: Path) -> None:
     """Quoted scalars like `skill: "demo-skill"` must not break slug comparisons."""
-    yaml = VALID_FRONTMATTER.replace(
-        "skill: demo-skill", 'skill: "demo-skill"'
-    ).replace(
-        "scenario: happy-path", "scenario: 'happy-path'"
-    ).replace(
-        "name: demo-skill/happy-path", 'name: "demo-skill/happy-path"'
+    yaml = (
+        VALID_FRONTMATTER.replace("skill: demo-skill", 'skill: "demo-skill"')
+        .replace("scenario: happy-path", "scenario: 'happy-path'")
+        .replace("name: demo-skill/happy-path", 'name: "demo-skill/happy-path"')
     )
     repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
     result = _run_check(repo)
@@ -306,9 +302,7 @@ def test_lint_accepts_quoted_frontmatter_values(tmp_path: Path) -> None:
 def test_lint_fails_when_phrasing_starts_with_TODO(tmp_path: Path) -> None:
     """Third-review P2: scaffolder writes `TODO first phrasing` etc.; the
     linter must catch body-level TODOs, not just frontmatter."""
-    yaml = VALID_FRONTMATTER.replace(
-        '"first phrasing"', '"TODO first phrasing"'
-    )
+    yaml = VALID_FRONTMATTER.replace('"first phrasing"', '"TODO first phrasing"')
     repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
     result = _run_check(repo)
     assert result.status == "fail"
@@ -354,8 +348,7 @@ def test_lint_fails_when_call_order_is_empty_list(tmp_path: Path) -> None:
     ordering do not get a silent green pass."""
     yaml = VALID_FRONTMATTER.replace(
         "  - first_skill_loaded: demo-skill",
-        "  - first_skill_loaded: demo-skill\n"
-        "  - call_order: []",
+        "  - first_skill_loaded: demo-skill\n  - call_order: []",
     )
     repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
     result = _run_check(repo)
@@ -370,8 +363,7 @@ def test_lint_fails_when_call_order_is_bare_key(tmp_path: Path) -> None:
     trigger the block-style-not-supported branch."""
     yaml = VALID_FRONTMATTER.replace(
         "  - first_skill_loaded: demo-skill",
-        "  - first_skill_loaded: demo-skill\n"
-        "  - call_order:",
+        "  - first_skill_loaded: demo-skill\n  - call_order:",
     )
     repo = _setup_repo(tmp_path, trajectory_yaml=yaml)
     result = _run_check(repo)
@@ -382,12 +374,10 @@ def test_lint_fails_when_call_order_is_bare_key(tmp_path: Path) -> None:
 
 def test_lint_resolves_imported_skill(tmp_path: Path) -> None:
     """Trajectories may target imported skills at base/skills/imported/<source>/<name>/."""
-    yaml = VALID_FRONTMATTER.replace(
-        "demo-skill/happy-path", "imported-skill/happy-path"
-    ).replace(
-        "skill: demo-skill", "skill: imported-skill"
-    ).replace(
-        "first_skill_loaded: demo-skill", "first_skill_loaded: imported-skill"
+    yaml = (
+        VALID_FRONTMATTER.replace("demo-skill/happy-path", "imported-skill/happy-path")
+        .replace("skill: demo-skill", "skill: imported-skill")
+        .replace("first_skill_loaded: demo-skill", "first_skill_loaded: imported-skill")
     )
     # Build the imported-skill layout instead of first-party.
     imported_dir = (

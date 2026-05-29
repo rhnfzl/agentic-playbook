@@ -67,7 +67,9 @@ def draft_trajectory_yaml(
     lines: list[str] = []
     lines.append("---")
     lines.append(f"name: {skill}/{scenario}")
-    lines.append(f"description: TODO one-line description of what this trajectory verifies.")
+    lines.append(
+        "description: TODO one-line description of what this trajectory verifies."
+    )
     lines.append(f"skill: {skill}")
     lines.append(f"scenario: {scenario}")
     lines.append("version: 0.1.0")
@@ -138,9 +140,7 @@ def save_fixture(
     expects: one OTLP-shaped span per line with `gen_ai.operation.name`
     + tool/skill attributes.
     """
-    fixtures_dir = (
-        repo_root / "base" / "trajectories" / skill / "fixtures"
-    )
+    fixtures_dir = repo_root / "base" / "trajectories" / skill / "fixtures"
     fixtures_dir.mkdir(parents=True, exist_ok=True)
     path = fixtures_dir / f"{scenario}-pass.jsonl"
     lines: list[str] = []
@@ -157,23 +157,27 @@ def _event_to_span(event) -> dict:  # type: ignore[no-untyped-def]
     preserves the same kind + name + arguments."""
     attrs: list[dict] = []
     if event.kind == "skill_load":
-        attrs.append({"key": "gen_ai.operation.name",
-                      "value": {"stringValue": "skill_load"}})
-        attrs.append({"key": "skill.name",
-                      "value": {"stringValue": event.name}})
+        attrs.append(
+            {"key": "gen_ai.operation.name", "value": {"stringValue": "skill_load"}}
+        )
+        attrs.append({"key": "skill.name", "value": {"stringValue": event.name}})
     elif event.kind == "tool_call":
-        attrs.append({"key": "gen_ai.operation.name",
-                      "value": {"stringValue": "tool_call"}})
-        attrs.append({"key": "tool.name",
-                      "value": {"stringValue": event.name}})
+        attrs.append(
+            {"key": "gen_ai.operation.name", "value": {"stringValue": "tool_call"}}
+        )
+        attrs.append({"key": "tool.name", "value": {"stringValue": event.name}})
         if event.arguments:
-            attrs.append({"key": "tool.arguments",
-                          "value": {"stringValue": json.dumps(event.arguments)}})
+            attrs.append(
+                {
+                    "key": "tool.arguments",
+                    "value": {"stringValue": json.dumps(event.arguments)},
+                }
+            )
     elif event.kind == "model_response":
-        attrs.append({"key": "gen_ai.operation.name",
-                      "value": {"stringValue": "chat"}})
-        attrs.append({"key": "gen_ai.request.model",
-                      "value": {"stringValue": event.name}})
+        attrs.append({"key": "gen_ai.operation.name", "value": {"stringValue": "chat"}})
+        attrs.append(
+            {"key": "gen_ai.request.model", "value": {"stringValue": event.name}}
+        )
     base_nano = 1_700_000_000_000_000_000 + event.seq * 1_000_000
     duration_nano = (event.duration_ms or 0) * 1_000_000
     return {
@@ -219,7 +223,8 @@ def main(
         parser.add_argument("--skill", required=True)
         parser.add_argument("--scenario", required=True)
         parser.add_argument(
-            "--prompt", required=True,
+            "--prompt",
+            required=True,
             help="The user prompt to send to Claude Code. Becomes "
             "phrasing #1 of the trajectory.",
         )
@@ -246,8 +251,7 @@ def main(
         trace = provider(trajectory_stub, user_prompt, "claude-code")
     except (RuntimeError, TimeoutError) as exc:
         print(
-            f"  error  trace_provider failed: "
-            f"{type(exc).__name__}: {exc}",
+            f"  error  trace_provider failed: {type(exc).__name__}: {exc}",
             file=sys.stderr,
         )
         return 1
@@ -262,9 +266,7 @@ def main(
     # Now we walk a numeric suffix (.draft, .draft.2, .draft.3, ...) so
     # the author's in-progress work is preserved and the new draft
     # lands beside it for diffing.
-    canonical = (
-        repo_root / "base" / "trajectories" / skill / f"{scenario}.yaml"
-    )
+    canonical = repo_root / "base" / "trajectories" / skill / f"{scenario}.yaml"
     canonical.parent.mkdir(parents=True, exist_ok=True)
     draft_path = _next_draft_path(canonical)
     draft_path.write_text(yaml_text, encoding="utf-8")
@@ -276,20 +278,15 @@ def main(
     print()
     print("Next steps:")
     print(f"  1. Open {rel_draft} and replace every TODO marker")
-    print(f"     (description, phrasings 2-5, rubric).")
-    print(f"  2. Rename to .yaml when satisfied:")
+    print("     (description, phrasings 2-5, rubric).")
+    print("  2. Rename to .yaml when satisfied:")
     print(f"       mv {rel_draft} {canonical.relative_to(repo_root)}")
-    print(
-        f"  3. Verify against the fixture you just recorded:"
-    )
+    print("  3. Verify against the fixture you just recorded:")
     print(
         f"       make verify-trajectory SKILL={skill} SCENARIO={scenario} "
         f"FIXTURE={rel_fixture}"
     )
-    print(
-        f"  4. Run `make check` to confirm the lint gate accepts the "
-        f"trajectory."
-    )
+    print("  4. Run `make check` to confirm the lint gate accepts the trajectory.")
     return 0
 
 

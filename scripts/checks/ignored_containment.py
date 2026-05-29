@@ -55,10 +55,7 @@ def _is_excluded(rel_path: Path, excludes: list[str]) -> bool:
     without touching ".claude" itself.
     """
     rel_str = str(rel_path)
-    return any(
-        rel_str == exc or rel_str.startswith(exc + "/")
-        for exc in excludes
-    )
+    return any(rel_str == exc or rel_str.startswith(exc + "/") for exc in excludes)
 
 
 def _scan(
@@ -75,8 +72,7 @@ def _scan(
         except ValueError:
             continue
         dirnames[:] = [
-            d for d in sorted(dirnames)
-            if not _is_excluded(rel_dir / d, excludes)
+            d for d in sorted(dirnames) if not _is_excluded(rel_dir / d, excludes)
         ]
         for fname in sorted(filenames):
             path = Path(dirpath) / fname
@@ -101,10 +97,14 @@ def _load_config(config_path: Path) -> tuple[list[str], list[str]]:
     with config_path.open("rb") as f:
         data = tomllib.load(f)
     terms_raw = data.get("terms", [])
-    if not isinstance(terms_raw, list) or not all(isinstance(t, str) for t in terms_raw):
+    if not isinstance(terms_raw, list) or not all(
+        isinstance(t, str) for t in terms_raw
+    ):
         raise ValueError("'terms' must be a list of strings")
     excludes_raw = data.get("exclude_dirs", _DEFAULT_EXCLUDES)
-    if not isinstance(excludes_raw, list) or not all(isinstance(e, str) for e in excludes_raw):
+    if not isinstance(excludes_raw, list) or not all(
+        isinstance(e, str) for e in excludes_raw
+    ):
         raise ValueError("'exclude_dirs' must be a list of strings")
     return terms_raw, excludes_raw
 
@@ -137,8 +137,7 @@ def run(ctx: CheckContext) -> CheckResult:
         return CheckResult(
             status="fail",
             summary=(
-                f"PLAYBOOK_CONTAINMENT_TERMS points at non-existent file: "
-                f"{config_path}"
+                f"PLAYBOOK_CONTAINMENT_TERMS points at non-existent file: {config_path}"
             ),
             details=[],
         )

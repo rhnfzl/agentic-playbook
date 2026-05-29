@@ -48,9 +48,7 @@ from mcp_native_config import (
 # MCP-registering adapters are distinct populations that happen to
 # overlap at v0.2. Update both this set and install.py's together
 # if the lockfile-reconcile scope changes.
-_MCP_REGISTERING_ADAPTERS = frozenset(
-    {"claude-code", "codex", "cursor", "windsurf"}
-)
+_MCP_REGISTERING_ADAPTERS = frozenset({"claude-code", "codex", "cursor", "windsurf"})
 
 
 def snapshot_pre_install_mcp(

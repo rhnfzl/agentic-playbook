@@ -203,9 +203,7 @@ def _new_managed_keys_for(
         hook_dir_factory = _HOOK_REGISTERING_ADAPTERS.get(name)
         if hook_dir_factory is None:
             return {}
-        return _hook_command_keys(
-            ctx, hook_dir_factory(tgt), adapter_name=name
-        )
+        return _hook_command_keys(ctx, hook_dir_factory(tgt), adapter_name=name)
 
     return compute_managed_keys_for(
         adapter_name,
@@ -366,15 +364,11 @@ def cmd_list(target: Path | None) -> int:
 
 
 def cmd_status(target: Path | None) -> int:
-    return _cmd_status_impl(
-        target, repo_root=REPO_ROOT, lockfile_name=LOCKFILE_NAME
-    )
+    return _cmd_status_impl(target, repo_root=REPO_ROOT, lockfile_name=LOCKFILE_NAME)
 
 
 def cmd_remove(target: Path | None) -> int:
-    return _cmd_remove_impl(
-        target, repo_root=REPO_ROOT, lockfile_name=LOCKFILE_NAME
-    )
+    return _cmd_remove_impl(target, repo_root=REPO_ROOT, lockfile_name=LOCKFILE_NAME)
 
 
 # cmd_verify + _verify_adapter live in scripts/install_verify.py per the
@@ -712,9 +706,7 @@ def main() -> None:
         available = list_profiles(REPO_ROOT)
         unknown = [name for name in requested_profiles if name not in available]
         if unknown:
-            print(
-                f"Unknown profile(s): {', '.join(unknown)}", file=sys.stderr
-            )
+            print(f"Unknown profile(s): {', '.join(unknown)}", file=sys.stderr)
             print(f"Available: {', '.join(available)}", file=sys.stderr)
             sys.exit(2)
 

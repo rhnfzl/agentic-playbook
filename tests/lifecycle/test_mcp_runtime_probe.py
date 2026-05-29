@@ -263,8 +263,7 @@ def test_mcp_runtime_probe_ok_on_long_running_server(tmp_path: Path) -> None:
     )
     result = probe_one_server("fake", cfg, timeout_sec=5.0)
     assert result.status == "ok", (
-        f"long-running server must classify as ok, got {result.status}: "
-        f"{result.detail}"
+        f"long-running server must classify as ok, got {result.status}: {result.detail}"
     )
     assert "fake-long-running" in result.detail
 
@@ -379,8 +378,7 @@ def test_mcp_runtime_probe_honors_startup_timeout(tmp_path: Path) -> None:
     # Probe default 0.2s; entry overrides to 5s.
     result = probe_one_server("slow", cfg, timeout_sec=0.2)
     assert result.status == "ok", (
-        f"probe should honor declared 5s timeout, got {result.status}: "
-        f"{result.detail}"
+        f"probe should honor declared 5s timeout, got {result.status}: {result.detail}"
     )
 
 

@@ -71,11 +71,22 @@ def _fixture_trace():
         session_id="cal",
         prompt="x",
         events=[
-            TraceEvent(seq=0, kind="skill_load", name="demo",
-                       arguments=None, duration_ms=None, raw_attrs={}),
-            TraceEvent(seq=1, kind="tool_call", name="Write",
-                       arguments={"path": "out.md"}, duration_ms=5,
-                       raw_attrs={}),
+            TraceEvent(
+                seq=0,
+                kind="skill_load",
+                name="demo",
+                arguments=None,
+                duration_ms=None,
+                raw_attrs={},
+            ),
+            TraceEvent(
+                seq=1,
+                kind="tool_call",
+                name="Write",
+                arguments={"path": "out.md"},
+                duration_ms=5,
+                raw_attrs={},
+            ),
         ],
         artifacts={"out.md": "sha256:a"},
         total_input_tokens=0,
@@ -94,10 +105,13 @@ class _StableClient:
 
     def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
         from trajectory_judge import JudgeResult
+
         self.calls += 1
         return JudgeResult(
-            score=self._score, reasoning="stable",
-            raw_response="", model=model,
+            score=self._score,
+            reasoning="stable",
+            raw_response="",
+            model=model,
         )
 
 
@@ -111,12 +125,15 @@ class _NoisyClient:
 
     def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
         from trajectory_judge import JudgeResult
+
         self.calls += 1
         score = self._scores[self._idx % len(self._scores)]
         self._idx += 1
         return JudgeResult(
-            score=score, reasoning=f"call {self.calls}",
-            raw_response="", model=model,
+            score=score,
+            reasoning=f"call {self.calls}",
+            raw_response="",
+            model=model,
         )
 
 
@@ -153,8 +170,10 @@ def test_calibrate_reports_zero_range_for_stable_rubric(tmp_path: Path) -> None:
 
     traj = PlaybookContent.load(tmp_path).trajectories[0]
     report = calibrate_trajectory(
-        trajectory=traj, trace=_fixture_trace(),
-        client=client, runs=3,
+        trajectory=traj,
+        trace=_fixture_trace(),
+        client=client,
+        runs=3,
     )
     assert report.score_range == 0.0
     assert report.is_noisy is False
@@ -173,8 +192,11 @@ def test_calibrate_flags_rubric_above_range_threshold(tmp_path: Path) -> None:
 
     traj = PlaybookContent.load(tmp_path).trajectories[0]
     report = calibrate_trajectory(
-        trajectory=traj, trace=_fixture_trace(),
-        client=client, runs=5, noise_threshold=0.1,
+        trajectory=traj,
+        trace=_fixture_trace(),
+        client=client,
+        runs=5,
+        noise_threshold=0.1,
     )
     assert report.is_noisy is True
     assert report.score_range > 0.1
@@ -191,8 +213,10 @@ def test_calibrate_returns_summary_with_min_max_median(tmp_path: Path) -> None:
 
     traj = PlaybookContent.load(tmp_path).trajectories[0]
     report = calibrate_trajectory(
-        trajectory=traj, trace=_fixture_trace(),
-        client=client, runs=5,
+        trajectory=traj,
+        trace=_fixture_trace(),
+        client=client,
+        runs=5,
     )
     assert report.min_score == 0.3
     assert report.max_score == 0.8
@@ -244,11 +268,17 @@ class _InfraErrorClient:
         self._idx += 1
         if self._idx in self._fail_on_runs:
             return JudgeResult(
-                score=0.0, reasoning="HTTP 429", raw_response="",
-                model=model, is_infra_error=True,
+                score=0.0,
+                reasoning="HTTP 429",
+                raw_response="",
+                model=model,
+                is_infra_error=True,
             )
         return JudgeResult(
-            score=0.9, reasoning="ok", raw_response="", model=model,
+            score=0.9,
+            reasoning="ok",
+            raw_response="",
+            model=model,
         )
 
 
@@ -265,8 +295,11 @@ def test_calibrate_excludes_infra_errors_from_range(tmp_path: Path) -> None:
     # Runs 2 and 4 return infra errors; the remaining 3 return 0.9.
     client = _InfraErrorClient(fail_on_runs={2, 4})
     report = calibrate_trajectory(
-        trajectory=traj, trace=_fixture_trace(),
-        client=client, runs=5, noise_threshold=0.1,
+        trajectory=traj,
+        trace=_fixture_trace(),
+        client=client,
+        runs=5,
+        noise_threshold=0.1,
     )
     assert report.requested_runs == 5
     assert report.successful_runs == 3
@@ -278,7 +311,9 @@ def test_calibrate_excludes_infra_errors_from_range(tmp_path: Path) -> None:
     assert report.usable_signal is True
 
 
-def test_calibrate_preserves_single_score_in_distribution_fields(tmp_path: Path) -> None:
+def test_calibrate_preserves_single_score_in_distribution_fields(
+    tmp_path: Path,
+) -> None:
     """Codex review-fold finding: when only one run succeeds out of N,
     `usable_signal=False` (correct, no range signal) but min/max/median
     should still report the surviving score so the human report does
@@ -302,17 +337,24 @@ def test_calibrate_preserves_single_score_in_distribution_fields(tmp_path: Path)
             self._idx += 1
             if self._idx == 3:  # the surviving run.
                 return JudgeResult(
-                    score=survivor_score, reasoning="ok", raw_response="",
+                    score=survivor_score,
+                    reasoning="ok",
+                    raw_response="",
                     model=model,
                 )
             return JudgeResult(
-                score=0.0, reasoning="HTTP 429", raw_response="",
-                model=model, is_infra_error=True,
+                score=0.0,
+                reasoning="HTTP 429",
+                raw_response="",
+                model=model,
+                is_infra_error=True,
             )
 
     report = calibrate_trajectory(
-        trajectory=traj, trace=_fixture_trace(),
-        client=_OneSurvivor(), runs=runs_total,
+        trajectory=traj,
+        trace=_fixture_trace(),
+        client=_OneSurvivor(),
+        runs=runs_total,
     )
     assert report.successful_runs == 1
     assert report.infra_errors == 4

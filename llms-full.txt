@@ -86,7 +86,7 @@ The three-layer capture system handles drift:
 
 ## Distribution paths
 
-Today the canonical install path is `make install` from a local clone (with optional `PROFILE=<role>` filter). A future marketplace-based distribution per ADR-0043 is designed but not shipped in this public mirror.
+Today the canonical install path is `make install` from a local clone (with optional `PROFILE=<role>` filter). A marketplace-based distribution per ADR-0043 also ships: `scripts/marketplace/` emits per-vendor plugin catalogs (Claude Code, Cursor, Codex, Gemini) from the scrubbed destination during `sync_distribution.py`, installable as `/plugin install <plugin>@<catalog>`.
 
 ## Inspirations
 
@@ -116,4 +116,4 @@ For a first read after this `llms-full.txt`:
 
 For the security and operations story: ADR-0047 → 0048 → 0049 in order.
 
-For the marketplace plugin story (designed in the upstream, not shipped in this public mirror): ADR-0043.
+For the marketplace plugin story (per-vendor catalogs emitted from the scrubbed destination; catalog identity `rhnfzl`): ADR-0043.

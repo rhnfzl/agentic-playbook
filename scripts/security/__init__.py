@@ -19,21 +19,21 @@ from typing import NamedTuple
 class Finding(NamedTuple):
     """Single security finding, one row in the aggregated report."""
 
-    source: str          # "mcp-scan", "agent-skill-evaluator", "ddipe", "pattern-audit"
-    severity: str        # "critical" | "high" | "medium" | "low" | "info"
-    skill_path: str      # e.g. "base/skills/imported/mattpocock/foo"
-    category: str        # short machine-readable label
-    message: str         # one-line human-readable description
-    raw: str = ""        # tool stdout excerpt for traceability
+    source: str  # "mcp-scan", "agent-skill-evaluator", "ddipe", "pattern-audit"
+    severity: str  # "critical" | "high" | "medium" | "low" | "info"
+    skill_path: str  # e.g. "base/skills/imported/mattpocock/foo"
+    category: str  # short machine-readable label
+    message: str  # one-line human-readable description
+    raw: str = ""  # tool stdout excerpt for traceability
 
 
 class WrapperResult(NamedTuple):
     """What every wrapper returns."""
 
     tool: str
-    status: str          # "ok" | "findings" | "skipped" | "error"
+    status: str  # "ok" | "findings" | "skipped" | "error"
     findings: list[Finding]
-    note: str = ""       # why skipped, or stderr excerpt on error
+    note: str = ""  # why skipped, or stderr excerpt on error
 
 
 def is_strict() -> bool:

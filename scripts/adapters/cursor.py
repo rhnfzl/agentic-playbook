@@ -70,7 +70,10 @@ class CursorAdapter:
         user_cfg = home / ".cursor" / "mcp.json"
         prior_mcp_user = managed_entries_for_config(prior_mcp_all, user_cfg)
         removed_user = _loader.reconcile_managed_json_mcp(
-            user_cfg, "mcpServers", new_mcp, prior_mcp_user,
+            user_cfg,
+            "mcpServers",
+            new_mcp,
+            prior_mcp_user,
         )
         if removed_user:
             print(
@@ -78,11 +81,12 @@ class CursorAdapter:
             )
         if target is not None and target.resolve() != home.resolve():
             project_cfg = target / ".cursor" / "mcp.json"
-            prior_mcp_project = managed_entries_for_config(
-                prior_mcp_all, project_cfg
-            )
+            prior_mcp_project = managed_entries_for_config(prior_mcp_all, project_cfg)
             removed_proj = _loader.reconcile_managed_json_mcp(
-                project_cfg, "mcpServers", new_mcp, prior_mcp_project,
+                project_cfg,
+                "mcpServers",
+                new_mcp,
+                prior_mcp_project,
             )
             if removed_proj:
                 print(

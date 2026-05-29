@@ -84,6 +84,6 @@ def test_live_spawn_returns_well_formed_trace_record() -> None:
     assert record.started_at <= record.ended_at
     # At least one event of some kind should land; an empty record is
     # a strong smell that the OTel env wiring is wrong.
-    assert (
-        len(record.events) > 0
-    ), "live spawn produced zero events; check OTel env wiring"
+    assert len(record.events) > 0, (
+        "live spawn produced zero events; check OTel env wiring"
+    )

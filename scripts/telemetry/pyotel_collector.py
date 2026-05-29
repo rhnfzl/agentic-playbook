@@ -115,7 +115,9 @@ class _Handler(BaseHTTPRequestHandler):
         pass
 
 
-def serve(host: str = "127.0.0.1", port: int = 4318, *, output: Path | None = None) -> None:
+def serve(
+    host: str = "127.0.0.1", port: int = 4318, *, output: Path | None = None
+) -> None:
     if output is not None:
         _Handler.storage = output
     server = ThreadingHTTPServer((host, port), _Handler)
@@ -135,7 +137,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=4318)
     parser.add_argument(
-        "--output", type=Path, default=None,
+        "--output",
+        type=Path,
+        default=None,
         help=f"defaults to {storage_path()}",
     )
     args = parser.parse_args(argv)

@@ -139,9 +139,7 @@ def scaffold_skill(
     )
 
 
-def write_rule(
-    playbook_home: Path, slug: str, body: str, scope: str = "base"
-) -> Path:
+def write_rule(playbook_home: Path, slug: str, body: str, scope: str = "base") -> Path:
     """Write a new rule. Refuses to overwrite an existing rule.
 
     v0.11 (ADR-0040): rules moved to base/rules/ + overlays/team/rules/.
@@ -160,9 +158,7 @@ def write_rule(
     return path
 
 
-def write_hook(
-    playbook_home: Path, slug: str, body: str, scope: str = "base"
-) -> Path:
+def write_hook(playbook_home: Path, slug: str, body: str, scope: str = "base") -> Path:
     """Write a new hook. Refuses to overwrite.
 
     v0.11 (ADR-0040): hooks moved to base/hooks/ + overlays/team/hooks/.

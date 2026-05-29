@@ -7,6 +7,4 @@ from ._legacy import capture_legacy_main
 
 
 def run(ctx: CheckContext) -> CheckResult:
-    return capture_legacy_main(
-        "audit_external_skill", summary="external skill audit"
-    )
+    return capture_legacy_main("audit_external_skill", summary="external skill audit")

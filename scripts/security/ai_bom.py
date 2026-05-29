@@ -63,14 +63,16 @@ def _imported_skill_sources(repo_root: Path) -> list[dict]:
         source = source_dir.name
         for skill_md in sorted(source_dir.rglob("SKILL.md")):
             skill_dir = skill_md.parent
-            rows.append({
-                "kind": "imported_skill",
-                "source": source,
-                "path": str(skill_dir.relative_to(repo_root)),
-                "name": _skill_frontmatter_field(skill_md, "name"),
-                "version": _skill_frontmatter_field(skill_md, "version"),
-                "vetted_as_of": _vetted_as_of(skill_dir),
-            })
+            rows.append(
+                {
+                    "kind": "imported_skill",
+                    "source": source,
+                    "path": str(skill_dir.relative_to(repo_root)),
+                    "name": _skill_frontmatter_field(skill_md, "name"),
+                    "version": _skill_frontmatter_field(skill_md, "version"),
+                    "vetted_as_of": _vetted_as_of(skill_dir),
+                }
+            )
     return rows
 
 
@@ -88,13 +90,15 @@ def _vendored_mcp_bundles(repo_root: Path) -> list[dict]:
                 if line.startswith("version"):
                     version = line.split("=", 1)[-1].strip().strip('"').strip("'")
                     break
-        rows.append({
-            "kind": "mcp_bundle",
-            "name": bundle.name,
-            "path": str(bundle.relative_to(repo_root)),
-            "version": version,
-            "vetted_as_of": _vetted_as_of(bundle),
-        })
+        rows.append(
+            {
+                "kind": "mcp_bundle",
+                "name": bundle.name,
+                "path": str(bundle.relative_to(repo_root)),
+                "version": version,
+                "vetted_as_of": _vetted_as_of(bundle),
+            }
+        )
     return rows
 
 
@@ -102,7 +106,8 @@ def build_bom(repo_root: Path) -> dict:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "repo": "agentic-playbook",
-        "components": _imported_skill_sources(repo_root) + _vendored_mcp_bundles(repo_root),
+        "components": _imported_skill_sources(repo_root)
+        + _vendored_mcp_bundles(repo_root),
     }
 
 
@@ -121,10 +126,9 @@ def _components_unchanged(new_bom: dict, existing: dict | None) -> bool:
     timestamp so `make check` does not dirty a clean tree."""
     if existing is None:
         return False
-    return (
-        new_bom.get("repo") == existing.get("repo")
-        and new_bom.get("components") == existing.get("components")
-    )
+    return new_bom.get("repo") == existing.get("repo") and new_bom.get(
+        "components"
+    ) == existing.get("components")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -133,11 +137,14 @@ def main(argv: list[str] | None = None) -> int:
         "--repo-root", type=Path, default=Path(__file__).resolve().parent.parent.parent
     )
     parser.add_argument(
-        "--output", type=Path, default=None,
+        "--output",
+        type=Path,
+        default=None,
         help="defaults to <repo-root>/docs/security/ai-bom.json",
     )
     parser.add_argument(
-        "--print", action="store_true",
+        "--print",
+        action="store_true",
         help="also print BOM to stdout",
     )
     args = parser.parse_args(argv)
@@ -153,8 +160,10 @@ def main(argv: list[str] | None = None) -> int:
         # tree where no skills or MCP bundles have changed.
         bom["generated_at"] = existing.get("generated_at", bom["generated_at"])
     output.write_text(json.dumps(bom, indent=2) + "\n", encoding="utf-8")
-    print(f"  ok  AI-BOM written to {output.relative_to(repo_root)} "
-          f"({len(bom['components'])} component(s))")
+    print(
+        f"  ok  AI-BOM written to {output.relative_to(repo_root)} "
+        f"({len(bom['components'])} component(s))"
+    )
     if args.print:
         print(json.dumps(bom, indent=2))
     return 0

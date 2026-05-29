@@ -103,9 +103,7 @@ def test_scaffolded_yaml_passes_lint_after_TODOs_replaced(tmp_path: Path) -> Non
     _seed_skill(tmp_path, "demo-skill")
     _invoke(tmp_path, "demo-skill", "happy-path")
 
-    traj_path = (
-        tmp_path / "base" / "trajectories" / "demo-skill" / "happy-path.yaml"
-    )
+    traj_path = tmp_path / "base" / "trajectories" / "demo-skill" / "happy-path.yaml"
     content = traj_path.read_text(encoding="utf-8")
     content = content.replace("TODO-model-id", "claude-opus-4-7")
     content = content.replace(

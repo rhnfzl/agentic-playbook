@@ -54,15 +54,20 @@ def _format_table(aggregates: list, window_days: int) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--days", type=int, default=30,
+        "--days",
+        type=int,
+        default=30,
         help="window size in days (default 30; 0 = all-time)",
     )
     parser.add_argument(
-        "--input", type=Path, default=None,
+        "--input",
+        type=Path,
+        default=None,
         help=f"telemetry JSONL path (defaults to {storage_path()})",
     )
     parser.add_argument(
-        "--json", action="store_true",
+        "--json",
+        action="store_true",
         help="emit JSON instead of a text table",
     )
     args = parser.parse_args(argv)
@@ -83,8 +88,10 @@ def main(argv: list[str] | None = None) -> int:
 
     for line in _format_table(aggregates, args.days):
         print(line)
-    print(f"\n  ok  {len(aggregates)} skill(s) reported "
-          f"over last {args.days}d (0 = all-time)")
+    print(
+        f"\n  ok  {len(aggregates)} skill(s) reported "
+        f"over last {args.days}d (0 = all-time)"
+    )
     return 0
 
 

@@ -18,8 +18,11 @@ class StateStore:
     def read(self, default: Any = None) -> Any:
         if not self.path.exists():
             return default if default is not None else {}
-        with portalocker.Lock(
-            str(self.path), mode="r", flags=portalocker.LOCK_SH, timeout=5
+        with portalocker.Lock(  # pyright: ignore[reportAttributeAccessIssue]  # justification: portalocker exports Lock at runtime; the installed build's type info omits it
+            str(self.path),
+            mode="r",
+            flags=portalocker.LOCK_SH,  # pyright: ignore[reportAttributeAccessIssue]  # justification: portalocker exports LOCK_SH at runtime; the installed build's type info omits it
+            timeout=5,
         ) as fh:
             content = fh.read()
             if not content.strip():

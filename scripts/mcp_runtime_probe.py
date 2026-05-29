@@ -92,9 +92,7 @@ class _RejectRedirectHandler(urllib.request.HTTPRedirectHandler):
     instead of by string prefix on server-controlled reason text.
     """
 
-    def redirect_request(
-        self, req, fp, code, msg, headers, newurl
-    ):  # type: ignore[override]
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
         try:
             new_host = urllib.parse.urlsplit(newurl).hostname or "<unknown>"
         except (ValueError, AttributeError):
@@ -102,8 +100,7 @@ class _RejectRedirectHandler(urllib.request.HTTPRedirectHandler):
         raise _ProbeRedirectRefused(
             req.full_url,
             code,
-            f"redirect refused by probe (host={new_host!r}); "
-            "auth headers would leak",
+            f"redirect refused by probe (host={new_host!r}); auth headers would leak",
             headers,
             fp,
         )
@@ -112,9 +109,7 @@ class _RejectRedirectHandler(urllib.request.HTTPRedirectHandler):
 _HTTP_OPENER = urllib.request.build_opener(_RejectRedirectHandler())
 
 
-_LOOPBACK_HOSTS = frozenset(
-    {"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"}
-)
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"})
 
 
 def _redact_url_for_logs(url: str, *, was_substituted: bool = False) -> str:
@@ -579,10 +574,7 @@ def probe_one_server(
             server_name=server_name,
             config_path=config_path,
             status="fail",
-            detail=(
-                "no stdout produced; "
-                f"stderr tail: {stderr_tail!r}"
-            ),
+            detail=(f"no stdout produced; stderr tail: {stderr_tail!r}"),
         )
 
     try:
@@ -633,8 +625,7 @@ def probe_one_server(
             config_path=config_path,
             status="fail",
             detail=(
-                "initialize result missing serverInfo.name; "
-                "not a conforming MCP server"
+                "initialize result missing serverInfo.name; not a conforming MCP server"
             ),
         )
     return ProbeResult(
@@ -978,10 +969,7 @@ def _probe_http_server(
             server_name=server_name,
             config_path=config_path,
             status="fail",
-            detail=(
-                f"malformed url after substitution: "
-                f"{type(exc).__name__}"
-            ),
+            detail=(f"malformed url after substitution: {type(exc).__name__}"),
         )
     url_was_substituted = url != raw_url
     url_carries_credentials = bool(
@@ -1013,19 +1001,21 @@ def _probe_http_server(
         "credential",
         "password",
     )
-    _NON_AUTH_SAFELIST = frozenset({
-        # Common diagnostic / static headers that may contain a
-        # keyword by coincidence ("keep-alive" has "keep", etc.) but
-        # carry no credential. Add to this list as real-world configs
-        # surface false positives.
-        "x-client",
-        "x-client-id",
-        "x-request-id",
-        "x-correlation-id",
-        "x-trace-id",
-        "user-agent",
-        "keep-alive",
-    })
+    _NON_AUTH_SAFELIST = frozenset(
+        {
+            # Common diagnostic / static headers that may contain a
+            # keyword by coincidence ("keep-alive" has "keep", etc.) but
+            # carry no credential. Add to this list as real-world configs
+            # surface false positives.
+            "x-client",
+            "x-client-id",
+            "x-request-id",
+            "x-correlation-id",
+            "x-trace-id",
+            "user-agent",
+            "keep-alive",
+        }
+    )
     user_has_auth_payload_headers = False
     if isinstance(raw_user_headers, dict):
         for hkey, hval in raw_user_headers.items():
@@ -1041,9 +1031,7 @@ def _probe_http_server(
                 user_has_auth_payload_headers = True
                 break
     has_auth_payload = (
-        user_has_auth_payload_headers
-        or bool(bearer_var)
-        or url_carries_credentials
+        user_has_auth_payload_headers or bool(bearer_var) or url_carries_credentials
     )
     response_is_sensitive = (
         url_was_substituted
@@ -1170,9 +1158,7 @@ def _probe_http_server(
         # rule as HTTPError reason + response body.
         reason = getattr(exc, "reason", type(exc).__name__)
         if response_is_sensitive:
-            reason_for_log = (
-                "<redacted; URL or headers used env-var substitution>"
-            )
+            reason_for_log = "<redacted; URL or headers used env-var substitution>"
         else:
             reason_for_log = repr(reason)[:120]
         return ProbeResult(
@@ -1300,8 +1286,7 @@ def _probe_http_server(
             continue
         if msg.get("jsonrpc") != "2.0":
             last_failure_detail = (
-                f"missing jsonrpc=2.0 envelope: "
-                f"{_redact_response_snippet(parsed_body)}"
+                f"missing jsonrpc=2.0 envelope: {_redact_response_snippet(parsed_body)}"
             )
             continue
         if msg.get("id") != _INITIALIZE_REQUEST_ID:
@@ -1330,8 +1315,7 @@ def _probe_http_server(
                 config_path=config_path,
                 status="fail",
                 detail=(
-                    f"server returned error: "
-                    f"{_redact_response_snippet(msg['error'])}"
+                    f"server returned error: {_redact_response_snippet(msg['error'])}"
                 ),
             )
         result = msg.get("result")
@@ -1344,8 +1328,7 @@ def _probe_http_server(
         server_info = result.get("serverInfo")
         if not isinstance(server_info, dict) or not server_info.get("name"):
             last_failure_detail = (
-                "initialize result missing serverInfo.name; "
-                "not a conforming MCP server"
+                "initialize result missing serverInfo.name; not a conforming MCP server"
             )
             continue
         # v0.9 round-10 adversarial HIGH security fix: the success path

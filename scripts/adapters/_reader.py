@@ -132,9 +132,7 @@ def load_rules(content_paths: ContentPaths) -> list[Rule]:
         if rule_md.name in ("README.md",):
             continue
         body = rule_md.read_text(encoding="utf-8")
-        by_name[rule_md.stem] = Rule(
-            path=rule_md, name=rule_md.stem, body=body
-        )
+        by_name[rule_md.stem] = Rule(path=rule_md, name=rule_md.stem, body=body)
     return sorted(by_name.values(), key=lambda r: r.name)
 
 
@@ -216,10 +214,7 @@ def load_mcp_configs(content_paths: ContentPaths) -> list[McpConfig]:
     # each group sort alphabetically.
     flat = [m for m in by_name.values() if m.source_dir is None]
     directory = [m for m in by_name.values() if m.source_dir is not None]
-    return (
-        sorted(flat, key=lambda m: m.name)
-        + sorted(directory, key=lambda m: m.name)
-    )
+    return sorted(flat, key=lambda m: m.name) + sorted(directory, key=lambda m: m.name)
 
 
 def load_agents(content_paths: ContentPaths) -> list[Agent]:
@@ -275,9 +270,7 @@ def _parse_inline_list(raw: str) -> list[str]:
         if not inner:
             return []
         return [
-            tok.strip().strip('"').strip("'")
-            for tok in inner.split(",")
-            if tok.strip()
+            tok.strip().strip('"').strip("'") for tok in inner.split(",") if tok.strip()
         ]
     return [s.strip('"').strip("'")]
 
@@ -420,9 +413,7 @@ def _parse_trajectory_body(body: str) -> tuple[list[str], list[dict], dict]:
                 in_phrasings = True
                 continue
             if in_phrasings and line.lstrip().startswith("- "):
-                phrasings.append(
-                    line.split("- ", 1)[1].strip().strip('"').strip("'")
-                )
+                phrasings.append(line.split("- ", 1)[1].strip().strip('"').strip("'"))
                 continue
             # Any non-list-item under input ends the phrasings sub-section.
             if in_phrasings and not line.lstrip().startswith("- "):
@@ -549,7 +540,5 @@ def load_prompts(content_paths: ContentPaths) -> list[Prompt]:
         fm, body = _parse_frontmatter(content)
         if not fm.get("name"):
             continue
-        by_name[prompt_md.stem] = Prompt(
-            path=prompt_md, name=prompt_md.stem, body=body
-        )
+        by_name[prompt_md.stem] = Prompt(path=prompt_md, name=prompt_md.stem, body=body)
     return sorted(by_name.values(), key=lambda p: p.name)

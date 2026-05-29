@@ -177,7 +177,9 @@ def main() -> int:
     ]
     skill_roots = [r for r in skill_roots if r.is_dir()]
     if not skill_roots:
-        print("  no skill roots found at base/skills/ or overlays/team/skills/; nothing to lint")
+        print(
+            "  no skill roots found at base/skills/ or overlays/team/skills/; nothing to lint"
+        )
         return 0
 
     issues: list[str] = []

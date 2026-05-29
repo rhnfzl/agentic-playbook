@@ -35,9 +35,7 @@ _HOOK_CURSOR_ONLY_HEADER_RE = re.compile(
     r"^#\s*PLAYBOOK-HOOK-CURSOR-ONLY:\s*(true|false)\s*$",
     re.IGNORECASE,
 )
-_HOOK_ADAPTERS_HEADER_RE = re.compile(
-    r"^#\s*PLAYBOOK-HOOK-ADAPTERS:\s*(.+?)\s*$"
-)
+_HOOK_ADAPTERS_HEADER_RE = re.compile(r"^#\s*PLAYBOOK-HOOK-ADAPTERS:\s*(.+?)\s*$")
 
 _HOOK_CAPABLE_ADAPTERS = frozenset(
     {"claude-code", "codex", "cursor", "cline", "copilot", "windsurf"}

@@ -310,9 +310,7 @@ def load_lockfile(target: Path | None, repo_root: Path) -> dict | None:
     return None
 
 
-def incompatible_lockfile_path(
-    target: Path | None, repo_root: Path
-) -> Path | None:
+def incompatible_lockfile_path(target: Path | None, repo_root: Path) -> Path | None:
     """Return the path to a non-v3 lockfile that would be USED, else None.
 
     v0.9 install/update writes call this BEFORE materializing any
@@ -423,9 +421,7 @@ def copied_dir_drift(full: Path, locked_entry: object) -> str | None:
     if not full.is_dir():
         return "missing"
     expected = (
-        locked_entry.get("tree_sha256", "")
-        if isinstance(locked_entry, dict)
-        else ""
+        locked_entry.get("tree_sha256", "") if isinstance(locked_entry, dict) else ""
     )
     if not expected:
         return None

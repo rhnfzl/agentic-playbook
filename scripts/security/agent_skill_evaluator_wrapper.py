@@ -47,14 +47,16 @@ def _to_findings(payload: dict, repo_root: Path) -> list[Finding]:
             rel = str(Path(skill_path).resolve().relative_to(repo_root))
         except (ValueError, OSError):
             rel = skill_path
-        out.append(Finding(
-            source="agent-skill-evaluator",
-            severity=_normalize_severity(row.get("level", "")),
-            skill_path=rel,
-            category=row.get("rule", "unspecified"),
-            message=row.get("message", "")[:200],
-            raw=json.dumps(row)[:500],
-        ))
+        out.append(
+            Finding(
+                source="agent-skill-evaluator",
+                severity=_normalize_severity(row.get("level", "")),
+                skill_path=rel,
+                category=row.get("rule", "unspecified"),
+                message=row.get("message", "")[:200],
+                raw=json.dumps(row)[:500],
+            )
+        )
     return out
 
 
@@ -90,7 +92,11 @@ def _run_via_uvx(skill_dirs: list[Path], repo_root: Path) -> WrapperResult:
     cmd.extend(str(d) for d in skill_dirs)
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120, check=False,
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
         return WrapperResult(
@@ -125,9 +131,7 @@ def _run_via_uvx(skill_dirs: list[Path], repo_root: Path) -> WrapperResult:
 
 def run(skill_dirs: list[Path], repo_root: Path) -> WrapperResult:
     if not skill_dirs:
-        return WrapperResult(
-            tool="agent-skill-evaluator", status="ok", findings=[]
-        )
+        return WrapperResult(tool="agent-skill-evaluator", status="ok", findings=[])
     mod = _try_import()
     if mod is not None:
         return _run_via_import(mod, skill_dirs, repo_root)

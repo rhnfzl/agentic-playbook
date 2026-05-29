@@ -49,8 +49,7 @@ def run(ctx: CheckContext) -> CheckResult:
         return CheckResult(
             status="fail",
             summary=(
-                f"{len(duplicates)} duplicate ADR number(s) across "
-                f"{scanned} ADR(s)"
+                f"{len(duplicates)} duplicate ADR number(s) across {scanned} ADR(s)"
             ),
             details=details,
         )

@@ -66,14 +66,21 @@ def test_skill_page_renders_bom_badge(tmp_path: Path) -> None:
     _seed_corpus(tmp_path)
     bom = tmp_path / "docs" / "security" / "ai-bom.json"
     bom.parent.mkdir(parents=True, exist_ok=True)
-    bom.write_text(json.dumps({
-        "components": [{
-            "kind": "imported_skill",
-            "path": "base/skills/engineering/demo",
-            "name": "demo",
-            "vetted_as_of": "2026-05-01",
-        }],
-    }), encoding="utf-8")
+    bom.write_text(
+        json.dumps(
+            {
+                "components": [
+                    {
+                        "kind": "imported_skill",
+                        "path": "base/skills/engineering/demo",
+                        "name": "demo",
+                        "vetted_as_of": "2026-05-01",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     out_dir = tmp_path / "atlas"
     build_atlas.build_site(tmp_path, out_dir)
     skill_html = (out_dir / "skill" / "base-engineering-demo.html").read_text(
@@ -102,7 +109,8 @@ def test_graph_json_has_nodes_and_edges(tmp_path: Path) -> None:
 
 
 def test_telemetry_off_omits_telemetry_badges(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     monkeypatch.setenv("TELEMETRY", "off")
     _seed_corpus(tmp_path)
@@ -115,7 +123,8 @@ def test_telemetry_off_omits_telemetry_badges(
 
 
 def test_atlas_telemetry_requires_explicit_opt_in(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     """Privacy: even with TELEMETRY unset (default-enabled per the
     standard contract), atlas must NOT render telemetry into committed
@@ -136,18 +145,29 @@ def test_atlas_telemetry_requires_explicit_opt_in(
 
 
 def test_atlas_telemetry_renders_when_explicit_opt_in(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     """Sanity check the inverse: TELEMETRY=on should opt the contributor
     into local rendering for personal browsing."""
     _seed_corpus(tmp_path)
     tele_dir = tmp_path / "tele"
     tele_dir.mkdir()
-    (tele_dir / "skills.jsonl").write_text(json.dumps({
-        "skill": "demo", "adapter": "claude-code", "model": "m",
-        "fired_at": "2026-05-28T12:00:00+00:00",
-        "latency_ms": 100, "input_tokens": 1, "output_tokens": 2,
-    }) + "\n", encoding="utf-8")
+    (tele_dir / "skills.jsonl").write_text(
+        json.dumps(
+            {
+                "skill": "demo",
+                "adapter": "claude-code",
+                "model": "m",
+                "fired_at": "2026-05-28T12:00:00+00:00",
+                "latency_ms": 100,
+                "input_tokens": 1,
+                "output_tokens": 2,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     monkeypatch.setenv("TELEMETRY", "on")
     monkeypatch.setenv("TELEMETRY_DIR", str(tele_dir))
     out_dir = tmp_path / "atlas"

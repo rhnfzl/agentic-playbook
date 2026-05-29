@@ -78,9 +78,7 @@ def run(ctx: CheckContext) -> CheckResult:
                     "scripts/install.py hardcodes PLAYBOOK_VERSION "
                     "(must read from VERSION file instead)"
                 ),
-                details=[
-                    f"scripts/install.py:{line_no}: {match.group(0).strip()}"
-                ],
+                details=[f"scripts/install.py:{line_no}: {match.group(0).strip()}"],
             )
 
     return CheckResult(

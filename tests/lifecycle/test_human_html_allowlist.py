@@ -38,8 +38,7 @@ def test_human_html_allowlist_check_flags_command_substitution(tmp_path: Path) -
 
     allowlist = tmp_path / ".human-html-allowlist"
     allowlist.write_text(
-        "myproject/notes/*\n"
-        "$(rm -rf /)\n",
+        "myproject/notes/*\n$(rm -rf /)\n",
         encoding="utf-8",
     )
 
@@ -92,7 +91,6 @@ def test_human_html_allowlist_warns_on_single_trailing_backslash(
     ctx = CheckContext(repo_root=tmp_path, content=None)
     result = run(ctx)
     assert result.status == "warn", (
-        f"single trailing backslash must warn; got {result.status}: "
-        f"{result.details}"
+        f"single trailing backslash must warn; got {result.status}: {result.details}"
     )
     assert any("WARN" in d for d in result.details)

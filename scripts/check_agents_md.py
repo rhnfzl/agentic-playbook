@@ -103,6 +103,7 @@ def get_first_class_dirs(repo_root: Path) -> list[str]:
 
     return dirs
 
+
 # Dir name segments treated as "docs / template" for freshness purposes
 # (180d budget). v0.12: match by ANY part of the path so post-v0.11 nested
 # paths like `base/prompts/AGENTS.md` still classify correctly.

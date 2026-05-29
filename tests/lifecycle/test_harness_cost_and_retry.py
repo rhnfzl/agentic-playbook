@@ -74,10 +74,22 @@ def _fixture_trace(skill: str = "demo"):
         session_id="t",
         prompt="x",
         events=[
-            TraceEvent(seq=0, kind="skill_load", name=skill,
-                       arguments=None, duration_ms=None, raw_attrs={}),
-            TraceEvent(seq=1, kind="tool_call", name="Write",
-                       arguments={"path": "out.md"}, duration_ms=5, raw_attrs={}),
+            TraceEvent(
+                seq=0,
+                kind="skill_load",
+                name=skill,
+                arguments=None,
+                duration_ms=None,
+                raw_attrs={},
+            ),
+            TraceEvent(
+                seq=1,
+                kind="tool_call",
+                name="Write",
+                arguments={"path": "out.md"},
+                duration_ms=5,
+                raw_attrs={},
+            ),
         ],
         artifacts={"out.md": "sha256:a"},
         total_input_tokens=10,
@@ -150,7 +162,9 @@ def test_max_judge_calls_caps_judge_invocations(tmp_path: Path) -> None:
         def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
             judge_calls["n"] += 1
             return JudgeResult(
-                score=0.9, reasoning="x", raw_response="",
+                score=0.9,
+                reasoning="x",
+                raw_response="",
                 model="claude-sonnet-4-6",
             )
 
@@ -371,10 +385,7 @@ def test_retries_inside_one_cell_consume_budget(tmp_path: Path) -> None:
     assert len(successful_cells) == 1
     skipped = [c for c in matrix.cells if not c.passed]
     assert len(skipped) == 4
-    assert all(
-        any("budget_exhausted" in f for f in c.failures)
-        for c in skipped
-    )
+    assert all(any("budget_exhausted" in f for f in c.failures) for c in skipped)
 
 
 # --- review-fold P2: judge budget exhausted must fail the cell ---
@@ -391,7 +402,9 @@ def test_judge_budget_exhausted_fails_the_cell(tmp_path: Path) -> None:
     class _PassJudge:
         def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
             return JudgeResult(
-                score=0.95, reasoning="ok", raw_response="",
+                score=0.95,
+                reasoning="ok",
+                raw_response="",
                 model="claude-sonnet-4-6",
             )
 
@@ -423,8 +436,11 @@ def test_judge_failures_are_not_retried(tmp_path: Path) -> None:
         def score_trajectory(self, rubric, trace_summary, model, temperature=0.0):
             judge_calls["n"] += 1
             return JudgeResult(
-                score=0.0, reasoning="HTTP 429", raw_response="",
-                model="claude-sonnet-4-6", is_infra_error=True,
+                score=0.0,
+                reasoning="HTTP 429",
+                raw_response="",
+                model="claude-sonnet-4-6",
+                is_infra_error=True,
             )
 
     _make_trajectory(tmp_path)

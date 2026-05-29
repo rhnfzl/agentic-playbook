@@ -29,11 +29,13 @@ def _seed_skill(skill_dir: Path, *, name: str, version: str) -> None:
 def test_emits_imported_skills(tmp_path: Path) -> None:
     _seed_skill(
         tmp_path / "base" / "skills" / "imported" / "mattpocock" / "skill-a",
-        name="skill-a", version="0.1.0",
+        name="skill-a",
+        version="0.1.0",
     )
     _seed_skill(
         tmp_path / "base" / "skills" / "imported" / "obra" / "skill-b",
-        name="skill-b", version="2.0.0",
+        name="skill-b",
+        version="2.0.0",
     )
     bom = ai_bom.build_bom(tmp_path)
     assert bom["repo"] == "agentic-playbook"
@@ -46,7 +48,8 @@ def test_emits_mcp_bundles(tmp_path: Path) -> None:
     bundle = tmp_path / "base" / "mcp" / "anchored-fs"
     bundle.mkdir(parents=True)
     (bundle / "manifest.toml").write_text(
-        'name = "anchored-fs"\nversion = "0.3.1"\n', encoding="utf-8",
+        'name = "anchored-fs"\nversion = "0.3.1"\n',
+        encoding="utf-8",
     )
     bom = ai_bom.build_bom(tmp_path)
     bundles = [c for c in bom["components"] if c["kind"] == "mcp_bundle"]
@@ -86,7 +89,8 @@ def test_bom_is_idempotent_when_components_unchanged(tmp_path: Path) -> None:
     skill-security)."""
     _seed_skill(
         tmp_path / "base" / "skills" / "imported" / "src" / "demo",
-        name="demo", version="0.1.0",
+        name="demo",
+        version="0.1.0",
     )
     out = tmp_path / "ai-bom.json"
     ai_bom.main(["--repo-root", str(tmp_path), "--output", str(out)])
@@ -105,7 +109,8 @@ def test_bom_writes_fresh_content_when_components_change(tmp_path: Path) -> None
     first = json.loads(out.read_text(encoding="utf-8"))
     _seed_skill(
         tmp_path / "base" / "skills" / "imported" / "src" / "added-later",
-        name="added-later", version="0.1.0",
+        name="added-later",
+        version="0.1.0",
     )
     ai_bom.main(["--repo-root", str(tmp_path), "--output", str(out)])
     second = json.loads(out.read_text(encoding="utf-8"))
