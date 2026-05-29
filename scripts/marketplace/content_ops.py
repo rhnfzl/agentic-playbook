@@ -53,21 +53,53 @@ def _refs_for_spec(profile: Profile, spec: ComponentSpec) -> tuple[str, ...]:
     return tuple(seen.keys())
 
 
-def _plugin_rel_for(spec: ComponentSpec, ref: str, source: Path) -> Path:
-    """Derive plugin-dir-relative path from spec + source layout.
+# Profiles reference content by BARE STEM (e.g. "lint-guard", "no-em-dashes"),
+# matching the canonical loaders in `scripts/adapters/_reader.py`, which glob
+# each content root with a fixed extension and key by `path.stem`. Skills are
+# the exception: they are directories referenced by their full sub-path
+# (e.g. "engineering/ci-failure-triage"), so they need no suffix fallback.
+# Keep this map in sync with the `_walk_content_roots(..., "<kind>", "<glob>")`
+# calls in `_reader.py` so the emitter resolves the same files the installer does.
+_SUFFIX_FALLBACKS: dict[str, tuple[str, ...]] = {
+    "rules": (".md",),
+    "hooks": (".sh",),
+    "agents": (".md",),
+    "commands": (".md",),
+    "prompts": (".md",),
+    "mcp": (".json",),
+}
 
-    For most kinds the plugin destination is `<spec.plugin_dst>/<ref>`. For
-    MCP refs (`spec.plugin_dst == "mcp_either"`), the destination depends
-    on source shape:
 
-      base/mcp/<name>.json          -> mcp/<name>.json (flat layout)
-      base/mcp/<name>/server.json   -> mcp/<name>/...  (bundle layout)
+def _resolve_source(spec: ComponentSpec, ref: str, repo_root: Path) -> Path | None:
+    """Resolve a profile ref to its source path on disk, or None if absent.
+
+    Tries the bare ref first (directory-style content such as skills, and
+    bundle-style MCP servers). Falls back to the extension(s) the canonical
+    loader globs for that kind so bare-stem refs resolve to `<ref><suffix>`.
     """
-    if spec.plugin_dst == "mcp_either":
-        if source.is_file() and source.suffix == ".json":
-            return Path("mcp") / source.name
-        return Path("mcp") / ref
-    return Path(spec.plugin_dst) / ref
+    base = repo_root / spec.source_dir / ref
+    if base.exists():
+        return base
+    for suffix in _SUFFIX_FALLBACKS.get(spec.kind, ()):
+        alt = repo_root / spec.source_dir / f"{ref}{suffix}"
+        if alt.exists():
+            return alt
+    return None
+
+
+def _plugin_rel_for(spec: ComponentSpec, ref: str, source: Path) -> Path:
+    """Derive plugin-dir-relative path from spec + resolved source.
+
+    Directory-style content keeps the ref path so a category prefix
+    survives (skills/engineering/ci-failure-triage, mcp/<bundle>).
+    File-style content keeps the resolved filename so the extension the
+    canonical loader expects survives (rules/<name>.md, hooks/<name>.sh,
+    mcp/<name>.json).
+    """
+    dst = "mcp" if spec.plugin_dst == "mcp_either" else spec.plugin_dst
+    if source.is_dir():
+        return Path(dst) / ref
+    return Path(dst) / source.name
 
 
 def _resolve_profile(
@@ -78,21 +110,11 @@ def _resolve_profile(
     warnings: list[str] = []
     for spec in specs_for(profile):
         for ref in _refs_for_spec(profile, spec):
-            source = config.repo_root / spec.source_dir / ref
-            if not source.exists():
-                if spec.plugin_dst == "mcp_either":
-                    alt = config.repo_root / spec.source_dir / f"{ref}.json"
-                    if alt.exists():
-                        plugin_rel = _plugin_rel_for(spec, ref, alt)
-                        resolved.append(
-                            ResolvedRef(
-                                spec=spec, ref=ref, source=alt, plugin_rel=plugin_rel
-                            )
-                        )
-                        continue
+            source = _resolve_source(spec, ref, config.repo_root)
+            if source is None:
                 warnings.append(
                     f"profile '{profile.name}' ref '{ref}' under {spec.kind} "
-                    f"missing on disk at {source}"
+                    f"missing on disk at {config.repo_root / spec.source_dir / ref}"
                 )
                 continue
             plugin_rel = _plugin_rel_for(spec, ref, source)

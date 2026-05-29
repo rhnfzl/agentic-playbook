@@ -53,9 +53,12 @@ def _build_hooks_json(
             continue
         matcher_match = _HOOK_MATCHER_RE.search(content)
         event = event_match.group(1)
+        # Point at the MATERIALIZED filename (entry.plugin_rel.name keeps the
+        # .sh suffix), not the bare profile ref. The ref is a stem; the file
+        # on disk and in the plugin dir is `<stem>.sh`.
         cmd: dict[str, str] = {
             "type": "command",
-            "command": f"${{PLUGIN_ROOT}}/hooks/{entry.ref}",
+            "command": f"${{PLUGIN_ROOT}}/hooks/{entry.plugin_rel.name}",
         }
         if matcher_match:
             cmd["matcher"] = matcher_match.group(1).strip()

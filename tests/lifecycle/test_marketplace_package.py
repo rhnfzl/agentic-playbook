@@ -64,6 +64,7 @@ from marketplace.content_ops import (
     _refs_for_spec,
     _remove_stale_plugin_content,
     _resolve_profile,
+    _resolve_source,
     _within,
 )
 from marketplace.emitter import (
@@ -74,7 +75,10 @@ from marketplace.emitter import (
     _write_if_changed,
 )
 from marketplace.hook_aggregator import _build_hooks_json
-from marketplace.manifests._shared import _default_marketplace_description, _plugin_readme
+from marketplace.manifests._shared import (
+    _default_marketplace_description,
+    _plugin_readme,
+)
 from marketplace.manifests.claude import (
     _claude_marketplace_manifest,
     _claude_plugin_entry,
@@ -250,7 +254,10 @@ class TestTypes:
             author_name="Rehan Fazal",
             author_email="rehan@example.com",
         )
-        assert cfg.author_block() == {"name": "Rehan Fazal", "email": "rehan@example.com"}
+        assert cfg.author_block() == {
+            "name": "Rehan Fazal",
+            "email": "rehan@example.com",
+        }
 
     def test_author_block_returns_fresh_dict(self, tmp_path):
         cfg = _make_config(tmp_path, tmp_path / "dest")
@@ -357,7 +364,9 @@ class TestProfileLoader:
             _validate_marketplace_name("my-claude-tools")
 
     def test_load_profile_minimal(self, tmp_path):
-        path = _seed_profile_toml(tmp_path, "backend-developer", 'description = "Backend"\n')
+        path = _seed_profile_toml(
+            tmp_path, "backend-developer", 'description = "Backend"\n'
+        )
         p = _load_profile(path, catalog_name="rhnfzl")
         assert p.name == "backend-developer"
         assert p.catalog_name == "rhnfzl"
@@ -479,6 +488,20 @@ class TestPluginRelFor:
         rel = _plugin_rel_for(spec, "anchored-fs", d)
         assert rel == Path("mcp/anchored-fs")
 
+    def test_hook_file_keeps_sh_extension(self, tmp_path):
+        spec = ComponentSpec("hooks", Path("base/hooks"), "hooks", "hooks")
+        f = tmp_path / "lint-guard.sh"
+        f.write_text("#")
+        rel = _plugin_rel_for(spec, "lint-guard", f)
+        assert rel == Path("hooks/lint-guard.sh")
+
+    def test_rule_file_keeps_md_extension(self, tmp_path):
+        spec = ComponentSpec("rules", Path("base/rules"), "rules", "rules")
+        f = tmp_path / "no-em-dashes.md"
+        f.write_text("#")
+        rel = _plugin_rel_for(spec, "no-em-dashes", f)
+        assert rel == Path("rules/no-em-dashes.md")
+
 
 class TestRefsForSpec:
     def test_role_profile_passthrough(self):
@@ -538,6 +561,83 @@ class TestResolveProfile:
         assert resolved[0].plugin_rel == Path("mcp/anchored-fs")
 
 
+class TestBareStemResolution:
+    """Profiles reference content by BARE STEM; the file on disk carries the
+    extension the canonical loader globs for. Regression guard for the bug
+    where every hook + rule + agent + command + prompt ref was dropped
+    because the resolver did a literal path check with no suffix fallback.
+    """
+
+    def test_hook_bare_stem_resolves_to_sh(self, tmp_path):
+        _seed_base_dirs(tmp_path)
+        (tmp_path / "base" / "hooks" / "lint-guard.sh").write_text(
+            "# PLAYBOOK-HOOK-EVENT: PreToolUse\n", encoding="utf-8"
+        )
+        p = _make_role_profile(hooks=("lint-guard",))
+        cfg = _make_config(tmp_path, tmp_path / "dest")
+        resolved, warnings = _resolve_profile(p, cfg)
+        assert warnings == ()
+        assert len(resolved) == 1
+        assert resolved[0].ref == "lint-guard"
+        assert resolved[0].source.name == "lint-guard.sh"
+        assert resolved[0].plugin_rel == Path("hooks/lint-guard.sh")
+
+    def test_rule_bare_stem_resolves_to_md(self, tmp_path):
+        _seed_base_dirs(tmp_path)
+        (tmp_path / "base" / "rules" / "no-em-dashes.md").write_text(
+            "rule body", encoding="utf-8"
+        )
+        p = _make_role_profile(rules=("no-em-dashes",))
+        cfg = _make_config(tmp_path, tmp_path / "dest")
+        resolved, warnings = _resolve_profile(p, cfg)
+        assert warnings == ()
+        assert resolved[0].plugin_rel == Path("rules/no-em-dashes.md")
+
+    def test_agent_command_prompt_bare_stem_resolve_to_md(self, tmp_path):
+        _seed_base_dirs(tmp_path)
+        (tmp_path / "base" / "agents" / "scout.md").write_text("a", encoding="utf-8")
+        (tmp_path / "base" / "commands" / "ship.md").write_text("c", encoding="utf-8")
+        (tmp_path / "base" / "prompts" / "kickoff.md").write_text("p", encoding="utf-8")
+        p = _make_role_profile(
+            agents=("scout",), commands=("ship",), prompts=("kickoff",)
+        )
+        cfg = _make_config(tmp_path, tmp_path / "dest")
+        resolved, warnings = _resolve_profile(p, cfg)
+        assert warnings == ()
+        rels = {r.plugin_rel for r in resolved}
+        assert Path("agents/scout.md") in rels
+        assert Path("commands/ship.md") in rels
+        assert Path("prompts/kickoff.md") in rels
+
+    def test_skill_dir_ref_needs_no_suffix(self, tmp_path):
+        _seed_base_dirs(tmp_path)
+        skill_dir = tmp_path / "base" / "skills" / "engineering" / "ci-failure-triage"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text("# skill", encoding="utf-8")
+        p = _make_role_profile(skills=("engineering/ci-failure-triage",))
+        cfg = _make_config(tmp_path, tmp_path / "dest")
+        resolved, warnings = _resolve_profile(p, cfg)
+        assert warnings == ()
+        # Category prefix survives in the plugin destination.
+        assert resolved[0].plugin_rel == Path("skills/engineering/ci-failure-triage")
+
+    def test_resolve_source_returns_none_when_truly_absent(self, tmp_path):
+        _seed_base_dirs(tmp_path)
+        spec = ComponentSpec("hooks", Path("base/hooks"), "hooks", "hooks")
+        assert _resolve_source(spec, "does-not-exist", tmp_path) is None
+
+    def test_bare_path_wins_over_suffix_fallback(self, tmp_path):
+        # If a bare ref exists as-is (e.g. an extensionless file), it is
+        # preferred over the suffixed fallback.
+        _seed_base_dirs(tmp_path)
+        spec = ComponentSpec("hooks", Path("base/hooks"), "hooks", "hooks")
+        (tmp_path / "base" / "hooks" / "exact").write_text("bare", encoding="utf-8")
+        (tmp_path / "base" / "hooks" / "exact.sh").write_text("sh", encoding="utf-8")
+        resolved = _resolve_source(spec, "exact", tmp_path)
+        assert resolved is not None
+        assert resolved.name == "exact"
+
+
 class TestMaterialize:
     def test_dry_run_writes_nothing(self, tmp_path):
         spec = ComponentSpec("skills", Path("base/skills"), "skills", "skills")
@@ -545,7 +645,9 @@ class TestMaterialize:
         src.mkdir()
         (src / "SKILL.md").write_text("hi")
         plugin_dir = tmp_path / "plugin"
-        ref = ResolvedRef(spec=spec, ref="alpha", source=src, plugin_rel=Path("skills/alpha"))
+        ref = ResolvedRef(
+            spec=spec, ref="alpha", source=src, plugin_rel=Path("skills/alpha")
+        )
         count = _materialize((ref,), plugin_dir, dry_run=True)
         assert count == 0
         assert not (plugin_dir / "skills" / "alpha").exists()
@@ -557,18 +659,24 @@ class TestMaterialize:
         (src / "SKILL.md").write_text("hi")
         (src / "nested" / "ref.md").write_text("there")
         plugin_dir = tmp_path / "plugin"
-        ref = ResolvedRef(spec=spec, ref="alpha", source=src, plugin_rel=Path("skills/alpha"))
+        ref = ResolvedRef(
+            spec=spec, ref="alpha", source=src, plugin_rel=Path("skills/alpha")
+        )
         count = _materialize((ref,), plugin_dir, dry_run=False)
         assert count == 1
         assert (plugin_dir / "skills" / "alpha" / "SKILL.md").read_text() == "hi"
-        assert (plugin_dir / "skills" / "alpha" / "nested" / "ref.md").read_text() == "there"
+        assert (
+            plugin_dir / "skills" / "alpha" / "nested" / "ref.md"
+        ).read_text() == "there"
 
     def test_copies_file(self, tmp_path):
         spec = ComponentSpec("mcp", Path("base/mcp"), "mcp_either", "mcp")
         src = tmp_path / "tavily.json"
         src.write_text("{}")
         plugin_dir = tmp_path / "plugin"
-        ref = ResolvedRef(spec=spec, ref="tavily", source=src, plugin_rel=Path("mcp/tavily.json"))
+        ref = ResolvedRef(
+            spec=spec, ref="tavily", source=src, plugin_rel=Path("mcp/tavily.json")
+        )
         count = _materialize((ref,), plugin_dir, dry_run=False)
         assert count == 1
         assert (plugin_dir / "mcp" / "tavily.json").read_text() == "{}"
@@ -592,10 +700,17 @@ class TestMaterialize:
 class TestExpectedPaths:
     def test_expected_paths_builds_set(self, tmp_path):
         spec = ComponentSpec("skills", Path("base/skills"), "skills", "skills")
-        r1 = ResolvedRef(spec=spec, ref="a", source=tmp_path, plugin_rel=Path("skills/a"))
-        r2 = ResolvedRef(spec=spec, ref="b", source=tmp_path, plugin_rel=Path("skills/b"))
+        r1 = ResolvedRef(
+            spec=spec, ref="a", source=tmp_path, plugin_rel=Path("skills/a")
+        )
+        r2 = ResolvedRef(
+            spec=spec, ref="b", source=tmp_path, plugin_rel=Path("skills/b")
+        )
         s = _expected_paths((r1, r2), tmp_path / "plugin")
-        assert s == {tmp_path / "plugin" / "skills" / "a", tmp_path / "plugin" / "skills" / "b"}
+        assert s == {
+            tmp_path / "plugin" / "skills" / "a",
+            tmp_path / "plugin" / "skills" / "b",
+        }
 
 
 class TestRemoveStalePluginContent:
@@ -637,7 +752,9 @@ class TestHookAggregator:
         src = repo_root / "base" / "hooks" / name
         src.parent.mkdir(parents=True, exist_ok=True)
         src.write_text(body, encoding="utf-8")
-        return ResolvedRef(spec=spec, ref=name, source=src, plugin_rel=Path(f"hooks/{name}"))
+        return ResolvedRef(
+            spec=spec, ref=name, source=src, plugin_rel=Path(f"hooks/{name}")
+        )
 
     def test_missing_event_header_warns(self, tmp_path, capsys):
         cfg = _make_config(tmp_path, tmp_path / "dest")
@@ -649,7 +766,7 @@ class TestHookAggregator:
         assert "bad.sh" in err
         assert p.name in err
 
-    def test_unreadable_file_warns(self, tmp_path, capsys, monkeypatch):
+    def test_unreadable_file_warns(self, tmp_path, capsys):
         cfg = _make_config(tmp_path, tmp_path / "dest")
         ref = self._seed_hook(tmp_path, "vanish.sh", "# placeholder")
         ref.source.unlink()
@@ -693,7 +810,19 @@ class TestMcpAggregator:
         src = repo_root / "base" / "mcp" / f"{ref}.json"
         src.parent.mkdir(parents=True, exist_ok=True)
         src.write_text(body, encoding="utf-8")
-        return ResolvedRef(spec=spec, ref=ref, source=src, plugin_rel=Path(f"mcp/{ref}.json"))
+        return ResolvedRef(
+            spec=spec, ref=ref, source=src, plugin_rel=Path(f"mcp/{ref}.json")
+        )
+
+    def _seed_mcp_bundle(self, repo_root: Path, ref: str, body: str) -> ResolvedRef:
+        """Bundle layout: source is a DIRECTORY whose config is server.json."""
+        spec = ComponentSpec("mcp", Path("base/mcp"), "mcp_either", "mcp")
+        bundle = repo_root / "base" / "mcp" / ref
+        bundle.mkdir(parents=True, exist_ok=True)
+        (bundle / "server.json").write_text(body, encoding="utf-8")
+        return ResolvedRef(
+            spec=spec, ref=ref, source=bundle, plugin_rel=Path(f"mcp/{ref}")
+        )
 
     def test_unparseable_warns(self, tmp_path, capsys):
         cfg = _make_config(tmp_path, tmp_path / "dest")
@@ -714,14 +843,45 @@ class TestMcpAggregator:
 
     def test_aggregates_servers(self, tmp_path):
         cfg = _make_config(tmp_path, tmp_path / "dest")
-        ref = self._seed_mcp(
-            tmp_path, "ok", json.dumps({"alpha": {"command": "node"}})
-        )
+        ref = self._seed_mcp(tmp_path, "ok", json.dumps({"alpha": {"command": "node"}}))
         p = _make_role_profile(mcp=("ok",))
         plugin_dir = tmp_path / "dest" / p.name
         _build_mcp_json(p, (ref,), cfg, plugin_dir)
         data = json.loads((plugin_dir / ".mcp.json").read_text())
         assert "alpha" in data["mcpServers"]
+
+    def test_bundle_layout_reads_server_json(self, tmp_path):
+        """Regression: when the MCP source is a directory (bundle layout),
+        the aggregator reads `<source>/server.json`, not the directory
+        itself. Guards the dir-branch added for parity with gemini."""
+        cfg = _make_config(tmp_path, tmp_path / "dest")
+        ref = self._seed_mcp_bundle(
+            tmp_path, "anchored-fs", json.dumps({"anchored-fs": {"command": "node"}})
+        )
+        p = _make_role_profile(mcp=("anchored-fs",))
+        plugin_dir = tmp_path / "dest" / p.name
+        written = _build_mcp_json(p, (ref,), cfg, plugin_dir)
+        assert written == 1
+        data = json.loads((plugin_dir / ".mcp.json").read_text())
+        assert "anchored-fs" in data["mcpServers"]
+
+    def test_bundle_layout_missing_server_json_warns(self, tmp_path, capsys):
+        """Bundle dir with no server.json -> WARN, no crash on the dir read."""
+        cfg = _make_config(tmp_path, tmp_path / "dest")
+        spec = ComponentSpec("mcp", Path("base/mcp"), "mcp_either", "mcp")
+        bundle = tmp_path / "base" / "mcp" / "empty-bundle"
+        bundle.mkdir(parents=True)
+        ref = ResolvedRef(
+            spec=spec,
+            ref="empty-bundle",
+            source=bundle,
+            plugin_rel=Path("mcp/empty-bundle"),
+        )
+        p = _make_role_profile(mcp=("empty-bundle",))
+        _build_mcp_json(p, (ref,), cfg, tmp_path / "dest" / p.name)
+        err = capsys.readouterr().err
+        assert "unparseable" in err
+        assert "empty-bundle" in err
 
     def test_empty_set_removes_stale_file(self, tmp_path):
         cfg = _make_config(tmp_path, tmp_path / "dest")
@@ -734,9 +894,7 @@ class TestMcpAggregator:
 
     def test_idempotent_no_rewrite(self, tmp_path):
         cfg = _make_config(tmp_path, tmp_path / "dest")
-        ref = self._seed_mcp(
-            tmp_path, "ok", json.dumps({"alpha": {"command": "node"}})
-        )
+        ref = self._seed_mcp(tmp_path, "ok", json.dumps({"alpha": {"command": "node"}}))
         p = _make_role_profile(mcp=("ok",))
         plugin_dir = tmp_path / "dest" / p.name
         _build_mcp_json(p, (ref,), cfg, plugin_dir)
@@ -839,7 +997,11 @@ class TestClaudeBuilders:
         spec = ComponentSpec("agents", Path("base/agents"), "agents", "agents")
         f = tmp_path / "agent.md"
         f.write_text("body")
-        resolved = (ResolvedRef(spec=spec, ref="agent.md", source=f, plugin_rel=Path("agents/agent.md")),)
+        resolved = (
+            ResolvedRef(
+                spec=spec, ref="agent.md", source=f, plugin_rel=Path("agents/agent.md")
+            ),
+        )
         p = _make_role_profile()
         entry = _claude_plugin_entry(p, cfg, resolved)
         assert "agents" in entry
@@ -937,7 +1099,11 @@ class TestCodexBuilders:
         assert set(_CODEX_AUTH) == {"ON_INSTALL", "ON_USE"}
 
     def test_codex_installation_enum_matches_docs(self):
-        assert set(_CODEX_INSTALLATION) == {"AVAILABLE", "NOT_AVAILABLE", "INSTALLED_BY_DEFAULT"}
+        assert set(_CODEX_INSTALLATION) == {
+            "AVAILABLE",
+            "NOT_AVAILABLE",
+            "INSTALLED_BY_DEFAULT",
+        }
 
     def test_multi_profile_no_overwrite(self, tmp_path):
         cfg = _make_config(tmp_path, tmp_path / "dest")
@@ -979,7 +1145,9 @@ class TestGeminiBuilders:
         f = tmp_path / "tavily.json"
         f.write_text(json.dumps({"tavily": {"command": "node"}}))
         resolved = (
-            ResolvedRef(spec=spec, ref="tavily", source=f, plugin_rel=Path("mcp/tavily.json")),
+            ResolvedRef(
+                spec=spec, ref="tavily", source=f, plugin_rel=Path("mcp/tavily.json")
+            ),
         )
         p = _make_role_profile(mcp=("tavily",))
         m = _gemini_extension_manifest(p, cfg, resolved)
@@ -990,7 +1158,9 @@ class TestGeminiBuilders:
         f = tmp_path / "broken.json"
         f.write_text("not valid")
         resolved = (
-            ResolvedRef(spec=spec, ref="broken", source=f, plugin_rel=Path("mcp/broken.json")),
+            ResolvedRef(
+                spec=spec, ref="broken", source=f, plugin_rel=Path("mcp/broken.json")
+            ),
         )
         p = _make_role_profile(mcp=("broken",))
         _mcp_servers_block(p, resolved)
@@ -1032,10 +1202,33 @@ class _FakeProfileTOML:
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text(f"# {name}", encoding="utf-8")
 
-    def add_profile(self, name: str, skills=(), rules=()) -> Path:
+    def add_rule_stem(self, stem: str) -> None:
+        """Real convention: file is `<stem>.md`, profile refs the bare stem."""
+        (self.repo_root / "base" / "rules" / f"{stem}.md").write_text(
+            f"# {stem}", encoding="utf-8"
+        )
+
+    def add_hook(
+        self, stem: str, *, event: str = "PreToolUse", matcher: str = "Bash"
+    ) -> None:
+        """Real convention: file is `<stem>.sh`, profile refs the bare stem."""
+        (self.repo_root / "base" / "hooks" / f"{stem}.sh").write_text(
+            f"# PLAYBOOK-HOOK-EVENT: {event}\n# PLAYBOOK-HOOK-MATCHER: {matcher}\necho hi\n",
+            encoding="utf-8",
+        )
+
+    def add_profile(self, name: str, skills=(), rules=(), hooks=()) -> Path:
         pdir = self.repo_root / "profiles"
         pdir.mkdir(parents=True, exist_ok=True)
-        body_lines = [f'description = "Profile {name}"', "[skills]", f"include = {list(skills)}", "[rules]", f"include = {list(rules)}"]
+        body_lines = [
+            f'description = "Profile {name}"',
+            "[skills]",
+            f"include = {list(skills)}",
+            "[rules]",
+            f"include = {list(rules)}",
+            "[hooks]",
+            f"include = {list(hooks)}",
+        ]
         body = "\n".join(body_lines) + "\n"
         path = pdir / f"{name}.toml"
         path.write_text(body, encoding="utf-8")
@@ -1062,7 +1255,9 @@ class TestEmitterOrchestrator:
         dest = tmp_path / "dest"
         cfg = _make_config(f.repo_root, dest)
         emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
-        data = json.loads((dest / "backend" / ".claude-plugin" / "plugin.json").read_text())
+        data = json.loads(
+            (dest / "backend" / ".claude-plugin" / "plugin.json").read_text()
+        )
         assert data["name"] == "backend"
         assert data["author"]["name"] == "Rehan Fazal"
 
@@ -1071,7 +1266,9 @@ class TestEmitterOrchestrator:
         dest = tmp_path / "dest"
         cfg = _make_config(f.repo_root, dest)
         emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
-        data = json.loads((dest / "backend" / ".codex-plugin" / "plugin.json").read_text())
+        data = json.loads(
+            (dest / "backend" / ".codex-plugin" / "plugin.json").read_text()
+        )
         assert "policy" not in data
 
     def test_emit_writes_gemini_extension_without_author(self, tmp_path):
@@ -1087,7 +1284,11 @@ class TestEmitterOrchestrator:
         dest = tmp_path / "dest"
         cfg = _make_config(f.repo_root, dest)
         emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
-        for rel in (".claude-plugin/marketplace.json", ".cursor-plugin/marketplace.json", ".codex-plugin/marketplace.json"):
+        for rel in (
+            ".claude-plugin/marketplace.json",
+            ".cursor-plugin/marketplace.json",
+            ".codex-plugin/marketplace.json",
+        ):
             assert (dest / rel).exists(), rel
 
     def test_emit_claude_marketplace_uses_bare_string_source(self, tmp_path):
@@ -1129,7 +1330,9 @@ class TestEmitterOrchestrator:
         dest = tmp_path / "dest"
         cfg = _make_config(f.repo_root, dest)
         emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
-        first_run = emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
+        first_run = emit(
+            cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl"
+        )
         assert first_run == 0  # second run writes nothing.
 
     def test_emit_dry_run_creates_nothing(self, tmp_path):
@@ -1144,7 +1347,9 @@ class TestEmitterOrchestrator:
         dest = tmp_path / "dest"
         cfg = _make_config(f.repo_root, dest)
         emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
-        sidecar = json.loads((dest / "backend" / ".claude-plugin" / "emitted-by.json").read_text())
+        sidecar = json.loads(
+            (dest / "backend" / ".claude-plugin" / "emitted-by.json").read_text()
+        )
         assert sidecar == {"tool": "marketplace", "version": "0.11.0"}
 
     def test_emit_per_plugin_readme(self, tmp_path):
@@ -1160,7 +1365,11 @@ class TestEmitterOrchestrator:
         f = self._fixture(tmp_path)
         cfg = _make_config(f.repo_root, tmp_path / "dest")
         with pytest.raises(ReservedNameError):
-            emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="anthropic-plugins")
+            emit(
+                cfg,
+                profiles_dir=f.repo_root / "profiles",
+                catalog_name="anthropic-plugins",
+            )
 
     def test_emit_invalid_catalog_slug_raises(self, tmp_path):
         f = self._fixture(tmp_path)
@@ -1184,27 +1393,42 @@ class TestEmitterOrchestrator:
     def test_main_returns_zero_on_success(self, tmp_path, capsys):
         f = self._fixture(tmp_path)
         dest = tmp_path / "dest"
-        rc = main([
-            "--repo-root", str(f.repo_root),
-            "--dest-root", str(dest),
-            "--profiles-dir", str(f.repo_root / "profiles"),
-            "--catalog-name", "rhnfzl",
-            "--author-name", "Rehan Fazal",
-            "--tool-version", "0.11.0",
-        ])
+        rc = main(
+            [
+                "--repo-root",
+                str(f.repo_root),
+                "--dest-root",
+                str(dest),
+                "--profiles-dir",
+                str(f.repo_root / "profiles"),
+                "--catalog-name",
+                "rhnfzl",
+                "--author-name",
+                "Rehan Fazal",
+                "--tool-version",
+                "0.11.0",
+            ]
+        )
         assert rc == 0
         assert "emit complete" in capsys.readouterr().out
 
-    def test_main_propagates_emit_error_exit_code(self, tmp_path, capsys):
+    def test_main_propagates_emit_error_exit_code(self, tmp_path):
         f = self._fixture(tmp_path)
         dest = tmp_path / "dest"
-        rc = main([
-            "--repo-root", str(f.repo_root),
-            "--dest-root", str(dest),
-            "--profiles-dir", str(f.repo_root / "profiles"),
-            "--catalog-name", "anthropic-plugins",
-            "--author-name", "Rehan Fazal",
-        ])
+        rc = main(
+            [
+                "--repo-root",
+                str(f.repo_root),
+                "--dest-root",
+                str(dest),
+                "--profiles-dir",
+                str(f.repo_root / "profiles"),
+                "--catalog-name",
+                "anthropic-plugins",
+                "--author-name",
+                "Rehan Fazal",
+            ]
+        )
         assert rc == 5  # ReservedNameError exit code
 
     def test_emitter_plugin_writes_table_isolated_per_platform(self):
@@ -1242,6 +1466,7 @@ class TestEmitterOrchestrator:
         dest = tmp_path / "dest"
         cfg = _make_config(f.repo_root, dest)
         from marketplace.profile_loader import _load_profiles
+
         profiles = _load_profiles(f.repo_root / "profiles", catalog_name="rhnfzl")
         backend = next(p for p in profiles if p.name == "backend")
         files, resolved = _emit_plugin_directory(backend, cfg)
@@ -1253,9 +1478,12 @@ class TestEmitterOrchestrator:
         dest = tmp_path / "dest"
         cfg = _make_config(f.repo_root, dest)
         from marketplace.profile_loader import _load_profiles
+
         profiles = _load_profiles(f.repo_root / "profiles", catalog_name="rhnfzl")
         resolved_by_profile = {p.name: () for p in profiles}
-        files = _emit_marketplace_manifests(profiles, cfg, resolved_by_profile, "rhnfzl")
+        files = _emit_marketplace_manifests(
+            profiles, cfg, resolved_by_profile, "rhnfzl"
+        )
         # 3 vendors -> at most 3 writes.
         assert files <= 3
 
@@ -1270,7 +1498,11 @@ class TestEmitterOrchestrator:
         dest = tmp_path / "dest"
         cfg = _make_config(f.repo_root, dest)
         emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
-        for rel in (".claude-plugin/marketplace.json", ".cursor-plugin/marketplace.json", ".codex-plugin/marketplace.json"):
+        for rel in (
+            ".claude-plugin/marketplace.json",
+            ".cursor-plugin/marketplace.json",
+            ".codex-plugin/marketplace.json",
+        ):
             data = json.loads((dest / rel).read_text())
             names = sorted(p["name"] for p in data["plugins"])
             assert names == ["_all", "alpha", "beta", "gamma"], rel
@@ -1284,3 +1516,53 @@ class TestEmitterOrchestrator:
         # Owner is the person, not the catalog handle.
         assert data["owner"]["name"] == "Rehan Fazal"
         assert data["owner"]["name"] != "rhnfzl"
+
+    def test_emit_bare_stem_hook_and_rule_end_to_end(self, tmp_path):
+        """Regression: profiles reference hooks + rules by bare stem; files on
+        disk carry .sh / .md. Both MUST materialize and hooks.json MUST point
+        at the .sh filename. Guards the bug where every hook + rule was
+        silently dropped because the resolver did a literal path check."""
+        f = _FakeProfileTOML(tmp_path / "repo")
+        f.add_skill("alpha")
+        f.add_rule_stem("no-em-dashes")
+        f.add_hook("lint-guard", event="PreToolUse", matcher="Bash")
+        f.add_profile(
+            "backend",
+            skills=["alpha"],
+            rules=["no-em-dashes"],
+            hooks=["lint-guard"],
+        )
+        dest = tmp_path / "dest"
+        cfg = _make_config(f.repo_root, dest)
+        emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
+
+        # Rule materialized with its .md extension.
+        assert (dest / "backend" / "rules" / "no-em-dashes.md").exists()
+        # Hook script materialized with its .sh extension.
+        assert (dest / "backend" / "hooks" / "lint-guard.sh").exists()
+        # hooks.json emitted and the command points at the .sh filename,
+        # not the bare ref.
+        hooks_json = json.loads(
+            (dest / "backend" / "hooks" / "hooks.json").read_text(encoding="utf-8")
+        )
+        cmd = hooks_json["hooks"]["PreToolUse"][0]["command"]
+        assert cmd == "${PLUGIN_ROOT}/hooks/lint-guard.sh"
+
+    def test_emit_bare_stem_refs_produce_no_warnings(self, tmp_path, capsys):
+        """The bare-stem hook + rule refs must resolve cleanly (no WARN noise
+        on stderr) now that the suffix fallback is in place."""
+        f = _FakeProfileTOML(tmp_path / "repo")
+        f.add_skill("alpha")
+        f.add_rule_stem("writing-style")
+        f.add_hook("never-push-to-develop")
+        f.add_profile(
+            "backend",
+            skills=["alpha"],
+            rules=["writing-style"],
+            hooks=["never-push-to-develop"],
+        )
+        dest = tmp_path / "dest"
+        cfg = _make_config(f.repo_root, dest)
+        emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
+        err = capsys.readouterr().err
+        assert "missing on disk" not in err

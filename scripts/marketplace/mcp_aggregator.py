@@ -29,11 +29,17 @@ def _build_mcp_json(
 
     servers: dict[str, object] = {}
     for entry in mcp_entries:
+        # Flat layout: entry.source is `<name>.json`. Bundle layout:
+        # entry.source is a directory whose config lives at `server.json`
+        # (mirrors gemini._mcp_servers_block).
+        source_json = (
+            entry.source / "server.json" if entry.source.is_dir() else entry.source
+        )
         try:
-            data = json.loads(entry.source.read_text(encoding="utf-8"))
+            data = json.loads(source_json.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             _stderr(
-                f"WARN: profile '{profile.name}' mcp '{entry.ref}' at {entry.source} "
+                f"WARN: profile '{profile.name}' mcp '{entry.ref}' at {source_json} "
                 f"unparseable ({type(exc).__name__}); drop the ref or fix the JSON"
             )
             continue
