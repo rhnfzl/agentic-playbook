@@ -282,6 +282,50 @@ class TestRefTraversalGuard:
         assert _resolve_source(spec, "/etc/passwd", tmp_path) is None
 
 
+class TestSymlinkSourceEscape:
+    """SECURITY: a committed symlink under base/<kind> whose target resolves
+    OUTSIDE the repo must not be followed and materialized (shutil.copy2
+    follows symlinks). In-repo symlinks (ADR-0035 hooks cross base/hooks ->
+    base/skills) MUST still resolve. Reproduces the adversarial finding."""
+
+    def test_in_repo_symlink_still_resolves(self, tmp_path):
+        repo = tmp_path / "repo"
+        _seed_base_dirs(repo)
+        # ADR-0035 shape: base/hooks/X.sh -> base/skills/.../hooks/X.sh
+        real = repo / "base" / "skills" / "meta" / "demo" / "hooks"
+        real.mkdir(parents=True)
+        real_file = real / "demo.sh"
+        real_file.write_text("# PLAYBOOK-HOOK-EVENT: Stop\n", encoding="utf-8")
+        link = repo / "base" / "hooks" / "demo.sh"
+        link.symlink_to(real_file)
+        spec = ComponentSpec("hooks", Path("base/hooks"), "hooks", "hooks")
+        resolved = _resolve_source(spec, "demo", repo)
+        assert resolved is not None  # in-repo cross-subtree symlink is allowed
+
+    def test_out_of_repo_symlink_is_rejected(self, tmp_path):
+        repo = tmp_path / "repo"
+        _seed_base_dirs(repo)
+        outside = tmp_path / "outside-secret.md"
+        outside.write_text("UNSCRUBBED_SECRET", encoding="utf-8")
+        link = repo / "base" / "rules" / "evil.md"
+        link.symlink_to(outside)  # symlink inside base/ -> outside the repo
+        spec = ComponentSpec("rules", Path("base/rules"), "rules", "rules")
+        # exists() is True (target exists) but it escapes the repo -> rejected.
+        assert _resolve_source(spec, "evil", repo) is None
+
+    def test_out_of_repo_symlink_not_materialized_end_to_end(self, tmp_path):
+        repo = tmp_path / "repo"
+        _seed_base_dirs(repo)
+        outside = tmp_path / "outside-secret.md"
+        outside.write_text("UNSCRUBBED_SECRET", encoding="utf-8")
+        (repo / "base" / "rules" / "evil.md").symlink_to(outside)
+        p = _make_role_profile(rules=("evil",))
+        cfg = _make_config(repo, tmp_path / "dest")
+        resolved, warnings = _resolve_profile(p, cfg)
+        assert resolved == ()  # never resolved -> never copied
+        assert warnings
+
+
 class TestSuffixFallbackParity:
     """Insurance against the recurring drop-bug (fixed in the bare-stem
     commit): _SUFFIX_FALLBACKS must stay aligned with the globs the

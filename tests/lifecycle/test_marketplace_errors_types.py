@@ -294,6 +294,15 @@ class TestProfileLoader:
         with pytest.raises(ReservedNameError):
             _load_profiles(pdir, catalog_name="anthropic-plugins")
 
+    def test_role_profile_named_all_profiles_collides(self, tmp_path):
+        # A role profile may not reuse the synthetic aggregate name; it would
+        # collide with the all-profiles entry in every emitted catalog.
+        pdir = tmp_path / "profiles"
+        _seed_profile_toml(pdir, "alpha", 'description = "A"\n')
+        _seed_profile_toml(pdir, "all-profiles", 'description = "collision"\n')
+        with pytest.raises(ProfileLoadError, match="collides"):
+            _load_profiles(pdir, catalog_name="rhnfzl")
+
 
 # ===================================================================
 # Content ops

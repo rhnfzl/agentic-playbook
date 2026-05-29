@@ -84,9 +84,25 @@ def _ref_escapes_source_dir(ref: str) -> bool:
     return ref_path.is_absolute() or ".." in ref_path.parts
 
 
+def _resolves_within_repo(path: Path, repo_root: Path) -> bool:
+    """True if `path`'s real (symlink-followed) target stays inside repo_root.
+
+    SECURITY: a candidate may be a symlink. `shutil.copy2` follows symlinks,
+    so a committed symlink under base/ pointing OUTSIDE the repo would copy
+    out-of-tree (unscrubbed) content into the public plugin dirs. We bound to
+    repo_root, NOT to spec.source_dir, because the legitimate ADR-0035 hook
+    symlinks deliberately cross subtrees (base/hooks/<x>.sh ->
+    base/skills/<cat>/<name>/hooks/<x>.sh) yet stay inside the repo.
+    """
+    try:
+        return path.resolve().is_relative_to(repo_root.resolve())
+    except (OSError, ValueError):
+        return False
+
+
 def _resolve_source(spec: ComponentSpec, ref: str, repo_root: Path) -> Path | None:
     """Resolve a profile ref to its source path on disk, or None if absent
-    or if the ref escapes the content root.
+    or if the ref / its symlink target escapes the repo.
 
     Tries the bare ref first (directory-style content such as skills, and
     bundle-style MCP servers). Falls back to the extension(s) the canonical
@@ -95,11 +111,11 @@ def _resolve_source(spec: ComponentSpec, ref: str, repo_root: Path) -> Path | No
     if _ref_escapes_source_dir(ref):
         return None
     base = repo_root / spec.source_dir / ref
-    if base.exists():
+    if base.exists() and _resolves_within_repo(base, repo_root):
         return base
     for suffix in _SUFFIX_FALLBACKS.get(spec.kind, ()):
         alt = repo_root / spec.source_dir / f"{ref}{suffix}"
-        if alt.exists():
+        if alt.exists() and _resolves_within_repo(alt, repo_root):
             return alt
     return None
 

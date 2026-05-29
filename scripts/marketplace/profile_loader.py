@@ -85,16 +85,21 @@ def _load_profile(path: Path, *, catalog_name: str) -> RoleProfile:
     )
 
 
+# The synthetic aggregate profile's name. Must be a valid installable slug:
+# it becomes a plugin name in the Claude / Cursor / Codex catalogs, and `_all`
+# (leading underscore) fails both this package's _validate_slug and Codex's
+# hyphen-case requirement. A role profile may not reuse this name (it would
+# collide with the synthetic entry in every emitted catalog).
+META_PROFILE_NAME = "all-profiles"
+
+
 def _build_meta_profile(
     members: tuple[RoleProfile, ...], *, catalog_name: str
 ) -> MetaProfile:
     if not members:
         raise ProfileLoadError("cannot build meta profile from empty members tuple")
-    # Name must be a valid installable slug: it becomes a plugin name in the
-    # Claude / Cursor / Codex catalogs, and `_all` (leading underscore) fails
-    # both this package's _validate_slug and Codex's hyphen-case requirement.
     return MetaProfile(
-        name="all-profiles",
+        name=META_PROFILE_NAME,
         catalog_name=catalog_name,
         description=f"Aggregate of all role profiles in the {catalog_name} catalog",
         members=members,
@@ -116,5 +121,10 @@ def _load_profiles(profiles_dir: Path, *, catalog_name: str) -> tuple[Profile, .
     )
     if not role_profiles:
         raise ProfileLoadError(f"no profile TOML files found under {profiles_dir}")
+    if any(rp.name == META_PROFILE_NAME for rp in role_profiles):
+        raise ProfileLoadError(
+            f"a role profile named '{META_PROFILE_NAME}' collides with the "
+            "synthetic aggregate profile; rename the role profile TOML"
+        )
     meta = _build_meta_profile(role_profiles, catalog_name=catalog_name)
     return role_profiles + (meta,)
