@@ -9,7 +9,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from marketplace import EmitterConfig, TOOL_VERSION, emit
+from marketplace import EmitError, EmitterConfig, TOOL_VERSION, emit
+
+# Re-export under a facade-local name so sync_distribution.py can catch
+# emit-time safety failures (and preserve the declared exit code) without
+# importing from the marketplace package directly.
+MarketplaceEmitError = EmitError
+
+__all__ = ["MarketplaceEmitError", "emitter_tool_version", "run_marketplace_emit"]
 
 
 class _ManifestLike(Protocol):

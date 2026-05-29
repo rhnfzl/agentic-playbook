@@ -25,11 +25,19 @@ def _claude_plugin_manifest(profile: Profile, config: EmitterConfig) -> dict:
 
 
 def _agent_relpaths(resolved: tuple[ResolvedRef, ...]) -> list[str]:
-    return sorted(
-        f"agents/{r.ref}" if r.source.is_file() else f"agents/{r.ref}/agent.md"
-        for r in resolved
-        if r.spec.kind == "agents"
-    )
+    # Use the MATERIALIZED path (plugin_rel), not the bare ref. A file
+    # agent referenced by stem `scout` materializes to `agents/scout.md`;
+    # emitting `agents/scout` would point the manifest at a path that does
+    # not exist. Directory-style agents expose their entry at `agent.md`.
+    paths: list[str] = []
+    for r in resolved:
+        if r.spec.kind != "agents":
+            continue
+        if r.source.is_file():
+            paths.append(r.plugin_rel.as_posix())
+        else:
+            paths.append(f"{r.plugin_rel.as_posix()}/agent.md")
+    return sorted(paths)
 
 
 def _claude_plugin_entry(

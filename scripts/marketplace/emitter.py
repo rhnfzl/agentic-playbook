@@ -42,10 +42,16 @@ _PLUGIN_MANIFEST_WRITES: tuple[tuple[str, _PluginManifestBuilder], ...] = (
     (".codex-plugin/plugin.json", _codex_plugin_manifest),
 )
 
+# Catalog (marketplace.json) destinations per vendor. Codex discovers a
+# repo-local marketplace at `.agents/plugins/marketplace.json` (and falls
+# back to `.claude-plugin/marketplace.json`); it does NOT read
+# `.codex-plugin/marketplace.json`, so the Codex catalog goes to the
+# `.agents/plugins/` location per ADR-0043 + the Codex plugin spec. The
+# per-plugin Codex manifest stays at `.codex-plugin/plugin.json`.
 _MARKETPLACE_WRITES: tuple[tuple[str, Callable[..., dict]], ...] = (
     (".claude-plugin/marketplace.json", _claude_marketplace_manifest),
     (".cursor-plugin/marketplace.json", _cursor_marketplace_manifest),
-    (".codex-plugin/marketplace.json", _codex_marketplace_manifest),
+    (".agents/plugins/marketplace.json", _codex_marketplace_manifest),
 )
 
 

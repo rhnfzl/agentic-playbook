@@ -25,12 +25,19 @@ def _build_hooks_json(
     config: EmitterConfig,
     plugin_dir: Path,
 ) -> int:
-    hook_entries = [r for r in resolved if r.spec.kind == "hooks"]
-    if not hook_entries:
-        out = plugin_dir / "hooks" / "hooks.json"
+    out = plugin_dir / "hooks" / "hooks.json"
+
+    def _drop_stale() -> int:
+        # Remove any previously-emitted hooks.json so a rejected source
+        # cannot leave a stale command installed (stale cleanup protects
+        # hooks.json by name, so it will not be removed otherwise).
         if out.exists() and not config.dry_run:
             out.unlink()
         return 0
+
+    hook_entries = [r for r in resolved if r.spec.kind == "hooks"]
+    if not hook_entries:
+        return _drop_stale()
 
     hooks_by_event: dict[str, list[dict[str, str]]] = {}
     for entry in hook_entries:
@@ -65,10 +72,12 @@ def _build_hooks_json(
         hooks_by_event.setdefault(event, []).append(cmd)
 
     if not hooks_by_event:
-        return 0
+        # Hook refs were present but every one was unreadable or missing
+        # its event header. Drop any stale hooks.json instead of leaving
+        # the previous (now-rejected) commands installed.
+        return _drop_stale()
 
     payload = {"hooks": hooks_by_event}
-    out = plugin_dir / "hooks" / "hooks.json"
     text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     if config.dry_run:
         return 0

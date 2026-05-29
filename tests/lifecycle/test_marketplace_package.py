@@ -798,6 +798,26 @@ class TestHookAggregator:
         _build_hooks_json(p, (), cfg, plugin_dir)
         assert not (plugin_dir / "hooks" / "hooks.json").exists()
 
+    def test_all_hooks_invalid_drops_stale_hooks_json(self, tmp_path, capsys):
+        """Regression: hook refs present but every one is rejected (no
+        PLAYBOOK-HOOK-EVENT header) must DELETE a previously-emitted
+        hooks.json, not leave the stale (now-rejected) command installed.
+        """
+        cfg = _make_config(tmp_path, tmp_path / "dest")
+        plugin_dir = tmp_path / "dest" / "backend-developer"
+        (plugin_dir / "hooks").mkdir(parents=True)
+        # A previously-valid hooks.json is already installed.
+        (plugin_dir / "hooks" / "hooks.json").write_text(
+            '{"hooks": {"PreToolUse": [{"command": "stale"}]}}', encoding="utf-8"
+        )
+        # Current source: a hook ref that resolves but lacks the event header.
+        ref = self._seed_hook(tmp_path, "headerless.sh", "echo no header\n")
+        p = _make_role_profile(hooks=("headerless.sh",))
+        _build_hooks_json(p, (ref,), cfg, plugin_dir)
+        assert "no PLAYBOOK-HOOK-EVENT header" in capsys.readouterr().err
+        # The stale command must be gone.
+        assert not (plugin_dir / "hooks" / "hooks.json").exists()
+
 
 # ===================================================================
 # MCP aggregator
@@ -1006,6 +1026,38 @@ class TestClaudeBuilders:
         entry = _claude_plugin_entry(p, cfg, resolved)
         assert "agents" in entry
         assert isinstance(entry["agents"], list)
+
+    def test_agent_file_uses_materialized_md_path(self, tmp_path):
+        """Regression: a file agent referenced by bare stem `scout`
+        materializes to agents/scout.md; the manifest agents entry must be
+        `agents/scout.md`, not `agents/scout` (which would not exist)."""
+        cfg = _make_config(tmp_path, tmp_path / "dest")
+        spec = ComponentSpec("agents", Path("base/agents"), "agents", "agents")
+        f = tmp_path / "scout.md"
+        f.write_text("body")
+        resolved = (
+            ResolvedRef(
+                spec=spec, ref="scout", source=f, plugin_rel=Path("agents/scout.md")
+            ),
+        )
+        p = _make_role_profile()
+        entry = _claude_plugin_entry(p, cfg, resolved)
+        assert entry["agents"] == ["agents/scout.md"]
+
+    def test_agent_dir_uses_agent_md_entry(self, tmp_path):
+        """A directory-style agent exposes its entry at agent.md."""
+        cfg = _make_config(tmp_path, tmp_path / "dest")
+        spec = ComponentSpec("agents", Path("base/agents"), "agents", "agents")
+        d = tmp_path / "scout"
+        d.mkdir()
+        resolved = (
+            ResolvedRef(
+                spec=spec, ref="scout", source=d, plugin_rel=Path("agents/scout")
+            ),
+        )
+        p = _make_role_profile()
+        entry = _claude_plugin_entry(p, cfg, resolved)
+        assert entry["agents"] == ["agents/scout/agent.md"]
 
     def test_multi_profile_no_overwrite(self, tmp_path):
         cfg = _make_config(tmp_path, tmp_path / "dest")
@@ -1287,9 +1339,21 @@ class TestEmitterOrchestrator:
         for rel in (
             ".claude-plugin/marketplace.json",
             ".cursor-plugin/marketplace.json",
-            ".codex-plugin/marketplace.json",
+            ".agents/plugins/marketplace.json",
         ):
             assert (dest / rel).exists(), rel
+
+    def test_codex_marketplace_at_agents_plugins_not_codex_plugin(self, tmp_path):
+        """Regression: Codex discovers repo-local catalogs at
+        .agents/plugins/marketplace.json, NOT .codex-plugin/marketplace.json."""
+        f = self._fixture(tmp_path)
+        dest = tmp_path / "dest"
+        cfg = _make_config(f.repo_root, dest)
+        emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
+        assert (dest / ".agents" / "plugins" / "marketplace.json").exists()
+        assert not (dest / ".codex-plugin" / "marketplace.json").exists()
+        # The per-plugin Codex manifest still lives under .codex-plugin/.
+        assert (dest / "backend" / ".codex-plugin" / "plugin.json").exists()
 
     def test_emit_claude_marketplace_uses_bare_string_source(self, tmp_path):
         f = self._fixture(tmp_path)
@@ -1307,7 +1371,9 @@ class TestEmitterOrchestrator:
         dest = tmp_path / "dest"
         cfg = _make_config(f.repo_root, dest)
         emit(cfg, profiles_dir=f.repo_root / "profiles", catalog_name="rhnfzl")
-        data = json.loads((dest / ".codex-plugin" / "marketplace.json").read_text())
+        data = json.loads(
+            (dest / ".agents" / "plugins" / "marketplace.json").read_text()
+        )
         sources = {p["name"]: p["source"] for p in data["plugins"]}
         assert sources["backend"] == {"source": "local", "path": "./backend"}
 
@@ -1501,7 +1567,7 @@ class TestEmitterOrchestrator:
         for rel in (
             ".claude-plugin/marketplace.json",
             ".cursor-plugin/marketplace.json",
-            ".codex-plugin/marketplace.json",
+            ".agents/plugins/marketplace.json",
         ):
             data = json.loads((dest / rel).read_text())
             names = sorted(p["name"] for p in data["plugins"])

@@ -1,9 +1,11 @@
-"""Contract tests for scripts/marketplace_config.py.
+"""Contract tests for scripts/marketplace_config.py + the sync integration.
 
 The facade exists so sync_distribution.py can call marketplace emit
 without importing from the marketplace package directly. Tests pin
-the facade's composition of EmitterConfig (every field hand-mapped)
-and the propagation of dry_run + the emit() return value.
+the facade's composition of EmitterConfig (every field hand-mapped),
+the propagation of dry_run + the emit() return value, the re-exported
+safety-exception contract, and the sync integration's read-from-scrubbed-
+destination + exit-code-preservation behavior.
 """
 
 from __future__ import annotations
@@ -11,8 +13,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from marketplace import TOOL_VERSION
-from marketplace_config import emitter_tool_version, run_marketplace_emit
+import pytest
+
+import sync_distribution
+from marketplace import EmitError, ReservedNameError, TOOL_VERSION
+from marketplace_config import (
+    MarketplaceEmitError,
+    emitter_tool_version,
+    run_marketplace_emit,
+)
 
 
 @dataclass
@@ -136,3 +145,88 @@ class TestRunMarketplaceEmit:
         )
         # No per-profile version override, no default in TOML -> default_profile_version wins.
         assert plugin_json["version"] == "0.5.0"
+
+
+class TestSafetyExceptionReexport:
+    def test_marketplace_emit_error_is_emit_error(self):
+        """The facade re-exports the package's EmitError so callers can
+        catch emit-time safety failures without importing the package."""
+        assert MarketplaceEmitError is EmitError
+
+    def test_run_marketplace_emit_propagates_reserved_name(self, tmp_path):
+        """A reserved catalog name raises a MarketplaceEmitError carrying
+        the declared exit code (5)."""
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        profiles_dir = _seed_minimal_playbook(repo_root)
+        manifest = _FakeManifest(
+            repo_root=repo_root,
+            destination=tmp_path / "dest",
+            catalog_name="anthropic-plugins",  # reserved
+            author_name="Rehan Fazal",
+            author_email=None,
+            profiles_dir=profiles_dir,
+            default_profile_version=None,
+        )
+        with pytest.raises(MarketplaceEmitError) as excinfo:
+            run_marketplace_emit(manifest, dry_run=False)
+        assert isinstance(excinfo.value, ReservedNameError)
+        assert excinfo.value.exit_code == 5
+
+
+def _make_marketplace_manifest(dest: Path, **overrides) -> sync_distribution.Manifest:
+    """Build a sync Manifest with the [marketplace] block populated."""
+    fields = {
+        "destination_path": dest,
+        "require_clean_git": False,
+        "allowlist": ["base/", "profiles/"],
+        "denylist": [],
+        "scrubs": [],
+        "marketplace_catalog_name": "rhnfzl",
+        "marketplace_author_name": "Rehan Fazal",
+        "marketplace_author_email": None,
+        "marketplace_profiles_dir": "profiles/",
+        "marketplace_default_profile_version": None,
+    }
+    fields.update(overrides)
+    return sync_distribution.Manifest(**fields)
+
+
+class TestSyncIntegration:
+    def test_emit_reads_from_scrubbed_destination_not_source(self, tmp_path):
+        """P1 scrub-safety: the emitter reads profiles + base content from
+        the DESTINATION (already scrubbed), never from the source. We seed
+        ONLY the destination; if the integration read from anywhere else it
+        would find nothing and emit zero plugin dirs."""
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        _seed_minimal_playbook(dest)  # scrubbed tree lives at the destination
+        manifest = _make_marketplace_manifest(dest)
+        written = sync_distribution._maybe_run_marketplace_emit(manifest, dry_run=False)
+        assert written is not None and written > 0
+        # Emitted from the destination's own (scrubbed) content.
+        assert (dest / "backend" / "skills" / "alpha" / "SKILL.md").exists()
+        assert (dest / ".claude-plugin" / "marketplace.json").exists()
+
+    def test_absent_marketplace_block_returns_none(self, tmp_path):
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        manifest = _make_marketplace_manifest(dest, marketplace_catalog_name=None)
+        assert (
+            sync_distribution._maybe_run_marketplace_emit(manifest, dry_run=False)
+            is None
+        )
+
+    def test_reserved_name_raises_systemexit_with_code_5(self, tmp_path):
+        """P5 exit-code preservation: an EmitError (reserved catalog name)
+        surfaces as SystemExit(5), not the generic exit 3, so the scheduled
+        wrapper can distinguish a marketplace safety failure from IO error."""
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        _seed_minimal_playbook(dest)
+        manifest = _make_marketplace_manifest(
+            dest, marketplace_catalog_name="anthropic-plugins"
+        )
+        with pytest.raises(SystemExit) as excinfo:
+            sync_distribution._maybe_run_marketplace_emit(manifest, dry_run=False)
+        assert excinfo.value.code == 5

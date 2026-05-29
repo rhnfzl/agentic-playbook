@@ -908,7 +908,7 @@ def run_distribution(args: argparse.Namespace) -> int:
     else:
         audit_written = False
 
-    marketplace_files = _maybe_run_marketplace_emit(manifest, source_root, args.dry_run)
+    marketplace_files = _maybe_run_marketplace_emit(manifest, args.dry_run)
 
     print(f"Source commit: {source_sha} ({source_branch})")
     print(f"Destination:   {destination}")
@@ -927,12 +927,19 @@ def run_distribution(args: argparse.Namespace) -> int:
     return 0
 
 
-def _maybe_run_marketplace_emit(
-    manifest: Manifest, source_root: Path, dry_run: bool
-) -> int | None:
+def _maybe_run_marketplace_emit(manifest: Manifest, dry_run: bool) -> int | None:
     """If the manifest declares a [marketplace] block, invoke the emitter
-    facade after the content sync completes. Returns the file-write
-    count, or None when the block is absent."""
+    facade after the content sync completes. Returns the file-write count,
+    or None when the block is absent.
+
+    SECURITY (ADR-0042 scrub contract): the emitter reads BOTH profiles and
+    base content from the DESTINATION tree, which this run has already
+    scrubbed + allowlist/denylist filtered. Reading from the source would
+    copy unscrubbed skills/rules/hooks/profiles straight into the public
+    plugin directories, bypassing the scrub layer. The operator must
+    therefore include `profiles/` (and `base/`) in [sources].allowlist so
+    the scrubbed copies exist at the destination before this step runs.
+    """
     if not (
         manifest.marketplace_catalog_name
         and manifest.marketplace_author_name
@@ -940,22 +947,30 @@ def _maybe_run_marketplace_emit(
     ):
         return None
 
+    dest = manifest.destination_path
+
     class _MarketplaceManifestAdapter:
-        def __init__(self, m: Manifest, repo_root: Path):
-            self.repo_root = repo_root
-            self.destination = m.destination_path
+        def __init__(self, m: Manifest) -> None:
+            # repo_root == destination: read the SCRUBBED tree, not source.
+            self.repo_root = dest
+            self.destination = dest
             self.catalog_name = m.marketplace_catalog_name or ""
             self.author_name = m.marketplace_author_name or ""
             self.author_email = m.marketplace_author_email
-            self.profiles_dir = (
-                repo_root / (m.marketplace_profiles_dir or "")
-            ).resolve()
+            self.profiles_dir = (dest / (m.marketplace_profiles_dir or "")).resolve()
             self.default_profile_version = m.marketplace_default_profile_version
 
-    from marketplace_config import run_marketplace_emit
+    from marketplace_config import MarketplaceEmitError, run_marketplace_emit
 
-    adapter = _MarketplaceManifestAdapter(manifest, source_root)
-    return run_marketplace_emit(adapter, dry_run=dry_run)
+    adapter = _MarketplaceManifestAdapter(manifest)
+    try:
+        return run_marketplace_emit(adapter, dry_run=dry_run)
+    except MarketplaceEmitError as exc:
+        # Preserve the emitter's declared exit code (5 = safety failure:
+        # reserved name, slug, path-safety, materialize) so the scheduled
+        # wrapper can distinguish it from a generic IO error (3).
+        _stderr(f"marketplace emit failed: {exc}")
+        raise SystemExit(exc.exit_code) from exc
 
 
 def run_memory(args: argparse.Namespace) -> int:

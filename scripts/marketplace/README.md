@@ -41,7 +41,7 @@ Re-running emit on an unchanged source produces zero new writes. `_write_if_chan
 
 ## Idempotency edge case: multi-profile root manifests
 
-The root-level catalog manifests (`.claude-plugin/marketplace.json`, `.cursor-plugin/marketplace.json`, `.codex-plugin/marketplace.json`) are written ONCE in `_emit_marketplace_manifests` after the per-profile loop, with the FULL profile tuple. Writing them inside the per-profile loop would let later profiles overwrite earlier ones; the post-loop write is load-bearing.
+The root-level catalog manifests (`.claude-plugin/marketplace.json`, `.cursor-plugin/marketplace.json`, and `.agents/plugins/marketplace.json` for Codex) are written ONCE in `_emit_marketplace_manifests` after the per-profile loop, with the FULL profile tuple. Writing them inside the per-profile loop would let later profiles overwrite earlier ones; the post-loop write is load-bearing. (Codex discovers repo-local catalogs at `.agents/plugins/marketplace.json`, not `.codex-plugin/`.)
 
 ## Extension recipe: add a new content type
 

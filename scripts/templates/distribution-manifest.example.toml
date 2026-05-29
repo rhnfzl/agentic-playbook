@@ -136,11 +136,18 @@ patterns = [
 # real name). It is distinct from catalog_name and goes into emitted
 # manifest `author{}` / `owner{}` blocks. Mixing the two is a bug the
 # emitter is designed to prevent.
+#
+# IMPORTANT (scrub safety): the emitter reads profiles + base content from
+# the DESTINATION tree, which this run has already scrubbed. For that to
+# work you MUST include `profiles/` and `base/` in [sources].allowlist
+# above, so their scrubbed copies exist at the destination before the
+# marketplace step runs. If `profiles_dir` is not present at the
+# destination the emit fails fast rather than shipping unscrubbed content.
 [marketplace]
 # catalog_name = "<your-catalog-handle>"
 # author_name = "<Your Name>"
 # author_email = "you@example.com"   # optional
-# profiles_dir = "profiles/"
+# profiles_dir = "profiles/"          # relative to the destination root
 # default_profile_version = "0.1.0"   # optional; per-profile override wins
 
 
