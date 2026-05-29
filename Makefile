@@ -129,8 +129,13 @@ init:
 	@if [ -z "$(TARGET)" ]; then echo "Usage: make init TARGET=/path/to/project"; exit 1; fi
 	@$(PYTHON) scripts/playbook_init.py --target "$(TARGET)"
 
+# PYRIGHT_PYTHON_FORCE_VERSION pins the pyright engine the pyright-zero
+# gate downloads. The PyPI `pyright` wrapper bundles an engine that lags
+# npm; the lagging engine mis-resolves modern pytest (9.x) and emits dozens
+# of false-positive "unknown attribute of module pytest" warnings. Pin a
+# floor that resolves current pytest; operators can override via the env.
 check:
-	@$(PYTHON) scripts/check.py
+	@PYRIGHT_PYTHON_FORCE_VERSION="$${PYRIGHT_PYTHON_FORCE_VERSION:-1.1.410}" $(PYTHON) scripts/check.py
 
 eval:
 	@$(PYTHON) scripts/eval_runner.py

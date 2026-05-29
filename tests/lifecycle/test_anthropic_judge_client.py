@@ -109,7 +109,7 @@ def test_client_returns_zero_score_on_http_error(monkeypatch) -> None:
             url="https://api.anthropic.com/v1/messages",
             code=429,
             msg="rate limited",
-            hdrs=None,
+            hdrs=None,  # type: ignore[arg-type]
             fp=None,  # type: ignore[arg-type]
         )
 
